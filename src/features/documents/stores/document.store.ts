@@ -9,6 +9,7 @@ import type {
   Pagination,
 } from '../types'
 import type {
+  DocumentBatch,
   ApplicantFolder,
   ApplicantFolderSummary,
   FolderFilters,
@@ -19,65 +20,70 @@ import type {
 // State Interface
 // ─────────────────────────────────────────────────────────────────────────────
 interface State {
-  // Flat documents
-  documents: ApplicantDocument[]
-  document: ApplicantDocument | null
-  pagination: Pagination
-  filters: DocumentFilters
+  // L1
+  batches:         DocumentBatch[]
+  batchesLoading:  boolean
+  batchesError:    string | null
 
-  // Folders — list (light)
-  folders: ApplicantFolderSummary[]
+  // L2
+  folders:           ApplicantFolderSummary[]
   foldersPagination: FolderPagination
-  foldersFilters: FolderFilters
-  foldersLoading: boolean
+  foldersFilters:    FolderFilters
+  foldersLoading:    boolean
+  foldersError:      string | null
 
-  // Folder — detail (heavy, one at a time)
-  folder: ApplicantFolder | null
+  // L3
+  folder:        ApplicantFolder | null
   folderLoading: boolean
+  folderError:   string | null
 
-  loading: boolean
-  submitting: boolean
+  // Flat docs
+  documents:      ApplicantDocument[]
+  document:       ApplicantDocument | null
+  pagination:     Pagination
+  filters:        DocumentFilters
+  loading:        boolean
+  submitting:     boolean
   uploadProgress: number
-  error: string | null
+  error:          string | null
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Defaults
 // ─────────────────────────────────────────────────────────────────────────────
 const defaultFilters = (): DocumentFilters => ({
-  search: '',
-  applicant_id: null,
+  search:           '',
+  applicant_id:     null,
   document_type_id: null,
-  status: null,
-  priority: null,
-  is_expired: null,
-  offset: 0,
-  limit: 15,
+  status:           null,
+  priority:         null,
+  is_expired:       null,
+  offset:           0,
+  limit:            15,
 })
 
 const defaultFolderFilters = (): FolderFilters => ({
-  search: '',
-  offset: 0,
-  limit: 12,
+  batch_id: null,
+  search:   '',
+  offset:   0,
+  limit:    15,
 })
 
 const emptyFolderPagination = (): FolderPagination => ({
-  total: 0,
-  offset: 0,
-  limit: 12,
+  total:        0,
+  offset:       0,
+  limit:        15,
   current_page: 1,
-  last_page: 1,
-  per_page: 12,
-  has_more: false,
-  from: 0,
-  to: 0,
+  last_page:    1,
+  per_page:     15,
+  has_more:     false,
+  from:         0,
+  to:           0,
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
-
-/** Strip empty / null / undefined values before sending as query params */
 function cleanParams(obj: Record<string, any>): Record<string, any> {
   const out: Record<string, any> = {}
   for (const key in obj) {
@@ -88,25 +94,24 @@ function cleanParams(obj: Record<string, any>): Record<string, any> {
   return out
 }
 
-/** Build a normalised FolderPagination from whatever the backend returns */
 function buildFolderPagination(raw: any, fallbackLimit: number): FolderPagination {
-  const total = Number(raw?.total ?? 0)
-  const offset = Number(raw?.offset ?? 0)
-  const perPage = Number(raw?.limit ?? raw?.per_page ?? fallbackLimit)
+  const total   = Number(raw?.total    ?? 0)
+  const offset  = Number(raw?.offset   ?? 0)
+  const perPage = Number(raw?.limit    ?? raw?.per_page ?? fallbackLimit)
 
   const current_page = perPage > 0 ? Math.floor(offset / perPage) + 1 : 1
-  const last_page = perPage > 0 ? Math.max(1, Math.ceil(total / perPage)) : 1
-  const from = total > 0 ? offset + 1 : 0
-  const to = Math.min(offset + perPage, total)
+  const last_page    = perPage > 0 ? Math.max(1, Math.ceil(total / perPage)) : 1
+  const from         = total > 0 ? offset + 1 : 0
+  const to           = Math.min(offset + perPage, total)
 
   return {
     total,
     offset,
-    limit: perPage,
-    per_page: perPage,
+    limit:        perPage,
+    per_page:     perPage,
     current_page,
     last_page,
-    has_more: raw?.has_more ?? (offset + perPage < total),
+    has_more:     raw?.has_more ?? (offset + perPage < total),
     from,
     to,
   }
@@ -117,52 +122,88 @@ function buildFolderPagination(raw: any, fallbackLimit: number): FolderPaginatio
 // ─────────────────────────────────────────────────────────────────────────────
 export const useDocumentStore = defineStore('document', {
   state: (): State => ({
-    // flat documents
-    documents: [],
-    document: null,
-    pagination: { page: 1, limit: 15, total: 0 },
-    filters: defaultFilters(),
+    // L1
+    batches:        [],
+    batchesLoading: false,
+    batchesError:   null,
 
-    // folder list
-    folders: [],
+    // L2
+    folders:           [],
     foldersPagination: emptyFolderPagination(),
-    foldersFilters: defaultFolderFilters(),
-    foldersLoading: false,
+    foldersFilters:    defaultFolderFilters(),
+    foldersLoading:    false,
+    foldersError:      null,
 
-    // folder detail
-    folder: null,
+    // L3
+    folder:        null,
     folderLoading: false,
+    folderError:   null,
 
-    loading: false,
-    submitting: false,
+    // flat docs
+    documents:      [],
+    document:       null,
+    pagination:     { page: 1, limit: 15, total: 0 },
+    filters:        defaultFilters(),
+    loading:        false,
+    submitting:     false,
     uploadProgress: 0,
-    error: null,
+    error:          null,
   }),
 
   actions: {
 
     // ═══════════════════════════════════════════════════════════════════════
-    // FOLDER LIST
+    // LEVEL 1 — BATCHES
+    // ═══════════════════════════════════════════════════════════════════════
+
+    async fetchBatches(search?: string) {
+      this.batchesLoading = true
+      this.batchesError   = null
+      try {
+        const params  = cleanParams({ search })
+        const batches = await documentApi.getBatches(params)
+
+        console.log('[store.fetchBatches] received:', batches)
+
+        // ✅ API layer already returns DocumentBatch[] — assign directly
+        this.batches = batches
+      } catch (e: any) {
+        this.batchesError = e?.response?.data?.message ?? 'Failed to load batches.'
+        this.batches      = []
+      } finally {
+        this.batchesLoading = false
+      }
+    },
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // LEVEL 2 — FOLDER LIST
     // ═══════════════════════════════════════════════════════════════════════
 
     async fetchFolders() {
       this.foldersLoading = true
-      this.error = null
+      this.foldersError   = null
       try {
         const params = cleanParams({ ...this.foldersFilters })
-        const raw: any = await documentApi.getFolders(params)
+        const raw    = await documentApi.getFolders(params)
 
-        console.log('[fetchFolders] raw result:', raw)
+        console.log('[store.fetchFolders] received:', raw)
 
-        // api layer already unwraps r.data.data → so raw = { records, total, ... }
-        this.folders = raw?.records ?? []
+        this.folders           = raw?.records ?? []
         this.foldersPagination = buildFolderPagination(raw, this.foldersFilters.limit)
       } catch (e: any) {
-        this.error = e?.response?.data?.message ?? 'Failed to load folders.'
-        this.folders = []
+        this.foldersError      = e?.response?.data?.message ?? 'Failed to load folders.'
+        this.folders           = []
         this.foldersPagination = emptyFolderPagination()
       } finally {
         this.foldersLoading = false
+      }
+    },
+
+    setBatchFilter(batchId: number | null) {
+      this.foldersFilters = {
+        ...this.foldersFilters,
+        batch_id: batchId,
+        offset:   0,
       }
     },
 
@@ -175,7 +216,7 @@ export const useDocumentStore = defineStore('document', {
     },
 
     setFoldersLimit(limit: number) {
-      this.foldersFilters.limit = limit
+      this.foldersFilters.limit  = limit
       this.foldersFilters.offset = 0
     },
 
@@ -184,32 +225,31 @@ export const useDocumentStore = defineStore('document', {
     },
 
     // ═══════════════════════════════════════════════════════════════════════
-    // FOLDER DETAIL
+    // LEVEL 3 — FOLDER DETAIL
     // ═══════════════════════════════════════════════════════════════════════
 
     async fetchFolder(applicantId: number) {
       this.folderLoading = true
-      this.folder = null   // clear stale data immediately
-      this.error = null
+      this.folder        = null
+      this.folderError   = null
       try {
         const result = await documentApi.getFolder(applicantId)
 
-        console.log('[fetchFolder] raw result:', result)
+        console.log('[store.fetchFolder] received:', result)
 
-        // api layer already unwraps r.data.data → result = { applicant_id, documents, ... }
         this.folder = result
       } catch (e: any) {
-        this.error = e?.response?.data?.message ?? 'Failed to load folder.'
-        this.folder = null
+        this.folderError = e?.response?.data?.message ?? 'Failed to load folder.'
+        this.folder      = null
       } finally {
         this.folderLoading = false
       }
     },
 
     clearFolder() {
-      this.folder = null
+      this.folder        = null
       this.folderLoading = false
-      this.error = null
+      this.folderError   = null
     },
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -218,18 +258,17 @@ export const useDocumentStore = defineStore('document', {
 
     async fetchDocuments() {
       this.loading = true
-      this.error = null
+      this.error   = null
       try {
         const params = cleanParams({ ...this.filters })
-        const raw: any = await documentApi.getAll(params)
+        const raw    = await documentApi.getAll(params)
 
-        console.log('[fetchDocuments] raw result:', raw)
+        console.log('[store.fetchDocuments] received:', raw)
 
-        // api layer already unwraps r.data.data → raw = { records, total, ... }
-        this.documents = raw?.records ?? raw?.data ?? []
+        this.documents        = raw?.records ?? raw?.data ?? []
         this.pagination.total = raw?.total ?? 0
       } catch (e: any) {
-        this.error = e?.response?.data?.message ?? 'Failed to load documents.'
+        this.error     = e?.response?.data?.message ?? 'Failed to load documents.'
         this.documents = []
       } finally {
         this.loading = false
@@ -237,9 +276,9 @@ export const useDocumentStore = defineStore('document', {
     },
 
     async fetchDocument(id: number) {
-      this.loading = true
+      this.loading  = true
       this.document = null
-      this.error = null
+      this.error    = null
       try {
         this.document = await documentApi.getOne(id)
       } catch (e: any) {
@@ -249,29 +288,27 @@ export const useDocumentStore = defineStore('document', {
       }
     },
 
-    clearDocument() {
-      this.document = null
-    },
+    clearDocument() { this.document = null },
 
     setPage(page: number) {
       this.pagination.page = page
-      this.filters.offset = (page - 1) * this.pagination.limit
+      this.filters.offset  = (page - 1) * this.pagination.limit
     },
 
     setLimit(limit: number) {
       this.pagination.limit = limit
-      this.pagination.page = 1
-      this.filters.limit = limit
-      this.filters.offset = 0
+      this.pagination.page  = 1
+      this.filters.limit    = limit
+      this.filters.offset   = 0
     },
 
     setFilters(f: Partial<DocumentFilters>) {
-      this.filters = { ...this.filters, ...f, offset: 0 }
+      this.filters         = { ...this.filters, ...f, offset: 0 }
       this.pagination.page = 1
     },
 
     resetFilters() {
-      this.filters = defaultFilters()
+      this.filters         = defaultFilters()
       this.pagination.page = 1
     },
 
@@ -280,9 +317,9 @@ export const useDocumentStore = defineStore('document', {
     // ═══════════════════════════════════════════════════════════════════════
 
     async createDocument(payload: CreateDocumentPayload) {
-      this.submitting = true
+      this.submitting     = true
       this.uploadProgress = 0
-      this.error = null
+      this.error          = null
       try {
         const created: ApplicantDocument = await documentApi.create(payload)
         return created
@@ -290,14 +327,14 @@ export const useDocumentStore = defineStore('document', {
         this.error = e?.response?.data?.message ?? 'Failed to create document.'
         throw e
       } finally {
-        this.submitting = false
+        this.submitting     = false
         this.uploadProgress = 0
       }
     },
 
     async updateDocument(id: number, payload: UpdateDocumentPayload) {
       this.submitting = true
-      this.error = null
+      this.error      = null
       try {
         const updated: ApplicantDocument = await documentApi.update(id, payload)
         this.document = updated
@@ -312,24 +349,23 @@ export const useDocumentStore = defineStore('document', {
 
     async deleteDocument(id: number) {
       this.submitting = true
-      this.error = null
+      this.error      = null
       try {
         await documentApi.delete(id)
 
-        // Remove from flat list
         this.documents = this.documents.filter((d) => d.id !== id)
 
-        // ✅ Fix: folder uses `groups` not `documents`
         if (this.folder) {
           this.folder = {
             ...this.folder,
-            groups: this.folder.groups.map((group) => ({
-              ...group,
-              versions: group.versions.filter((v) => v.id !== id),
-            })).filter((group) => group.versions.length > 0),
+            groups: this.folder.groups
+              .map((group) => ({
+                ...group,
+                versions: group.versions.filter((v) => v.id !== id),
+              }))
+              .filter((group) => group.versions.length > 0),
           }
         }
-
       } catch (e: any) {
         this.error = e?.response?.data?.message ?? 'Failed to delete document.'
         throw e
@@ -337,18 +373,18 @@ export const useDocumentStore = defineStore('document', {
         this.submitting = false
       }
     },
+
     // ═══════════════════════════════════════════════════════════════════════
     // VERIFY / REJECT
     // ═══════════════════════════════════════════════════════════════════════
 
     async verify(id: number) {
       this.submitting = true
-      this.error = null
+      this.error      = null
       try {
         const updated: ApplicantDocument = await documentApi.verify(id)
         this.document = updated
 
-        // ✅ Fix: folder uses `groups[].versions[]` not `documents[]`
         if (this.folder) {
           this.folder = {
             ...this.folder,
@@ -360,7 +396,6 @@ export const useDocumentStore = defineStore('document', {
             })),
           }
         }
-
         return updated
       } catch (e: any) {
         this.error = e?.response?.data?.message ?? 'Failed to verify document.'
@@ -372,12 +407,11 @@ export const useDocumentStore = defineStore('document', {
 
     async reject(id: number, reason: string) {
       this.submitting = true
-      this.error = null
+      this.error      = null
       try {
         const updated: ApplicantDocument = await documentApi.reject(id, reason)
         this.document = updated
 
-        // ✅ Fix: folder uses `groups[].versions[]` not `documents[]`
         if (this.folder) {
           this.folder = {
             ...this.folder,
@@ -389,7 +423,6 @@ export const useDocumentStore = defineStore('document', {
             })),
           }
         }
-
         return updated
       } catch (e: any) {
         this.error = e?.response?.data?.message ?? 'Failed to reject document.'

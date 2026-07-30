@@ -1,7 +1,17 @@
 // src/features/documents/types/folders.ts
 import type { DocumentStatus, DocumentPriority } from './index'
 
-// ─── Light summary (used in the folders grid) ──────────────────────────────
+// ─── Level 1 — Batch ───────────────────────────────────────────────────────
+export interface DocumentBatch {
+  id:                          number
+  name:                        string
+  code:                        string
+  applicants_with_docs_count:  number
+  has_pending:                 boolean
+  created_at:                  string | null
+}
+
+// ─── Level 2 — Light summary (folders grid) ───────────────────────────────
 export interface ApplicantFolderSummary {
   applicant_id:    number
   applicant_code:  string
@@ -10,9 +20,10 @@ export interface ApplicantFolderSummary {
   total_types:     number
   total_documents: number
   has_pending:     boolean
+  latest_upload:   string | null   // ← was missing
 }
 
-// ─── Full detail (used in the folder detail page) ──────────────────────────
+// ─── Level 3 — Full detail (folder detail page) ───────────────────────────
 export interface FolderVersion {
   id:            number
   version:       number
@@ -42,13 +53,15 @@ export interface ApplicantFolder extends ApplicantFolderSummary {
   groups: DocumentGroup[]
 }
 
-// ─── Filters + pagination ──────────────────────────────────────────────────
+// ─── Filters ──────────────────────────────────────────────────────────────
 export interface FolderFilters {
-  search: string
-  offset: number
-  limit:  number
+  batch_id: number | null    // ← was missing
+  search:   string
+  offset:   number
+  limit:    number
 }
 
+// ─── Pagination ───────────────────────────────────────────────────────────
 export interface FolderPagination {
   total:        number
   offset:       number

@@ -12,7 +12,7 @@ import { batchRoutes } from './routes/batch.routes'
 import { companyRoutes } from './routes/company.routes'
 import { companyCategoryRoutes } from './routes/company-category.routes'
 import { documentTypesRoutes } from './routes/document-types.routes'
-
+import { verificationRoutes } from './routes/verification.routes';
 
 
 
@@ -32,6 +32,7 @@ const router = createRouter({
     ...companyRoutes,
     ...companyCategoryRoutes,
     ...documentTypesRoutes,
+    ...verificationRoutes,
 
     { path: '/:pathMatch(.*)*', name: 'NotFound', redirect: '/dashboard' },
   ],

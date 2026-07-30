@@ -1,60 +1,115 @@
 // src/features/documents/api/document.api.ts
+
 import http from '@shared/api/http'
 import type {
+  ApplicantDocument,
   CreateDocumentPayload,
   UpdateDocumentPayload,
 } from '../types'
+import type {
+  DocumentBatch,
+  ApplicantFolder,
+} from '../types/folders'
 
 const BASE = '/applicant-documents'
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Unwrap helper — handles ALL possible http interceptor configurations
+// ─────────────────────────────────────────────────────────────────────────────
+//   Case A — no interceptor:   res = { data: { success, message, data: X } }
+//   Case B — one interceptor:  res = { success, message, data: X }
+//   Case C — deep interceptor: res = X
+// ─────────────────────────────────────────────────────────────────────────────
+function unwrap<T>(res: any): T {
+  // Peel off axios wrapper if present
+  const body = res?.data !== undefined && res?.status !== undefined ? res.data : res
+
+  // Peel off API envelope { success, message, data } if present
+  if (body && typeof body === 'object' && 'success' in body && 'data' in body) {
+    return body.data as T
+  }
+
+  return body as T
+}
+
 export const documentApi = {
 
-  // ─── Folders ───────────────────────────────────────────────
-  getFolders: (params?: Record<string, any>) =>
-    http.get(`${BASE}/folders`, { params }).then((r) => r.data),
+  // ── Level 1 — Batches ──────────────────────────────────────────────────
+  async getBatches(params?: { search?: string }): Promise<DocumentBatch[]> {
+    const res  = await http.get(`${BASE}/batches`, { params })
+    const data = unwrap<DocumentBatch[]>(res)
 
-  getFolder: (applicantId: number) =>
-    http.get(`${BASE}/${applicantId}/folder`).then((r) => r.data),
+    console.log('[api.getBatches] raw:', res)
+    console.log('[api.getBatches] unwrapped:', data)
 
-  // ─── Flat CRUD ─────────────────────────────────────────────
-  getAll: (params?: Record<string, any>) =>
-    http.get(BASE, { params }).then((r) => r.data),
-
-  getOne: (id: number) =>
-    http.get(`${BASE}/${id}`).then((r) => r.data),
-
-  create: (payload: CreateDocumentPayload) => {
-    const fd = new FormData()
-    fd.append('applicant_id',     String(payload.applicant_id))
-    fd.append('document_type_id', String(payload.document_type_id))
-    fd.append('file',             payload.file)
-    if (payload.document_date) fd.append('document_date', payload.document_date)
-    if (payload.expiry_date)   fd.append('expiry_date',   payload.expiry_date)
-    if (payload.priority)      fd.append('priority',      payload.priority)
-    if (payload.notes)         fd.append('notes',         payload.notes)
-    return http.post(BASE, fd).then((r) => r.data)
+    return Array.isArray(data) ? data : []
   },
 
-  update: (id: number, payload: UpdateDocumentPayload) =>
-    http.put(`${BASE}/${id}`, payload).then((r) => r.data),
-
-  delete: (id: number) =>
-    http.delete(`${BASE}/${id}`).then((r) => r.data),
-
-  verify: (id: number) =>
-    http.post(`${BASE}/${id}/verify`).then((r) => r.data),
-
-  reject: (id: number, reason?: string) =>
-    http.post(`${BASE}/${id}/reject`, { reason }).then((r) => r.data),
-
-  uploadVersion: (id: number, file: File) => {
-    const fd = new FormData()
-    fd.append('file', file)
-    return http.post(`${BASE}/${id}/versions`, fd).then((r) => r.data)
+  // ── Level 2 — Folder list ──────────────────────────────────────────────
+  async getFolders(params?: Record<string, any>): Promise<any> {
+    const res = await http.get(`${BASE}/folders`, { params })
+    return unwrap<any>(res)   // { records, total, offset, limit, ... }
   },
 
-  getDownloadUrl: (id: number): string => {
-    const base = (http.defaults.baseURL ?? '').replace(/\/$/, '')
-    return `${base}${BASE}/${id}/download`
+  // ── Level 3 — Single folder ────────────────────────────────────────────
+  async getFolder(applicantId: number): Promise<ApplicantFolder> {
+    const res = await http.get(`${BASE}/${applicantId}/folder`)
+    return unwrap<ApplicantFolder>(res)
+  },
+
+  // ── Flat document list ─────────────────────────────────────────────────
+  async getAll(params?: Record<string, any>): Promise<any> {
+    const res = await http.get(BASE, { params })
+    return unwrap<any>(res)   // { records, total, ... }
+  },
+
+  // ── Single document ────────────────────────────────────────────────────
+  async getOne(id: number): Promise<ApplicantDocument> {
+    const res = await http.get(`${BASE}/${id}`)
+    return unwrap<ApplicantDocument>(res)
+  },
+
+  // ── Create (multipart) ─────────────────────────────────────────────────
+  async create(payload: CreateDocumentPayload): Promise<ApplicantDocument> {
+    const form = new FormData()
+    Object.entries(payload).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) {
+        form.append(key, value as any)
+      }
+    })
+    const res = await http.post(BASE, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return unwrap<ApplicantDocument>(res)
+  },
+
+  // ── Update ─────────────────────────────────────────────────────────────
+  async update(id: number, payload: UpdateDocumentPayload): Promise<ApplicantDocument> {
+    const res = await http.put(`${BASE}/${id}`, payload)
+    return unwrap<ApplicantDocument>(res)
+  },
+
+  // ── Delete ─────────────────────────────────────────────────────────────
+  async delete(id: number): Promise<void> {
+    await http.delete(`${BASE}/${id}`)
+  },
+
+  // ── Verify ─────────────────────────────────────────────────────────────
+  async verify(id: number): Promise<ApplicantDocument> {
+    const res = await http.post(`${BASE}/${id}/verify`)
+    return unwrap<ApplicantDocument>(res)
+  },
+
+  // ── Reject ─────────────────────────────────────────────────────────────
+  async reject(id: number, reason: string): Promise<ApplicantDocument> {
+    const res = await http.post(`${BASE}/${id}/reject`, {
+      rejection_reason: reason,
+    })
+    return unwrap<ApplicantDocument>(res)
+  },
+
+  // ── Download URL (sync helper) ─────────────────────────────────────────
+  getDownloadUrl(id: number): string {
+    return `${BASE}/${id}/download`
   },
 }
