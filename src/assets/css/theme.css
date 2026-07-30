@@ -1,0 +1,24 @@
+:root {
+  --color-blueberry:  #6B7A8F;
+  --color-apricot:    #F7882F;
+  --color-citrus:     #F7C331;
+  --color-apple-core: #DCC7AA;
+
+  --color-primary:    #6B7A8F;
+  --color-accent:     #F7882F;
+  --color-secondary:  #F7C331;
+  --color-neutral:    #DCC7AA;
+
+  --color-success:    #16a34a;
+  --color-danger:     #dc2626;
+  --color-warning:    #F7C331;
+  --color-info:       #6B7A8F;
+
+  --surface-page:     #faf7f2;
+  --surface-card:     #ffffff;
+  --surface-border:   #e8d9bf;
+}
+
+body {
+  background-color: var(--surface-page);
+}
