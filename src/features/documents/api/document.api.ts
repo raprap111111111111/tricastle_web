@@ -5,6 +5,7 @@ import type {
   ApplicantDocument,
   CreateDocumentPayload,
   UpdateDocumentPayload,
+  DocumentStatus,
 } from '../types'
 import type {
   DocumentBatch,
@@ -13,22 +14,11 @@ import type {
 
 const BASE = '/applicant-documents'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Unwrap helper — handles ALL possible http interceptor configurations
-// ─────────────────────────────────────────────────────────────────────────────
-//   Case A — no interceptor:   res = { data: { success, message, data: X } }
-//   Case B — one interceptor:  res = { success, message, data: X }
-//   Case C — deep interceptor: res = X
-// ─────────────────────────────────────────────────────────────────────────────
 function unwrap<T>(res: any): T {
-  // Peel off axios wrapper if present
   const body = res?.data !== undefined && res?.status !== undefined ? res.data : res
-
-  // Peel off API envelope { success, message, data } if present
   if (body && typeof body === 'object' && 'success' in body && 'data' in body) {
     return body.data as T
   }
-
   return body as T
 }
 
@@ -38,17 +28,13 @@ export const documentApi = {
   async getBatches(params?: { search?: string }): Promise<DocumentBatch[]> {
     const res  = await http.get(`${BASE}/batches`, { params })
     const data = unwrap<DocumentBatch[]>(res)
-
-    console.log('[api.getBatches] raw:', res)
-    console.log('[api.getBatches] unwrapped:', data)
-
     return Array.isArray(data) ? data : []
   },
 
   // ── Level 2 — Folder list ──────────────────────────────────────────────
   async getFolders(params?: Record<string, any>): Promise<any> {
     const res = await http.get(`${BASE}/folders`, { params })
-    return unwrap<any>(res)   // { records, total, offset, limit, ... }
+    return unwrap<any>(res)
   },
 
   // ── Level 3 — Single folder ────────────────────────────────────────────
@@ -60,7 +46,7 @@ export const documentApi = {
   // ── Flat document list ─────────────────────────────────────────────────
   async getAll(params?: Record<string, any>): Promise<any> {
     const res = await http.get(BASE, { params })
-    return unwrap<any>(res)   // { records, total, ... }
+    return unwrap<any>(res)
   },
 
   // ── Single document ────────────────────────────────────────────────────
@@ -108,8 +94,39 @@ export const documentApi = {
     return unwrap<ApplicantDocument>(res)
   },
 
+  // ── Update Status (generic) ────────────────────────────────────────────
+  async updateStatus(
+    id: number,
+    payload: {
+      status: DocumentStatus
+      rejection_reason?: string | null
+      notes?: string | null
+    }
+  ): Promise<ApplicantDocument> {
+    const res = await http.patch(`${BASE}/${id}/status`, payload)
+    return unwrap<ApplicantDocument>(res)
+  },
+
+  // ── Upload new version (multipart) ─────────────────────────────────────
+  async uploadVersion(id: number, file: File): Promise<ApplicantDocument> {
+    const form = new FormData()
+    form.append('file', file)
+
+    const res = await http.post(`${BASE}/${id}/versions`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return unwrap<ApplicantDocument>(res)
+  },
+
   // ── Download URL (sync helper) ─────────────────────────────────────────
   getDownloadUrl(id: number): string {
-    return `${BASE}/${id}/download`
+    const base = (http.defaults?.baseURL ?? '').replace(/\/+$/, '')
+    return `${base}${BASE}/${id}/download`
+  },
+
+  // ── Preview URL (sync helper) ──────────────────────────────────────────
+  getPreviewUrl(id: number): string {
+    const base = (http.defaults?.baseURL ?? '').replace(/\/+$/, '')
+    return `${base}${BASE}/${id}/preview`
   },
 }

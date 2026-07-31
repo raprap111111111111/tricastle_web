@@ -1,3 +1,5 @@
+// src/shared/constants/nav.config.ts  (or wherever buildNavSections lives)
+
 import { Perm } from '@shared/constants/permissions'
 import type { NavSection } from '@shared/types/nav.types'
 
@@ -10,7 +12,7 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
   const isApplicant = ctx.role === 'applicant'
 
   return [
-    // ─── MAIN ──────────────────────────────────────────
+    // ─── MAIN ──────────────────────────────────────────────
     {
       title: 'MAIN',
       items: [
@@ -39,7 +41,7 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
           permissions: [Perm.companyViewAny],
         },
         {
-          icon: 'pi pi-tags',                    // ← NEW
+          icon: 'pi pi-tags',
           title: 'Company Categories',
           to: '/company-categories',
           permissions: [Perm.companyCategoryViewAny],
@@ -47,7 +49,7 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
       ],
     },
 
-    // ─── DOCUMENTS ─────────────────────────────────────
+    // ─── DOCUMENTS ─────────────────────────────────────────
     {
       title: 'DOCUMENTS',
       items: [
@@ -58,21 +60,16 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
           permissions: [Perm.documentViewAny, Perm.documentView],
         },
         {
-          icon: 'pi pi-verified',
-          title: 'Verifications',
-          to: '/verifications',
-          permissions: [Perm.documentVerificationViewAny],
-        },
-        {
           icon: 'pi pi-history',
           title: 'Document Versions',
           to: '/document-versions',
           permissions: [Perm.documentVersionViewAny],
         },
         {
+          // ✅ was '/expiry-alerts' — must match the registered route path
           icon: 'pi pi-clock',
           title: 'Expiry Alerts',
-          to: '/expiry-alerts',
+          to: '/document-expiry-alerts',
           permissions: [Perm.documentExpiryAlertViewAny],
         },
         {
@@ -90,7 +87,7 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
       ],
     },
 
-    // ─── OCR & AI ──────────────────────────────────────
+    // ─── OCR & AI ──────────────────────────────────────────
     {
       title: 'OCR & AI',
       items: [
@@ -121,7 +118,7 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
       ],
     },
 
-    // ─── QUALITY ───────────────────────────────────────
+    // ─── QUALITY ───────────────────────────────────────────
     {
       title: 'QUALITY',
       items: [
@@ -152,7 +149,7 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
       ],
     },
 
-    // ─── COMMUNICATION ─────────────────────────────────
+    // ─── COMMUNICATION ─────────────────────────────────────
     {
       title: 'COMMUNICATION',
       items: [
@@ -171,7 +168,7 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
       ],
     },
 
-    // ─── REPORTS ───────────────────────────────────────
+    // ─── REPORTS ───────────────────────────────────────────
     {
       title: 'REPORTS',
       items: [
@@ -190,7 +187,7 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
       ],
     },
 
-    // ─── SYSTEM ────────────────────────────────────────
+    // ─── SYSTEM ────────────────────────────────────────────
     {
       title: 'SYSTEM',
       items: [

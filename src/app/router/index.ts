@@ -1,3 +1,5 @@
+// src/app/router/index.ts
+
 import { createRouter, createWebHistory } from 'vue-router'
 import { authGuard } from './guards/auth.guard'
 import { authRoutes } from './routes/auth.routes'
@@ -12,9 +14,9 @@ import { batchRoutes } from './routes/batch.routes'
 import { companyRoutes } from './routes/company.routes'
 import { companyCategoryRoutes } from './routes/company-category.routes'
 import { documentTypesRoutes } from './routes/document-types.routes'
-import { verificationRoutes } from './routes/verification.routes';
-
-
+import { verificationRoutes } from './routes/verification.routes'
+import { documentVersionsRoutes } from './routes/document-versions.routes'
+import { documentExpiryAlertRoutes } from './routes/document-expiry-alert.routes' // ← ADD
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -33,6 +35,8 @@ const router = createRouter({
     ...companyCategoryRoutes,
     ...documentTypesRoutes,
     ...verificationRoutes,
+    ...documentVersionsRoutes,
+    ...documentExpiryAlertRoutes, // ← ADD
 
     { path: '/:pathMatch(.*)*', name: 'NotFound', redirect: '/dashboard' },
   ],
