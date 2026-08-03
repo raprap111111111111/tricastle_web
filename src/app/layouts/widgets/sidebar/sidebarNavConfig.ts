@@ -1,4 +1,4 @@
-// src/shared/constants/nav.config.ts  (or wherever buildNavSections lives)
+// src/shared/constants/nav.config.ts
 
 import { Perm } from '@shared/constants/permissions'
 import type { NavSection } from '@shared/types/nav.types'
@@ -40,12 +40,6 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
           to: '/companies',
           permissions: [Perm.companyViewAny],
         },
-        {
-          icon: 'pi pi-tags',
-          title: 'Company Categories',
-          to: '/company-categories',
-          permissions: [Perm.companyCategoryViewAny],
-        },
       ],
     },
 
@@ -60,74 +54,30 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
           permissions: [Perm.documentViewAny, Perm.documentView],
         },
         {
-          icon: 'pi pi-history',
-          title: 'Document Versions',
-          to: '/document-versions',
-          permissions: [Perm.documentVersionViewAny],
+          icon: 'pi pi-check-square',
+          title: 'Verifications',
+          to: '/document-verifications',
+          permissions: [Perm.documentVerificationViewAny],
         },
         {
-          // ✅ was '/expiry-alerts' — must match the registered route path
           icon: 'pi pi-clock',
-          title: 'Expiry Alerts',
+          title: 'Expiring Soon',
           to: '/document-expiry-alerts',
           permissions: [Perm.documentExpiryAlertViewAny],
         },
         {
-          icon: 'pi pi-folder',
-          title: 'File Repository',
-          to: '/file-repository',
-          permissions: [Perm.fileRepositoryViewAny],
-        },
-        {
-          icon: 'pi pi-tag',
-          title: 'Document Types',
-          to: '/document-types',
-          permissions: [Perm.documentTypeViewAny],
+          icon: 'pi pi-history',
+          title: 'Version History',
+          to: '/document-versions',
+          permissions: [Perm.documentVersionViewAny],
         },
       ],
     },
 
-    // ─── OCR & AI ──────────────────────────────────────────
+    // ─── WORKFLOW ──────────────────────────────────────────
     {
-      title: 'OCR & AI',
+      title: 'WORKFLOW',
       items: [
-        {
-          icon: 'pi pi-eye',
-          title: 'OCR Jobs',
-          to: '/ocr/jobs',
-          permissions: [Perm.ocrJobViewAny],
-        },
-        {
-          icon: 'pi pi-file-edit',
-          title: 'OCR Templates',
-          to: '/ocr/templates',
-          permissions: [Perm.ocrTemplateViewAny],
-        },
-        {
-          icon: 'pi pi-search',
-          title: 'Field Extractions',
-          to: '/ocr/extractions',
-          permissions: [Perm.ocrFieldExtractionViewAny],
-        },
-        {
-          icon: 'pi pi-pencil',
-          title: 'Manual Corrections',
-          to: '/ocr/corrections',
-          permissions: [Perm.ocrManualCorrectionViewAny],
-        },
-      ],
-    },
-
-    // ─── QUALITY ───────────────────────────────────────────
-    {
-      title: 'QUALITY',
-      items: [
-        {
-          icon: 'pi pi-chart-bar',
-          title: 'Quality Scores',
-          to: '/quality-scores',
-          permissions: [Perm.qualityScoreViewAny],
-        },
         {
           icon: 'pi pi-pencil',
           title: 'Correction Requests',
@@ -136,13 +86,13 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
         },
         {
           icon: 'pi pi-check-square',
-          title: 'Correction Approvals',
+          title: 'Pending Approvals',
           to: '/correction-approvals',
           permissions: [Perm.correctionApprovalViewAny],
         },
         {
           icon: 'pi pi-exclamation-triangle',
-          title: 'Verification Mismatches',
+          title: 'Issues & Mismatches',
           to: '/mismatches',
           permissions: [Perm.verificationMismatchViewAny],
         },
@@ -187,7 +137,38 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
       ],
     },
 
-    // ─── SYSTEM ────────────────────────────────────────────
+    // ─── CONFIGURATION ─────────────────────────────────────
+    {
+      title: 'CONFIGURATION',
+      items: [
+        {
+          icon: 'pi pi-tag',
+          title: 'Document Types',
+          to: '/document-types',
+          permissions: [Perm.documentTypeViewAny],
+        },
+        {
+          icon: 'pi pi-tags',
+          title: 'Company Categories',
+          to: '/company-categories',
+          permissions: [Perm.companyCategoryViewAny],
+        },
+        {
+          icon: 'pi pi-folder',
+          title: 'File Storage',
+          to: '/file-repository',
+          permissions: [Perm.fileRepositoryViewAny],
+        },
+        {
+          icon: 'pi pi-cog',
+          title: 'Settings',
+          to: '/settings',
+          permissions: [Perm.settingView],
+        },
+      ],
+    },
+
+    // ─── SYSTEM (Admin) ────────────────────────────────────
     {
       title: 'SYSTEM',
       items: [
@@ -232,12 +213,6 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
           title: 'Social Accounts',
           to: '/social-accounts',
           permissions: [Perm.socialAccountViewAny],
-        },
-        {
-          icon: 'pi pi-cog',
-          title: 'Settings',
-          to: '/settings',
-          permissions: [Perm.settingView],
         },
       ],
     },
