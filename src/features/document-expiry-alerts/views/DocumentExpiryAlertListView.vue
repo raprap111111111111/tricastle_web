@@ -1,16 +1,17 @@
 <!-- src/features/document-expiry-alerts/views/DocumentExpiryAlertListView.vue -->
 <script setup lang="ts">
-import { onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import Button from 'primevue/button';
-import Toast from 'primevue/toast';
+import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import Toast from 'primevue/toast'
 
-import DocumentExpiryAlertTable   from '../components/DocumentExpiryAlertTable.vue';
-import DocumentExpiryAlertFilters from '../components/DocumentExpiryAlertFilters.vue';
-import { useDocumentExpiryAlerts } from '../composables/useDocumentExpiryAlert';
-import type { DocumentExpiryAlert } from '../types';
+import DocumentExpiryAlertTable   from '../components/DocumentExpiryAlertTable.vue'
+import DocumentExpiryAlertFilters from '../components/DocumentExpiryAlertFilters.vue'
+import { useDocumentExpiryAlerts } from '../composables/useDocumentExpiryAlert'
+import { useDocumentExpiryAlertStore } from '../stores/document-expiry-alert.store'
+import type { DocumentExpiryAlert } from '../types'
 
-const router = useRouter();
+const router = useRouter()
+const store  = useDocumentExpiryAlertStore()
 
 const {
   alerts,
@@ -24,116 +25,138 @@ const {
   handlePageChange,
   handleFilterChange,
   handleRefresh,
-} = useDocumentExpiryAlerts();
+} = useDocumentExpiryAlerts()
 
 function countByType(list: DocumentExpiryAlert[], type: string): number {
-  return list.filter((a) => a.alert_type === type).length;
+  return list.filter((a) => a.alert_type === type).length
 }
 
-onMounted(() => loadAlerts());
+async function onLimitChange(newLimit: number) {
+  filters.value.limit  = newLimit
+  filters.value.offset = 0
+  await store.fetchAlerts()
+}
+
+onMounted(() => loadAlerts())
 </script>
 
 <template>
-  <div class="p-6">
+  <div class="p-6 lg:p-8 space-y-8">
     <Toast />
 
-    <!-- ─── Header ─────────────────────────────────────── -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <!-- ═════════════ Header ═════════════ -->
+    <header class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
       <div>
-        <div class="flex items-center gap-2 mb-1">
-          <i class="pi pi-clock text-2xl text-primary-600" />
-          <h1 class="text-2xl font-bold text-gray-900">Document Expiry Alerts</h1>
-        </div>
-        <p class="text-sm text-gray-500">
-          Documents expiring within 90 days or already expired
+        <h1 class="text-3xl font-serif font-bold text-blueberry-800 tracking-tight">
+          Document Expiry Alerts
+        </h1>
+        <p class="mt-1 text-sm text-blueberry-500 flex items-center gap-1.5">
+          Monitor documents nearing expiration
+          <span class="text-lg">⏰</span>
         </p>
       </div>
+    </header>
 
-      <div class="flex items-center gap-2">
-        <Button
-          label="Refresh"
-          icon="pi pi-refresh"
-          severity="secondary"
-          outlined
-          :loading="loading"
-          @click="handleRefresh"
-        />
+    <!-- ═════════════ Hero Info Banner ═════════════ -->
+    <div class="bg-gradient-to-r from-apricot-50 to-apricot-50/40 rounded-2xl border border-apricot-100 p-6">
+      <div class="flex items-start gap-4">
+        <div class="w-14 h-14 rounded-2xl bg-apricot-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-apricot-200">
+          <i class="pi pi-exclamation-triangle text-white text-2xl" />
+        </div>
+        <div>
+          <p class="text-xs font-bold text-apricot-600 uppercase tracking-widest mb-1">
+            Expiry Monitoring
+          </p>
+          <h2 class="text-xl font-serif font-bold text-blueberry-800 mb-1">
+            Documents expiring soon
+          </h2>
+          <p class="text-sm text-blueberry-500">
+            Showing all documents that expire within 90 days or are already past their expiry date
+          </p>
+        </div>
       </div>
     </div>
 
-    <!-- ─── Summary Cards ──────────────────────────────── -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <!-- ═════════════ Summary Cards ═════════════ -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <!-- Total -->
-      <div class="bg-white rounded-xl border border-gray-200 p-4">
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Total</span>
-          <div class="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">
-            <i class="pi pi-file text-primary-500 text-sm" />
+      <div class="bg-white rounded-2xl border border-appleCore-100 p-5 hover:shadow-md transition-shadow">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold text-blueberry-500 uppercase tracking-wider">Total</p>
+            <p class="text-3xl font-bold text-blueberry-800 mt-2">{{ total }}</p>
+          </div>
+          <div class="w-11 h-11 rounded-xl bg-appleCore-50 flex items-center justify-center">
+            <i class="pi pi-file text-blueberry-500" />
           </div>
         </div>
-        <div class="text-2xl font-bold text-gray-900">{{ total }}</div>
-        <div class="text-xs text-gray-400 mt-1">Expiring documents</div>
+        <p class="text-xs text-blueberry-400 mt-3">Expiring documents</p>
       </div>
 
       <!-- Critical -->
-      <div class="bg-white rounded-xl border border-red-200 p-4">
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-xs font-medium text-red-500 uppercase tracking-wide">Critical</span>
-          <div class="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
-            <i class="pi pi-exclamation-triangle text-red-500 text-sm" />
+      <div class="bg-white rounded-2xl border border-red-100 p-5 hover:shadow-md transition-shadow">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold text-red-500 uppercase tracking-wider">Critical</p>
+            <p class="text-3xl font-bold text-red-600 mt-2">{{ criticalAlerts.length }}</p>
+          </div>
+          <div class="w-11 h-11 rounded-xl bg-red-50 flex items-center justify-center">
+            <i class="pi pi-exclamation-triangle text-red-500" />
           </div>
         </div>
-        <div class="text-2xl font-bold text-red-600">{{ criticalAlerts.length }}</div>
-        <div class="text-xs text-gray-400 mt-1">≤ 30 days or expired</div>
+        <p class="text-xs text-red-400 mt-3">≤ 30 days or expired</p>
       </div>
 
       <!-- 60 days -->
-      <div class="bg-white rounded-xl border border-orange-200 p-4">
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-xs font-medium text-orange-500 uppercase tracking-wide">60 Days</span>
-          <div class="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
-            <i class="pi pi-exclamation-circle text-orange-500 text-sm" />
+      <div class="bg-white rounded-2xl border border-amber-100 p-5 hover:shadow-md transition-shadow">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold text-amber-600 uppercase tracking-wider">60 Days</p>
+            <p class="text-3xl font-bold text-amber-600 mt-2">{{ countByType(alerts, '60_days') }}</p>
+          </div>
+          <div class="w-11 h-11 rounded-xl bg-amber-50 flex items-center justify-center">
+            <i class="pi pi-clock text-amber-500" />
           </div>
         </div>
-        <div class="text-2xl font-bold text-orange-600">
-          {{ countByType(alerts, '60_days') }}
-        </div>
-        <div class="text-xs text-gray-400 mt-1">31 – 60 days out</div>
+        <p class="text-xs text-amber-500 mt-3">31 – 60 days out</p>
       </div>
 
       <!-- Expired -->
-      <div class="bg-white rounded-xl border border-gray-300 p-4">
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Expired</span>
-          <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
-            <i class="pi pi-times-circle text-gray-500 text-sm" />
+      <div class="bg-white rounded-2xl border border-appleCore-100 p-5 hover:shadow-md transition-shadow">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold text-blueberry-500 uppercase tracking-wider">Expired</p>
+            <p class="text-3xl font-bold text-blueberry-700 mt-2">{{ expiredAlerts.length }}</p>
+          </div>
+          <div class="w-11 h-11 rounded-xl bg-appleCore-50 flex items-center justify-center">
+            <i class="pi pi-times-circle text-blueberry-500" />
           </div>
         </div>
-        <div class="text-2xl font-bold text-gray-700">{{ expiredAlerts.length }}</div>
-        <div class="text-xs text-gray-400 mt-1">Already expired</div>
+        <p class="text-xs text-blueberry-400 mt-3">Already expired</p>
       </div>
     </div>
 
-    <!-- ─── Filters ─────────────────────────────────────── -->
-    <div class="mb-4">
-      <DocumentExpiryAlertFilters
-        v-model="filters"
+    <!-- ═════════════ Filters ═════════════ -->
+    <DocumentExpiryAlertFilters
+      v-model="filters"
+      :loading="loading"
+      @search="handleFilterChange"
+      @reset="handleFilterChange"
+    />
+
+    <!-- ═════════════ Table Card ═════════════ -->
+    <div class="bg-white rounded-2xl border border-appleCore-100 overflow-hidden">
+      <DocumentExpiryAlertTable
+        :alerts="alerts"
+        :total="total"
         :loading="loading"
-        @search="handleFilterChange"
-        @reset="handleFilterChange"
+        :current-page="currentPage"
+        :limit="filters.limit ?? 10"
+        @view="(id: number) => router.push({ name: 'documents.view', params: { id } })"
+        @view-applicant="(id: number) => router.push({ name: 'applicants.show', params: { id } })"
+        @page-change="handlePageChange"
+        @limit-change="onLimitChange"
       />
     </div>
-
-    <!-- ─── Table ───────────────────────────────────────── -->
-    <DocumentExpiryAlertTable
-      :alerts="alerts"
-      :total="total"
-      :loading="loading"
-      :current-page="currentPage"
-      :limit="filters.limit ?? 10"
-      @view="(id: number) => router.push({ name: 'documents.show', params: { id } })"
-      @view-applicant="(id: number) => router.push({ name: 'applicants.show', params: { id } })"
-      @page-change="handlePageChange"
-    />
   </div>
 </template>

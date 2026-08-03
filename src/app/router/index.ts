@@ -36,7 +36,7 @@ const router = createRouter({
     ...documentTypesRoutes,
     ...verificationRoutes,
     ...documentVersionsRoutes,
-    ...documentExpiryAlertRoutes, // ← ADD
+    ...documentExpiryAlertRoutes,
 
     { path: '/:pathMatch(.*)*', name: 'NotFound', redirect: '/dashboard' },
   ],

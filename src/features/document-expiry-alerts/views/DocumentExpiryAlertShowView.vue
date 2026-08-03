@@ -4,7 +4,6 @@ import { onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import Button from 'primevue/button';
-import Tag from 'primevue/tag';
 import Skeleton from 'primevue/skeleton';
 import Toast from 'primevue/toast';
 
@@ -20,20 +19,8 @@ const store  = useDocumentExpiryAlertStore();
 const { selectedAlert, loading } = storeToRefs(store);
 const { formatDaysUntilExpiry }  = useDocumentExpiryAlerts();
 
-// ─── Derived alert type (since backend show endpoint doesn't include it) ──
-const derivedAlertType = computed<AlertType | null>(() => {
-  if (!selectedAlert.value?.expiry_date) return null;
-  const days = derivedDaysUntilExpiry.value ?? 0;
-  if (days < 0)   return 'expired';
-  if (days <= 30) return '30_days';
-  if (days <= 60) return '60_days';
-  if (days <= 90) return '90_days';
-  return null;
-});
-
 const derivedDaysUntilExpiry = computed<number | null>(() => {
   if (!selectedAlert.value?.expiry_date) return null;
-  // If the backend already provides it (list endpoint), prefer that
   if (typeof selectedAlert.value.days_until_expiry === 'number') {
     return selectedAlert.value.days_until_expiry;
   }
@@ -44,6 +31,16 @@ const derivedDaysUntilExpiry = computed<number | null>(() => {
   return Math.floor((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 });
 
+const derivedAlertType = computed<AlertType | null>(() => {
+  if (!selectedAlert.value?.expiry_date) return null;
+  const days = derivedDaysUntilExpiry.value ?? 0;
+  if (days < 0)   return 'expired';
+  if (days <= 30) return '30_days';
+  if (days <= 60) return '60_days';
+  if (days <= 90) return '90_days';
+  return null;
+});
+
 const applicantName = computed(() => {
   const a = selectedAlert.value?.applicant;
   if (!a) return '—';
@@ -51,7 +48,26 @@ const applicantName = computed(() => {
   return `${a.first_name ?? ''} ${a.last_name ?? ''}`.trim() || '—';
 });
 
-// ─── Helpers ──────────────────────────────────────────────
+const iconBgClass = computed(() => {
+  switch (derivedAlertType.value) {
+    case 'expired':  return 'bg-gray-500';
+    case '30_days':  return 'bg-red-500';
+    case '60_days':  return 'bg-amber-500';
+    case '90_days':  return 'bg-blue-500';
+    default:         return 'bg-green-500';
+  }
+});
+
+const iconShadow = computed(() => {
+  switch (derivedAlertType.value) {
+    case 'expired':  return 'shadow-gray-200';
+    case '30_days':  return 'shadow-red-200';
+    case '60_days':  return 'shadow-amber-200';
+    case '90_days':  return 'shadow-blue-200';
+    default:         return 'shadow-green-200';
+  }
+});
+
 function formatDate(d: string | null | undefined): string {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('en-PH', {
@@ -80,65 +96,60 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="p-6">
+  <div class="p-6 lg:p-8 space-y-6">
     <Toast />
 
-    <div class="max-w-4xl mx-auto">
+    <div class="max-w-5xl mx-auto space-y-6">
 
-      <!-- Back Button -->
-      <Button
-        icon="pi pi-arrow-left"
-        label="Back to Alerts"
-        severity="secondary"
-        text
-        class="mb-6"
+      <!-- ═════ Back Button ═════ -->
+      <button
+        class="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-orange-500 transition-colors font-medium"
         @click="router.push({ name: 'document-expiry-alerts.index' })"
-      />
+      >
+        <i class="pi pi-arrow-left text-xs" />
+        Back to Expiry Alerts
+      </button>
 
-      <!-- Loading Skeleton -->
+      <!-- ═════ Loading Skeleton ═════ -->
       <template v-if="loading && !selectedAlert">
-        <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-3">
+        <div class="bg-white rounded-2xl border border-gray-200 p-6 space-y-3">
           <Skeleton height="2rem" width="40%" />
           <Skeleton height="1rem" />
           <Skeleton height="1rem" width="80%" />
         </div>
       </template>
 
-      <!-- Detail Content -->
       <template v-else-if="selectedAlert">
 
-        <!-- ─── Header Card ──────────────────────────────── -->
-        <div class="bg-white rounded-xl border border-gray-200 p-6 mb-4">
-          <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+        <!-- ═════ Hero Card ═════ -->
+        <div class="bg-white rounded-2xl border border-gray-200 p-6 lg:p-8">
+          <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-6">
 
             <div class="flex items-start gap-4">
-              <!-- Icon -->
+              <!-- Icon Bubble -->
               <div
                 :class="[
-                  'w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0',
-                  derivedAlertType === 'expired'  ? 'bg-gray-100'  :
-                  derivedAlertType === '30_days'  ? 'bg-red-100'   :
-                  derivedAlertType === '60_days'  ? 'bg-orange-100':
-                  derivedAlertType === '90_days'  ? 'bg-blue-100'  :
-                                                    'bg-green-100',
+                  'w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg',
+                  iconBgClass,
+                  iconShadow,
                 ]"
               >
                 <i
                   :class="[
-                    'text-2xl',
-                    derivedAlertType === 'expired'  ? 'pi pi-times-circle text-gray-500'         :
-                    derivedAlertType === '30_days'  ? 'pi pi-exclamation-triangle text-red-500'  :
-                    derivedAlertType === '60_days'  ? 'pi pi-exclamation-circle text-orange-500' :
-                    derivedAlertType === '90_days'  ? 'pi pi-info-circle text-blue-500'          :
-                                                      'pi pi-check-circle text-green-500',
+                    'text-white text-2xl',
+                    derivedAlertType === 'expired'  ? 'pi pi-times-circle'         :
+                    derivedAlertType === '30_days'  ? 'pi pi-exclamation-triangle' :
+                    derivedAlertType === '60_days'  ? 'pi pi-clock'                :
+                    derivedAlertType === '90_days'  ? 'pi pi-info-circle'          :
+                                                      'pi pi-check-circle',
                   ]"
                 />
               </div>
 
-              <div>
-                <div class="flex items-center gap-2 mb-1 flex-wrap">
-                  <h1 class="text-xl font-bold text-gray-900">
-                    {{ selectedAlert.document_type?.name ?? 'Document' }} #{{ selectedAlert.id }}
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 mb-2 flex-wrap">
+                  <h1 class="text-2xl font-serif font-bold text-gray-900">
+                    {{ selectedAlert.document_type?.name ?? 'Document' }}
                   </h1>
                   <DocumentExpiryAlertBadge
                     v-if="derivedAlertType"
@@ -148,10 +159,13 @@ onMounted(() => {
                 </div>
                 <p class="text-sm text-gray-500">
                   <template v-if="derivedDaysUntilExpiry !== null">
-                    {{ formatDaysUntilExpiry(derivedDaysUntilExpiry) }}
+                    <span class="font-semibold text-gray-800">
+                      {{ formatDaysUntilExpiry(derivedDaysUntilExpiry) }}
+                    </span>
+                    · Document #{{ selectedAlert.id }}
                   </template>
                   <template v-else>
-                    No expiry date set
+                    Document #{{ selectedAlert.id }}
                   </template>
                 </p>
               </div>
@@ -162,151 +176,156 @@ onMounted(() => {
               <Button
                 label="View Document"
                 icon="pi pi-file"
-                severity="info"
-                outlined
-                size="small"
+                class="!bg-orange-500 hover:!bg-orange-600 !border-orange-500 !text-white !px-5 !rounded-xl"
                 @click="router.push({ name: 'documents.show', params: { id: selectedAlert.id } })"
               />
               <Button
-                label="View Applicant"
                 icon="pi pi-user"
                 severity="secondary"
                 outlined
-                size="small"
+                class="!rounded-xl !border-gray-200"
+                v-tooltip.top="'View Applicant'"
                 @click="router.push({ name: 'applicants.show', params: { id: selectedAlert.applicant_id } })"
               />
             </div>
           </div>
         </div>
 
-        <!-- ─── Details Grid ─────────────────────────────── -->
+        <!-- ═════ Details Grid ═════ -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-          <!-- Applicant -->
-          <div class="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4 flex items-center gap-2">
-              <i class="pi pi-user text-primary-500" /> Applicant
-            </h2>
-            <div class="space-y-3">
-              <div>
-                <div class="text-xs text-gray-400">Full Name</div>
-                <div class="text-sm font-medium text-gray-800">{{ applicantName }}</div>
+          <!-- Applicant Info -->
+          <div class="bg-white rounded-2xl border border-gray-200 p-6">
+            <div class="flex items-center gap-2 mb-4">
+              <div class="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
+                <i class="pi pi-user text-orange-500 text-sm" />
               </div>
-              <div>
-                <div class="text-xs text-gray-400">Applicant Code</div>
-                <div class="text-sm font-mono font-medium text-primary-600">
-                  {{ selectedAlert.applicant?.applicant_code ?? '—' }}
+              <h2 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Applicant</h2>
+            </div>
+            <div class="space-y-4">
+              <div class="flex items-center gap-3 pb-4 border-b border-gray-100">
+                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 to-orange-500 flex items-center justify-center text-white font-bold">
+                  {{ applicantName.charAt(0) }}
+                </div>
+                <div>
+                  <div class="font-semibold text-gray-900">{{ applicantName }}</div>
+                  <div class="text-xs text-gray-500 font-mono">
+                    {{ selectedAlert.applicant?.applicant_code ?? '—' }}
+                  </div>
                 </div>
               </div>
               <div v-if="selectedAlert.applicant?.email">
-                <div class="text-xs text-gray-400">Email</div>
-                <div class="text-sm text-gray-800">{{ selectedAlert.applicant.email }}</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Document -->
-          <div class="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4 flex items-center gap-2">
-              <i class="pi pi-file text-primary-500" /> Document
-            </h2>
-            <div class="space-y-3">
-              <div>
-                <div class="text-xs text-gray-400">Document Type</div>
-                <div class="text-sm font-medium text-gray-800">
-                  {{ selectedAlert.document_type?.name ?? '—' }}
-                </div>
-              </div>
-              <div>
-                <div class="text-xs text-gray-400">File Name</div>
-                <div class="text-sm text-gray-800 truncate">{{ selectedAlert.file_name }}</div>
-              </div>
-              <div class="grid grid-cols-2 gap-3">
-                <div>
-                  <div class="text-xs text-gray-400">File Size</div>
-                  <div class="text-sm text-gray-800">{{ formatFileSize(selectedAlert.file_size) }}</div>
-                </div>
-                <div>
-                  <div class="text-xs text-gray-400">Version</div>
-                  <div class="text-sm text-gray-800">v{{ selectedAlert.version }}</div>
+                <div class="text-xs text-gray-400 mb-1">Email</div>
+                <div class="text-sm text-gray-800 flex items-center gap-1.5">
+                  <i class="pi pi-envelope text-gray-400 text-xs" />
+                  {{ selectedAlert.applicant.email }}
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Expiry Info -->
-          <div class="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4 flex items-center gap-2">
-              <i class="pi pi-clock text-primary-500" /> Expiry Info
-            </h2>
+          <!-- Document Info -->
+          <div class="bg-white rounded-2xl border border-gray-200 p-6">
+            <div class="flex items-center gap-2 mb-4">
+              <div class="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
+                <i class="pi pi-file text-orange-500 text-sm" />
+              </div>
+              <h2 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Document</h2>
+            </div>
             <div class="space-y-3">
               <div>
-                <div class="text-xs text-gray-400">Expiry Date</div>
-                <div
+                <div class="text-xs text-gray-400 mb-1">File Name</div>
+                <div class="text-sm text-gray-800 truncate font-medium">{{ selectedAlert.file_name }}</div>
+              </div>
+              <div class="grid grid-cols-2 gap-3 pt-3 border-t border-gray-100">
+                <div>
+                  <div class="text-xs text-gray-400 mb-1">File Size</div>
+                  <div class="text-sm text-gray-800 font-medium">{{ formatFileSize(selectedAlert.file_size) }}</div>
+                </div>
+                <div>
+                  <div class="text-xs text-gray-400 mb-1">Version</div>
+                  <div class="text-sm text-gray-800 font-medium">v{{ selectedAlert.version }}</div>
+                </div>
+              </div>
+              <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
+                <span class="text-sm text-gray-600">Status</span>
+                <span
                   :class="[
-                    'text-sm font-semibold',
-                    derivedAlertType === 'expired' ? 'text-gray-600' : 'text-red-600',
+                    'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border capitalize',
+                    selectedAlert.status === 'verified'
+                      ? 'bg-green-50 text-green-700 border-green-200'
+                      : 'bg-blue-50 text-blue-700 border-blue-200',
                   ]"
                 >
+                  {{ selectedAlert.status?.replace(/_/g, ' ') }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Expiry Timeline -->
+          <div class="bg-white rounded-2xl border border-gray-200 p-6 md:col-span-2">
+            <div class="flex items-center gap-2 mb-5">
+              <div class="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
+                <i class="pi pi-clock text-orange-500 text-sm" />
+              </div>
+              <h2 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Expiry Timeline</h2>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div class="text-center p-4 rounded-xl bg-gray-50 border border-gray-100">
+                <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  Document Date
+                </div>
+                <div class="text-sm font-bold text-gray-800">
+                  {{ formatDate(selectedAlert.document_date) }}
+                </div>
+              </div>
+
+              <div class="text-center p-4 rounded-xl bg-red-50 border border-red-100">
+                <div class="text-xs font-semibold text-red-500 uppercase tracking-wider mb-2">
+                  Expires On
+                </div>
+                <div class="text-sm font-bold text-red-700">
                   {{ formatDate(selectedAlert.expiry_date) }}
                 </div>
               </div>
-              <div>
-                <div class="text-xs text-gray-400">Days Until Expiry</div>
-                <div class="text-sm text-gray-800">
+
+              <div class="text-center p-4 rounded-xl bg-orange-50 border border-orange-100">
+                <div class="text-xs font-semibold text-orange-500 uppercase tracking-wider mb-2">
+                  Time Remaining
+                </div>
+                <div class="text-sm font-bold text-orange-700">
                   <template v-if="derivedDaysUntilExpiry !== null">
                     {{ formatDaysUntilExpiry(derivedDaysUntilExpiry) }}
                   </template>
                   <template v-else>—</template>
                 </div>
               </div>
-              <div v-if="selectedAlert.document_date">
-                <div class="text-xs text-gray-400">Document Date</div>
-                <div class="text-sm text-gray-800">{{ formatDate(selectedAlert.document_date) }}</div>
-              </div>
             </div>
-          </div>
 
-          <!-- Status & Metadata -->
-          <div class="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4 flex items-center gap-2">
-              <i class="pi pi-info-circle text-primary-500" /> Status
-            </h2>
-            <div class="space-y-3">
-              <div class="flex items-center justify-between">
-                <span class="text-sm text-gray-600">Verification Status</span>
-                <Tag
-                  :value="selectedAlert.status?.replace('_', ' ')"
-                  :severity="selectedAlert.status === 'verified' ? 'success' : 'info'"
-                  class="text-xs capitalize"
-                />
+            <!-- Metadata footer -->
+            <div class="mt-5 pt-4 border-t border-gray-100 flex flex-wrap gap-4 text-xs text-gray-500">
+              <div class="flex items-center gap-1.5">
+                <i class="pi pi-calendar-plus text-gray-400" />
+                Created {{ formatDateTime(selectedAlert.created_at) }}
               </div>
-              <div class="flex items-center justify-between">
-                <span class="text-sm text-gray-600">Priority</span>
-                <Tag
-                  :value="selectedAlert.priority"
-                  severity="secondary"
-                  class="text-xs capitalize"
-                />
-              </div>
-              <div>
-                <div class="text-xs text-gray-400">Created At</div>
-                <div class="text-sm text-gray-800">{{ formatDateTime(selectedAlert.created_at) }}</div>
-              </div>
-              <div>
-                <div class="text-xs text-gray-400">Last Updated</div>
-                <div class="text-sm text-gray-800">{{ formatDateTime(selectedAlert.updated_at) }}</div>
+              <div class="flex items-center gap-1.5">
+                <i class="pi pi-history text-gray-400" />
+                Updated {{ formatDateTime(selectedAlert.updated_at) }}
               </div>
             </div>
           </div>
         </div>
       </template>
 
-      <!-- Not Found -->
+      <!-- Empty state -->
       <template v-else>
-        <div class="flex flex-col items-center justify-center py-20 text-gray-400">
-          <i class="pi pi-file-o text-5xl mb-3" />
-          <p class="text-lg font-medium">Document not found</p>
+        <div class="flex flex-col items-center justify-center py-20 text-center">
+          <div class="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+            <i class="pi pi-file-o text-4xl text-gray-400" />
+          </div>
+          <p class="text-lg font-semibold text-gray-700">Document not found</p>
           <Button
             label="Back to Alerts"
             severity="secondary"
