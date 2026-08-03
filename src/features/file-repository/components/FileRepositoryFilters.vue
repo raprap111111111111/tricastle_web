@@ -1,141 +1,239 @@
 <!-- src/features/file-repository/components/FileRepositoryFilters.vue -->
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import InputText from 'primevue/inputtext'
-import Select    from 'primevue/select'
-import ToggleSwitch from 'primevue/toggleswitch'
-import Button    from 'primevue/button'
-import type { FileRepositoryFilters } from '../types'
-import { DISK_OPTIONS, MIME_PRESETS } from '../types'
+import { reactive, watch, ref } from 'vue'
+import InputText    from 'primevue/inputtext'
+import Dropdown     from 'primevue/dropdown'
+import OverlayPanel from 'primevue/overlaypanel'
+import SelectButton from 'primevue/selectbutton'
+import { AppButton } from '@shared/ui'
+import {
+  DISK_OPTIONS,
+  MIME_PRESETS,
+  ORDER_BY_OPTIONS,
+  type FileRepositoryFilters,
+} from '../types'
 
-// ─── Props / Emits ────────────────────────────────────────────────────
-interface Props {
-  modelValue: Partial<FileRepositoryFilters>
-}
-
-const props  = defineProps<Props>()
-const emit   = defineEmits<{
-  filter: [filters: Partial<FileRepositoryFilters>]
-  reset:  []
+const props = defineProps<{
+  modelValue?: FileRepositoryFilters
 }>()
 
-// ─── Local state (controlled) ─────────────────────────────────────────
-const search         = ref(props.modelValue.search        ?? '')
-const disk           = ref(props.modelValue.disk          ?? null)
-const mimeType       = ref(props.modelValue.mime_type     ?? null)
-const unusedOnly     = ref(props.modelValue.unused_only   ?? false)
-const encryptedOnly  = ref(props.modelValue.encrypted_only ?? false)
+const emit = defineEmits<{
+  (e: 'filter', filters: Partial<FileRepositoryFilters>): void
+  (e: 'reset'): void
+}>()
 
-// ─── Debounce search ──────────────────────────────────────────────────
-let searchTimer: ReturnType<typeof setTimeout>
-watch(search, (val) => {
-  clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => emitFilter(), 400)
+const local = reactive<Partial<FileRepositoryFilters>>({
+  search:         '',
+  disk:           null,
+  mime_type:      null,
+  order_by:       'created_at',
+  order_dir:      'desc',
+  unused_only:    null,
+  encrypted_only: null,
 })
 
-watch([disk, mimeType, unusedOnly, encryptedOnly], () => emitFilter())
+watch(
+  () => props.modelValue,
+  (val) => val && Object.assign(local, val),
+  { immediate: true },
+)
 
-function emitFilter() {
-  emit('filter', {
-    search:         search.value     || undefined,
-    disk:           disk.value       || null,
-    mime_type:      mimeType.value   || null,
-    unused_only:    unusedOnly.value   || null,
-    encrypted_only: encryptedOnly.value || null,
-  })
+const advancedPanel = ref()
+function toggleAdvanced(event: Event) {
+  advancedPanel.value?.toggle(event)
 }
 
-function handleReset() {
-  search.value        = ''
-  disk.value          = null
-  mimeType.value      = null
-  unusedOnly.value    = false
-  encryptedOnly.value = false
+const orderDirOptions = [
+  { label: 'Newest', value: 'desc' },
+  { label: 'Oldest', value: 'asc'  },
+]
+
+const boolOptions = [
+  { label: 'All', value: null  },
+  { label: 'Yes', value: true  },
+  { label: 'No',  value: false },
+]
+
+function onSearch() {
+  emit('filter', { ...local })
+}
+
+function onReset() {
+  Object.assign(local, {
+    search:         '',
+    disk:           null,
+    mime_type:      null,
+    order_by:       'created_at',
+    order_dir:      'desc',
+    unused_only:    null,
+    encrypted_only: null,
+  })
   emit('reset')
 }
 
-const diskOptions = [{ label: 'All Disks', value: null }, ...DISK_OPTIONS]
-const mimeOptions = [{ label: 'All Types', value: null }, ...MIME_PRESETS]
+function activeAdvancedCount(): number {
+  let c = 0
+  if (local.disk)                    c++
+  if (local.mime_type)               c++
+  if (local.unused_only    !== null) c++
+  if (local.encrypted_only !== null) c++
+  return c
+}
 </script>
 
 <template>
-  <div class="bg-white rounded-2xl border border-appleCore-200 p-5">
-    <!-- Header row -->
-    <div class="flex items-center justify-between mb-4">
-      <h3 class="font-serif font-semibold text-blueberry-800 text-sm">
-        Filters
-      </h3>
-      <Button
-        label="Reset"
-        size="small"
-        text
-        severity="secondary"
-        icon="pi pi-refresh"
-        @click="handleReset"
-        class="!text-blueberry-400 hover:!text-blueberry-600"
+  <!-- ══════════════════════════════════════════════════════════
+       SINGLE-ROW SEARCH BAR
+       ══════════════════════════════════════════════════════════ -->
+  <div class="flex items-center gap-3 flex-wrap">
+
+    <!-- ✅ FIXED: search input with icon inside -->
+    <div class="flex-1 min-w-[280px] relative">
+      <i
+        class="pi pi-search absolute left-4 top-1/2 -translate-y-1/2
+               text-blueberry-400 pointer-events-none z-10"
+      />
+      <InputText
+        v-model="local.search"
+        placeholder="Search file name, hash..."
+        class="w-full !pl-11 !h-[52px] !text-sm !rounded-xl !bg-white !border-appleCore-200"
+        @keyup.enter="onSearch"
       />
     </div>
 
-    <!-- Filter grid -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- Orange search button -->
+    <button
+      type="button"
+      class="w-[52px] h-[52px] rounded-xl bg-apricot-500 hover:bg-apricot-600
+             text-white flex items-center justify-center flex-shrink-0
+             transition-colors"
+      @click="onSearch"
+    >
+      <i class="pi pi-search" />
+    </button>
 
-      <!-- Search -->
-      <div class="flex flex-col gap-1">
-        <label class="text-xs font-medium text-blueberry-500">Search</label>
-        <InputText
-          v-model="search"
-          placeholder="File name or hash…"
-          class="w-full !text-sm"
-          :pt="{
-            root: { class: 'border-appleCore-200 rounded-xl focus:border-blueberry-400' }
-          }"
-        />
-      </div>
+    <!-- Disk filter -->
+    <Dropdown
+      v-model="local.disk"
+      :options="DISK_OPTIONS"
+      option-label="label"
+      option-value="value"
+      placeholder="All Disks"
+      show-clear
+      class="!min-w-[180px] !text-sm !rounded-xl !bg-white !border-appleCore-200 !h-[52px]"
+      @change="onSearch"
+    />
 
-      <!-- Disk -->
-      <div class="flex flex-col gap-1">
-        <label class="text-xs font-medium text-blueberry-500">Storage Disk</label>
-        <Select
-          v-model="disk"
-          :options="diskOptions"
-          option-label="label"
-          option-value="value"
-          placeholder="All Disks"
-          class="w-full !text-sm"
-          :pt="{
-            root: { class: 'border-appleCore-200 rounded-xl' }
-          }"
-        />
-      </div>
+    <!-- Advanced toggle -->
+    <button
+      type="button"
+      class="relative w-[52px] h-[52px] rounded-xl bg-white border border-appleCore-200
+             text-blueberry-600 hover:bg-appleCore-50 flex items-center justify-center
+             flex-shrink-0 transition-colors"
+      v-tooltip.top="'Advanced filters'"
+      @click="toggleAdvanced"
+    >
+      <i class="pi pi-sliders-h" />
+      <span
+        v-if="activeAdvancedCount() > 0"
+        class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-apricot-500
+               text-white text-[10px] font-bold flex items-center justify-center"
+      >
+        {{ activeAdvancedCount() }}
+      </span>
+    </button>
 
-      <!-- MIME type -->
-      <div class="flex flex-col gap-1">
-        <label class="text-xs font-medium text-blueberry-500">File Type</label>
-        <Select
-          v-model="mimeType"
-          :options="mimeOptions"
-          option-label="label"
-          option-value="value"
-          placeholder="All Types"
-          class="w-full !text-sm"
-          :pt="{
-            root: { class: 'border-appleCore-200 rounded-xl' }
-          }"
-        />
-      </div>
-
-      <!-- Toggles column -->
-      <div class="flex flex-col gap-3">
-        <div class="flex items-center justify-between">
-          <label class="text-xs font-medium text-blueberry-500">Unused Only</label>
-          <ToggleSwitch v-model="unusedOnly" />
-        </div>
-        <div class="flex items-center justify-between">
-          <label class="text-xs font-medium text-blueberry-500">Encrypted Only</label>
-          <ToggleSwitch v-model="encryptedOnly" />
-        </div>
-      </div>
-
-    </div>
+    <!-- Reset -->
+    <button
+      type="button"
+      class="w-[52px] h-[52px] rounded-xl bg-white border border-appleCore-200
+             text-blueberry-600 hover:bg-appleCore-50 flex items-center justify-center
+             flex-shrink-0 transition-colors"
+      v-tooltip.top="'Reset filters'"
+      @click="onReset"
+    >
+      <i class="pi pi-refresh" />
+    </button>
   </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       ADVANCED FILTERS POPUP
+       ══════════════════════════════════════════════════════════ -->
+  <OverlayPanel
+    ref="advancedPanel"
+    :pt="{
+      root: '!rounded-2xl !border !border-appleCore-200 !shadow-xl !mt-2',
+      content: '!p-5',
+    }"
+  >
+    <div class="w-[420px] space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-appleCore-100">
+        <div>
+          <h4 class="text-sm font-semibold text-blueberry-800">Advanced Filters</h4>
+          <p class="text-xs text-blueberry-400 mt-0.5">Refine your search</p>
+        </div>
+        <i class="pi pi-sliders-h text-blueberry-400 text-lg" />
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-semibold text-blueberry-500 uppercase tracking-wide">File Type</label>
+        <Dropdown
+          v-model="local.mime_type"
+          :options="MIME_PRESETS"
+          option-label="label"
+          option-value="value"
+          placeholder="All types"
+          show-clear
+          class="w-full !text-sm !rounded-xl !border-appleCore-200"
+        />
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-semibold text-blueberry-500 uppercase tracking-wide">Sort By</label>
+        <div class="flex gap-2">
+          <Dropdown
+            v-model="local.order_by"
+            :options="ORDER_BY_OPTIONS"
+            option-label="label"
+            option-value="value"
+            class="flex-1 !text-sm !rounded-xl !border-appleCore-200"
+          />
+          <Dropdown
+            v-model="local.order_dir"
+            :options="orderDirOptions"
+            option-label="label"
+            option-value="value"
+            class="w-32 !text-sm !rounded-xl !border-appleCore-200"
+          />
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-semibold text-blueberry-500 uppercase tracking-wide">Unused Files</label>
+        <SelectButton
+          v-model="local.unused_only"
+          :options="boolOptions"
+          option-label="label"
+          option-value="value"
+          class="!text-xs"
+        />
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-semibold text-blueberry-500 uppercase tracking-wide">Encrypted</label>
+        <SelectButton
+          v-model="local.encrypted_only"
+          :options="boolOptions"
+          option-label="label"
+          option-value="value"
+          class="!text-xs"
+        />
+      </div>
+
+      <div class="flex justify-end gap-2 pt-3 border-t border-appleCore-100">
+        <AppButton label="Clear" variant="neutral" icon="pi pi-times" size="small" outlined @click="onReset" />
+        <AppButton label="Apply" variant="primary" icon="pi pi-check" size="small" @click="() => { onSearch(); advancedPanel?.hide() }" />
+      </div>
+    </div>
+  </OverlayPanel>
 </template>

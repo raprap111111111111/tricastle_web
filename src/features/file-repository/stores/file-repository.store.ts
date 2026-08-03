@@ -3,101 +3,143 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { fileRepositoryApi } from '../api/file-repository.api'
-import type { FileRepository, FileRepositoryFilters, Pagination } from '../types'
+import type {
+  FileRepository,
+  FileRepositoryFilters,
+  Pagination,
+} from '../types'
 
 const DEFAULT_FILTERS: FileRepositoryFilters = {
-  search:        undefined,
-  disk:          null,
-  mime_type:     null,
-  is_encrypted:  null,
-  uploaded_by:   null,
-  unused_only:   null,
-  encrypted_only: null,
-  min_size:      null,
-  max_size:      null,
-  offset:        0,
-  limit:         10,
-  order_by:      'created_at',
-  order_dir:     'desc',
+  offset:    0,
+  limit:     10,
+  order_by:  'created_at',
+  order_dir: 'desc',
 }
 
 export const useFileRepositoryStore = defineStore('fileRepository', () => {
-  // ─── State ────────────────────────────────────────────────────────────
+
+  // ─── State ───────────────────────────────────────────────────────────
   const files          = ref<FileRepository[]>([])
-  const pagination     = ref<Pagination>({
-    total:        0,
-    offset:       0,
-    limit:        10,
-    per_page:     10,
-    current_page: 1,
-    last_page:    1,
-  })
+  const pagination     = ref<Pagination | null>(null)
   const filters        = ref<FileRepositoryFilters>({ ...DEFAULT_FILTERS })
   const loading        = ref(false)
   const submitting     = ref(false)
-  const error          = ref<string | null>(null)
   const uploadProgress = ref(0)
+  const error          = ref<string | null>(null)
 
-  // ─── Computed ─────────────────────────────────────────────────────────
-  const totalFiles    = computed(() => pagination.value.total)
-  const currentPage   = computed(() => pagination.value.current_page)
-  const lastPage      = computed(() => pagination.value.last_page)
+  // ─── Computed ────────────────────────────────────────────────────────
+  const totalFiles = computed(() => pagination.value?.total ?? 0)
 
   const encryptedCount = computed(
     () => files.value.filter(f => f.is_encrypted).length
   )
+
   const unusedCount = computed(
     () => files.value.filter(f => f.reference_count === 0).length
   )
-  const totalSize = computed(() =>
-    files.value.reduce((sum, f) => sum + (f.file_size ?? 0), 0)
+
+  const totalSize = computed(
+    () => files.value.reduce((acc, f) => acc + f.file_size, 0)
   )
 
-  // ─── Actions ──────────────────────────────────────────────────────────
-
+  // ─── Actions ─────────────────────────────────────────────────────────
   async function fetchFiles() {
     loading.value = true
     error.value   = null
 
     try {
-      const response = await fileRepositoryApi.getAll(filters.value)
-      const data     = response.data.data
+      const res = await fileRepositoryApi.getAll(filters.value)
+      const d   = res.data.data
 
-      files.value = data.records
+      files.value = d.records
+
       pagination.value = {
-        total:        data.total,
-        offset:       data.offset,
-        limit:        data.limit,
-        per_page:     data.per_page,
-        current_page: data.current_page,
-        last_page:    data.last_page,
+        total:        d.total,
+        offset:       d.offset,
+        limit:        d.limit,
+        per_page:     d.per_page,
+        current_page: d.current_page,
+        last_page:    d.last_page,
       }
-    } catch (err: any) {
-      error.value = err?.response?.data?.message ?? 'Failed to load files.'
+    } catch (e: any) {
+      error.value = e?.response?.data?.message ?? 'Failed to load files.'
+      throw e
     } finally {
       loading.value = false
     }
   }
 
-  /**
-   * PrimeVue Paginator emits 0-based page index → convert to offset
-   */
-  function setPage(page: number) {
-    filters.value.offset = page * filters.value.limit
-    fetchFiles()
+  async function uploadFile(file: File, extra?: Record<string, any>) {
+    submitting.value    = true
+    uploadProgress.value = 0
+    error.value          = null
+
+    try {
+      const res = await fileRepositoryApi.upload(
+        file,
+        extra,
+        (progressEvent: ProgressEvent) => {
+          if (progressEvent.total) {
+            uploadProgress.value = Math.round(
+              (progressEvent.loaded / progressEvent.total) * 100
+            )
+          }
+        }
+      )
+
+      // Prepend new file to list
+      files.value.unshift(res.data.data)
+
+      if (pagination.value) {
+        pagination.value.total++
+      }
+    } catch (e: any) {
+      error.value = e?.response?.data?.message ?? 'Upload failed.'
+      throw e
+    } finally {
+      submitting.value    = false
+      uploadProgress.value = 0
+    }
   }
 
-  function setLimit(limit: number) {
-    filters.value.limit  = limit
-    filters.value.offset = 0
-    fetchFiles()
+  async function deleteFile(id: number) {
+    submitting.value = true
+    error.value      = null
+
+    try {
+      await fileRepositoryApi.delete(id)
+      files.value = files.value.filter(f => f.id !== id)
+      if (pagination.value) pagination.value.total--
+    } catch (e: any) {
+      error.value = e?.response?.data?.message ?? 'Delete failed.'
+      throw e
+    } finally {
+      submitting.value = false
+    }
   }
 
+  async function purgeFile(id: number) {
+    submitting.value = true
+    error.value      = null
+
+    try {
+      await fileRepositoryApi.purge(id)
+      files.value = files.value.filter(f => f.id !== id)
+      if (pagination.value) pagination.value.total--
+    } catch (e: any) {
+      error.value = e?.response?.data?.message ?? 'Purge failed.'
+      throw e
+    } finally {
+      submitting.value = false
+    }
+  }
+
+  // ─── Filter helpers ───────────────────────────────────────────────────
   function setFilters(incoming: Partial<FileRepositoryFilters>) {
     filters.value = {
       ...filters.value,
       ...incoming,
-      offset: 0, // reset to first page on filter change
+      offset: 0, // reset to page 1 on any filter change
     }
     fetchFiles()
   }
@@ -107,68 +149,9 @@ export const useFileRepositoryStore = defineStore('fileRepository', () => {
     fetchFiles()
   }
 
-  async function uploadFile(
-    file: File,
-    extra?: Record<string, any>
-  ): Promise<FileRepository> {
-    submitting.value     = true
-    uploadProgress.value = 0
-    error.value          = null
-
-    try {
-      const response = await fileRepositoryApi.upload(
-        file,
-        extra,
-        (evt: ProgressEvent) => {
-          if (evt.lengthComputable) {
-            uploadProgress.value = Math.round((evt.loaded / evt.total) * 100)
-          }
-        }
-      )
-
-      // Prepend to current list so staff sees it immediately
-      files.value.unshift(response.data.data)
-      pagination.value.total += 1
-
-      return response.data.data
-    } catch (err: any) {
-      error.value = err?.response?.data?.message ?? 'Upload failed.'
-      throw err
-    } finally {
-      submitting.value = false
-    }
-  }
-
-  async function deleteFile(id: number): Promise<void> {
-    submitting.value = true
-    error.value      = null
-
-    try {
-      await fileRepositoryApi.delete(id)
-      files.value          = files.value.filter(f => f.id !== id)
-      pagination.value.total = Math.max(0, pagination.value.total - 1)
-    } catch (err: any) {
-      error.value = err?.response?.data?.message ?? 'Delete failed.'
-      throw err
-    } finally {
-      submitting.value = false
-    }
-  }
-
-  async function purgeFile(id: number): Promise<void> {
-    submitting.value = true
-    error.value      = null
-
-    try {
-      await fileRepositoryApi.purge(id)
-      files.value          = files.value.filter(f => f.id !== id)
-      pagination.value.total = Math.max(0, pagination.value.total - 1)
-    } catch (err: any) {
-      error.value = err?.response?.data?.message ?? 'Purge failed.'
-      throw err
-    } finally {
-      submitting.value = false
-    }
+  function setPage(page: number) {
+    filters.value.offset = (page - 1) * filters.value.limit
+    fetchFiles()
   }
 
   return {
@@ -178,23 +161,20 @@ export const useFileRepositoryStore = defineStore('fileRepository', () => {
     filters,
     loading,
     submitting,
-    error,
     uploadProgress,
+    error,
     // computed
     totalFiles,
-    currentPage,
-    lastPage,
     encryptedCount,
     unusedCount,
     totalSize,
     // actions
     fetchFiles,
-    setPage,
-    setLimit,
-    setFilters,
-    resetFilters,
     uploadFile,
     deleteFile,
     purgeFile,
+    setFilters,
+    resetFilters,
+    setPage,
   }
 })

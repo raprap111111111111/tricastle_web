@@ -1,139 +1,130 @@
 <!-- src/features/file-repository/components/FileRepositoryDeleteDialog.vue -->
 <script setup lang="ts">
-import { computed } from 'vue'
 import Dialog from 'primevue/dialog'
-import Button from 'primevue/button'
-import AppHoldToDeleteButton from '@shared/ui/AppHoldToDeleteButton.vue'
+import { AppButton, AppHoldToDeleteButton } from '@shared/ui'
+import FileSizeLabel from './FileSizeLabel.vue'
 import type { FileRepository } from '../types'
 
-// ─── Props / Emits ────────────────────────────────────────────────────
+// ─── Props / Emits ───────────────────────────────────────────────────
 const props = defineProps<{
-  visible:     boolean
-  file:        FileRepository | null
-  submitting?: boolean
+  visible: boolean
+  file: FileRepository | null
+  loading: boolean
+  mode: 'soft' | 'purge'
 }>()
 
 const emit = defineEmits<{
-  'update:visible': [value: boolean]
-  confirm:         [id: number]
-  cancel:          []
+  (e: 'update:visible', val: boolean): void
+  (e: 'confirm'): void
 }>()
 
-// ─── Computed ─────────────────────────────────────────────────────────
-const isReferenced = computed(
-  () => (props.file?.reference_count ?? 0) > 0
-)
+// ─── Helpers ─────────────────────────────────────────────────────────
+function mimeIcon(mime: string): string {
+  if (mime.startsWith('image/')) return 'pi pi-image'
+  if (mime.includes('pdf')) return 'pi pi-file-pdf'
+  if (mime.includes('word')) return 'pi pi-file-word'
+  if (mime.includes('excel') || mime.includes('spreadsheet')) return 'pi pi-file-excel'
+  if (mime.startsWith('text/')) return 'pi pi-file'
+  return 'pi pi-file'
+}
 
-const warningText = computed(() => {
-  if (!props.file) return ''
-  if (isReferenced.value)
-    return `This file is still referenced by ${props.file.reference_count} document(s). Deleting it here will soft-delete the repository record but the physical file will be retained until all references are removed.`
-  return 'This will soft-delete the file record. The physical file will be marked as unused and can be permanently purged later.'
-})
+function mimeColor(mime: string): string {
+  if (mime.startsWith('image/')) return 'text-purple-500'
+  if (mime.includes('pdf')) return 'text-red-500'
+  if (mime.includes('word')) return 'text-blue-500'
+  if (mime.includes('excel') || mime.includes('spreadsheet')) return 'text-green-600'
+  return 'text-blueberry-400'
+}
 
 function close() {
   emit('update:visible', false)
-  emit('cancel')
-}
-
-function onConfirm() {
-  if (props.file) emit('confirm', props.file.id)
 }
 </script>
 
 <template>
-  <Dialog
-    :visible="visible"
-    @update:visible="close"
-    modal
-    :closable="!submitting"
-    :style="{ width: '28rem' }"
-    :pt="{
-      root:    { class: 'rounded-2xl overflow-hidden border border-appleCore-200 shadow-xl' },
-      header:  { class: 'bg-[#faf7f2] border-b border-appleCore-100 px-6 py-4' },
-      content: { class: 'bg-[#faf7f2] px-6 py-5' },
-      footer:  { class: 'bg-[#faf7f2] border-t border-appleCore-100 px-6 py-4' },
-    }"
-  >
-    <!-- Header -->
-    <template #header>
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
-          <i class="pi pi-trash text-red-500 text-base" />
-        </div>
+  <Dialog :visible="props.visible" modal :header="props.mode === 'purge' ? 'Permanently Purge File' : 'Delete File'"
+    :style="{ width: '480px' }" :draggable="false" :pt="{
+      header: '!bg-white !border-b !border-appleCore-100 !px-6 !py-4',
+      content: '!bg-white !px-6 !py-5',
+      footer: '!bg-appleCore-50 !border-t !border-appleCore-100 !px-6 !py-4',
+    }" @update:visible="close">
+    <div v-if="props.file" class="space-y-4">
+
+      <!-- ── Warning Banner ────────────────────────────────────────── -->
+      <div class="flex items-start gap-3 p-3 rounded-xl border" :class="props.mode === 'purge'
+        ? 'bg-red-50 border-red-200'
+        : 'bg-amber-50 border-amber-200'">
+        <i class="pi pi-exclamation-triangle mt-0.5 flex-shrink-0"
+          :class="props.mode === 'purge' ? 'text-red-500' : 'text-amber-500'" />
         <div>
-          <p class="font-serif font-semibold text-blueberry-800 text-base leading-tight">
-            Delete File
+          <p class="text-sm font-semibold" :class="props.mode === 'purge' ? 'text-red-700' : 'text-amber-700'">
+            {{
+              props.mode === 'purge'
+                ? 'This action cannot be undone!'
+                : 'This file will be soft-deleted.'
+            }}
           </p>
-          <p class="text-xs text-blueberry-400 mt-0.5">Soft delete — recoverable</p>
+          <p class="text-xs mt-0.5" :class="props.mode === 'purge' ? 'text-red-500' : 'text-amber-600'">
+            {{
+              props.mode === 'purge'
+                ? 'The physical file will be permanently removed from storage and the database.'
+                : 'The record will be flagged as deleted. Use Purge to permanently remove it.'
+            }}
+          </p>
         </div>
       </div>
-    </template>
 
-    <!-- Body -->
-    <template #default>
-      <div class="space-y-4">
-        <!-- File info pill -->
-        <div
-          v-if="file"
-          class="bg-white rounded-xl border border-appleCore-200 px-4 py-3 flex items-center gap-3"
-        >
-          <i class="pi pi-file text-blueberry-400 text-lg flex-shrink-0" />
-          <div class="min-w-0">
-            <p class="text-sm font-medium text-blueberry-700 truncate">
-              {{ file.original_name }}
-            </p>
-            <p class="text-xs text-blueberry-400 font-mono truncate">
-              {{ file.file_hash.slice(0, 24) }}…
-            </p>
-          </div>
+      <!-- ── File Info Card ────────────────────────────────────────── -->
+      <div class="flex items-center gap-3 bg-appleCore-50 border
+               border-appleCore-200 rounded-xl p-4">
+        <div class="w-12 h-12 rounded-xl bg-white border border-appleCore-200
+                 flex items-center justify-center flex-shrink-0 shadow-sm">
+          <i :class="[
+            mimeIcon(props.file.mime_type),
+            mimeColor(props.file.mime_type),
+            'text-xl',
+          ]" />
         </div>
-
-        <!-- Reference warning -->
-        <div
-          v-if="isReferenced"
-          class="flex gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3"
-        >
-          <i class="pi pi-exclamation-triangle text-amber-500 mt-0.5 flex-shrink-0" />
-          <p class="text-xs text-amber-700 leading-relaxed">
-            {{ warningText }}
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold text-blueberry-800 text-sm truncate" v-tooltip.top="props.file.original_name">
+            {{ props.file.original_name }}
           </p>
-        </div>
-        <div
-          v-else
-          class="flex gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3"
-        >
-          <i class="pi pi-info-circle text-red-400 mt-0.5 flex-shrink-0" />
-          <p class="text-xs text-red-600 leading-relaxed">
-            {{ warningText }}
+          <p class="text-xs text-blueberry-400 mt-0.5 flex items-center gap-2 flex-wrap">
+            <FileSizeLabel :bytes="props.file.file_size" :decimals="1" />
+            <span>·</span>
+            <span class="capitalize">{{ props.file.disk }}</span>
+            <span>·</span>
+            <span v-if="props.file.is_encrypted" class="text-amber-500">
+              <i class="pi pi-lock text-xs mr-0.5" />Encrypted
+            </span>
+            <span v-else class="text-blueberry-300">Unencrypted</span>
           </p>
-        </div>
-
-        <!-- Hold-to-confirm -->
-        <div class="pt-1">
-          <p class="text-xs text-blueberry-400 mb-2 text-center">
-            Hold the button below to confirm deletion
+          <!-- reference count warning -->
+          <p class="text-xs mt-1 font-medium"
+            :class="props.file.reference_count > 0 ? 'text-red-500' : 'text-blueberry-400'">
+            <i class="pi pi-link text-xs mr-1" />
+            Used by {{ props.file.reference_count }} document(s)
+            <span v-if="props.file.reference_count > 0" class="italic font-normal ml-1">
+              — deleting may break linked documents
+            </span>
           </p>
-          <AppHoldToDeleteButton
-            :loading="submitting"
-            label="Hold to Delete"
-            @confirmed="onConfirm"
-          />
         </div>
       </div>
-    </template>
 
-    <!-- Footer -->
+
+      <!-- ✅ Correct name matching the barrel export -->
+      <AppHoldToDeleteButton v-if="props.mode === 'purge'" label="Hold to permanently purge" hint-text="hold 3 seconds"
+        :duration="3000" :loading="props.loading" @complete="emit('confirm')" />
+
+    </div>
+
+    <!-- ── Footer ────────────────────────────────────────────────────── -->
     <template #footer>
-      <div class="flex justify-end">
-        <Button
-          label="Cancel"
-          text
-          severity="secondary"
-          :disabled="submitting"
-          @click="close"
-          class="!text-blueberry-500 hover:!text-blueberry-700"
-        />
+      <div class="flex justify-end gap-3">
+        <AppButton label="Cancel" variant="neutral" outlined :disabled="props.loading" @click="close" />
+        <!-- Soft delete has a normal button; purge uses HoldToDelete above -->
+        <AppButton v-if="props.mode === 'soft'" label="Delete" variant="danger" icon="pi pi-trash"
+          :loading="props.loading" @click="emit('confirm')" />
       </div>
     </template>
   </Dialog>

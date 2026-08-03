@@ -16,7 +16,9 @@ import { companyCategoryRoutes } from './routes/company-category.routes'
 import { documentTypesRoutes } from './routes/document-types.routes'
 import { verificationRoutes } from './routes/verification.routes'
 import { documentVersionsRoutes } from './routes/document-versions.routes'
-import { documentExpiryAlertRoutes } from './routes/document-expiry-alert.routes' // ← ADD
+import { documentExpiryAlertRoutes } from './routes/document-expiry-alert.routes'
+import { fileRepositoryRoutes } from './routes/file-repository.routes'
+
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -37,6 +39,8 @@ const router = createRouter({
     ...verificationRoutes,
     ...documentVersionsRoutes,
     ...documentExpiryAlertRoutes,
+    ...fileRepositoryRoutes,
+
 
     { path: '/:pathMatch(.*)*', name: 'NotFound', redirect: '/dashboard' },
   ],

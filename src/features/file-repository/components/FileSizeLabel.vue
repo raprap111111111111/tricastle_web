@@ -3,22 +3,24 @@
 import { computed } from 'vue'
 
 const props = defineProps<{
-  bytes: number
+  bytes:     number
   decimals?: number
 }>()
 
 const label = computed(() => {
-  const d = props.decimals ?? 2
-  const b = props.bytes
+  const bytes    = props.bytes ?? 0
+  const decimals = props.decimals ?? 2
 
-  if (b === 0)          return '0 B'
-  if (b < 1024)         return `${b} B`
-  if (b < 1024 ** 2)    return `${(b / 1024).toFixed(d)} KB`
-  if (b < 1024 ** 3)    return `${(b / 1024 ** 2).toFixed(d)} MB`
-  return                       `${(b / 1024 ** 3).toFixed(d)} GB`
+  if (bytes === 0) return '0 B'
+
+  const k     = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i     = Math.floor(Math.log(bytes) / Math.log(k))
+
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(decimals))} ${sizes[i]}`
 })
 </script>
 
 <template>
-  <span class="tabular-nums">{{ label }}</span>
+  <span>{{ label }}</span>
 </template>

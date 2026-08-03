@@ -1,221 +1,300 @@
 <!-- src/features/file-repository/components/FileRepositoryUploadDialog.vue -->
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import Dialog   from 'primevue/dialog'
-import Button   from 'primevue/button'
-import ProgressBar from 'primevue/progressbar'
-import FileSizeLabel from './FileSizeLabel.vue'
+import { ref, watch }  from 'vue'
+import Dialog          from 'primevue/dialog'
+import Dropdown        from 'primevue/dropdown'
+import ToggleButton    from 'primevue/togglebutton'
+import ProgressBar     from 'primevue/progressbar'
+import { AppButton } from '@shared/ui'
+import FileSizeLabel   from './FileSizeLabel.vue'
+import { DISK_OPTIONS } from '../types'
 
+// ─── Constants ───────────────────────────────────────────────────────
+const MAX_MB    = 20
+const MAX_BYTES = MAX_MB * 1024 * 1024
+
+const ALLOWED_TYPES = [
+  'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain', 'text/csv',
+  'application/zip',
+]
+
+// ─── Props / Emits ───────────────────────────────────────────────────
 const props = defineProps<{
-  visible:     boolean
-  submitting?: boolean
-  progress?:   number
+  visible:    boolean
+  submitting: boolean
+  progress:   number
 }>()
 
 const emit = defineEmits<{
-  'update:visible': [value: boolean]
-  upload:          [file: File]
-  cancel:          []
+  (e: 'update:visible', val: boolean): void
+  (e: 'upload', file: File, extra: Record<string, any>): void
+  (e: 'cancel'): void
 }>()
 
-// ─── State ────────────────────────────────────────────────────────────
-const selectedFile = ref<File | null>(null)
-const isDragging   = ref(false)
-const inputRef     = ref<HTMLInputElement | null>(null)
+// ─── Local state ─────────────────────────────────────────────────────
+const fileInputRef  = ref<HTMLInputElement>()
+const dragOver      = ref(false)
+const selectedFile  = ref<File | null>(null)
+const fileError     = ref<string | null>(null)
+const disk          = ref<string>('local')
+const isEncrypted   = ref(false)
 
-// ─── Computed ─────────────────────────────────────────────────────────
-const canSubmit = computed(
-  () => selectedFile.value !== null && !props.submitting
-)
+// Reset when dialog closes
+watch(() => props.visible, open => {
+  if (!open) resetState()
+})
 
-// ─── Handlers ─────────────────────────────────────────────────────────
-function onFileChange(evt: Event) {
-  const target = evt.target as HTMLInputElement
-  if (target.files?.[0]) selectedFile.value = target.files[0]
+// ─── Helpers ─────────────────────────────────────────────────────────
+function resetState() {
+  selectedFile.value = null
+  fileError.value    = null
+  disk.value         = 'local'
+  isEncrypted.value  = false
 }
 
-function onDrop(evt: DragEvent) {
-  isDragging.value = false
-  const file = evt.dataTransfer?.files?.[0]
-  if (file) selectedFile.value = file
+function validate(file: File): string | null {
+  if (!ALLOWED_TYPES.includes(file.type))
+    return `File type "${file.type}" is not supported.`
+  if (file.size > MAX_BYTES)
+    return `File exceeds the maximum size of ${MAX_MB} MB.`
+  return null
 }
 
-function onDragover() { isDragging.value = true  }
-function onDragleave() { isDragging.value = false }
+function setFile(file: File) {
+  const err          = validate(file)
+  fileError.value    = err
+  selectedFile.value = err ? null : file
+}
 
 function clearFile() {
   selectedFile.value = null
-  if (inputRef.value) inputRef.value.value = ''
+  fileError.value    = null
+  if (fileInputRef.value) fileInputRef.value.value = ''
 }
 
-function handleSubmit() {
+function onFileInput(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (file) setFile(file)
+}
+
+function onDrop(e: DragEvent) {
+  e.preventDefault()
+  dragOver.value = false
+  const file = e.dataTransfer?.files?.[0]
+  if (file) setFile(file)
+}
+
+function mimeIcon(mime: string): string {
+  if (mime.startsWith('image/')) return 'pi pi-image'
+  if (mime.includes('pdf'))      return 'pi pi-file-pdf'
+  if (mime.includes('word'))     return 'pi pi-file-word'
+  if (mime.includes('excel') || mime.includes('spreadsheet')) return 'pi pi-file-excel'
+  if (mime.startsWith('text/'))  return 'pi pi-file'
+  if (mime.includes('zip'))      return 'pi pi-box'
+  return 'pi pi-file'
+}
+
+function mimeColor(mime: string): string {
+  if (mime.startsWith('image/')) return 'text-purple-500'
+  if (mime.includes('pdf'))      return 'text-red-500'
+  if (mime.includes('word'))     return 'text-blue-500'
+  if (mime.includes('excel') || mime.includes('spreadsheet')) return 'text-green-600'
+  return 'text-blueberry-400'
+}
+
+// ─── Submit ──────────────────────────────────────────────────────────
+function submit() {
   if (!selectedFile.value) return
-  emit('upload', selectedFile.value)
+  emit('upload', selectedFile.value, {
+    disk:         disk.value,
+    is_encrypted: isEncrypted.value ? 1 : 0,
+  })
 }
 
 function close() {
-  if (props.submitting) return
-  clearFile()
   emit('update:visible', false)
   emit('cancel')
-}
-
-// ─── File icon ────────────────────────────────────────────────────────
-function fileIcon(mime?: string): string {
-  if (!mime) return 'pi pi-file'
-  if (mime === 'application/pdf') return 'pi pi-file-pdf'
-  if (mime.startsWith('image/'))  return 'pi pi-image'
-  return 'pi pi-file'
 }
 </script>
 
 <template>
   <Dialog
-    :visible="visible"
-    @update:visible="close"
+    :visible="props.visible"
     modal
-    :closable="!submitting"
     header="Upload File"
-    :style="{ width: '32rem' }"
+    :style="{ width: '560px' }"
+    :draggable="false"
     :pt="{
-      root:    { class: 'rounded-2xl overflow-hidden border border-appleCore-200 shadow-xl' },
-      header:  { class: 'bg-[#faf7f2] border-b border-appleCore-100 px-6 py-4 font-serif font-semibold text-blueberry-800' },
-      content: { class: 'bg-[#faf7f2] px-6 py-5' },
-      footer:  { class: 'bg-[#faf7f2] border-t border-appleCore-100 px-6 py-4' },
+      header:  '!bg-white !border-b !border-appleCore-100 !px-6 !py-4',
+      content: '!bg-white !px-6 !py-5',
+      footer:  '!bg-appleCore-50 !border-t !border-appleCore-100 !px-6 !py-4',
     }"
+    @update:visible="close"
   >
-    <template #default>
-      <div class="space-y-5">
+    <div class="space-y-5">
 
-        <!-- Drop zone -->
-        <div
-          class="relative border-2 border-dashed rounded-2xl transition-colors cursor-pointer"
-          :class="[
-            isDragging
-              ? 'border-blueberry-400 bg-blueberry-50'
-              : 'border-appleCore-200 bg-white hover:border-appleCore-400'
-          ]"
-          @dragover.prevent="onDragover"
-          @dragleave.prevent="onDragleave"
-          @drop.prevent="onDrop"
-          @click="inputRef?.click()"
-        >
-          <div class="flex flex-col items-center justify-center py-10 px-4 text-center pointer-events-none">
-            <div class="w-12 h-12 rounded-2xl bg-appleCore-50 border border-appleCore-200 flex items-center justify-center mb-3">
-              <i class="pi pi-cloud-upload text-blueberry-400 text-xl" />
-            </div>
-            <p class="text-sm font-medium text-blueberry-700 mb-1">
-              Drag & drop a file here
+      <!-- ── Drop Zone ─────────────────────────────────────────────── -->
+      <div
+        class="border-2 border-dashed rounded-2xl p-8 text-center
+               cursor-pointer transition-all duration-150"
+        :class="dragOver
+          ? 'border-apricot-400 bg-apricot-50/60'
+          : 'border-appleCore-300 bg-appleCore-50/40 hover:border-apricot-300 hover:bg-apricot-50/20'"
+        @click="fileInputRef?.click()"
+        @dragover.prevent="dragOver = true"
+        @dragleave="dragOver = false"
+        @drop="onDrop"
+      >
+        <input
+          ref="fileInputRef"
+          type="file"
+          class="hidden"
+          @change="onFileInput"
+        />
+
+        <!-- File selected preview -->
+        <div v-if="selectedFile" class="flex flex-col items-center gap-3">
+          <div
+            class="w-14 h-14 rounded-2xl bg-white border border-appleCore-200
+                   flex items-center justify-center shadow-sm"
+          >
+            <i
+              :class="[
+                mimeIcon(selectedFile.type),
+                mimeColor(selectedFile.type),
+                'text-2xl',
+              ]"
+            />
+          </div>
+          <div>
+            <p class="font-semibold text-blueberry-800 text-sm">
+              {{ selectedFile.name }}
             </p>
-            <p class="text-xs text-blueberry-400">
-              or <span class="text-blueberry-600 underline underline-offset-2">click to browse</span>
+            <p class="text-xs text-blueberry-400 mt-0.5">
+              <FileSizeLabel :bytes="selectedFile.size" :decimals="1" />
+              · {{ selectedFile.type }}
             </p>
           </div>
+          <button
+            class="text-xs text-red-500 underline hover:text-red-600 mt-1 transition-colors"
+            @click.stop="clearFile"
+          >
+            Remove file
+          </button>
+        </div>
 
-          <!-- Hidden input -->
-          <input
-            ref="inputRef"
-            type="file"
-            class="sr-only"
-            @change="onFileChange"
+        <!-- Empty state -->
+        <div v-else class="flex flex-col items-center gap-3">
+          <div
+            class="w-14 h-14 rounded-2xl bg-white border border-appleCore-200
+                   flex items-center justify-center shadow-sm"
+          >
+            <i class="pi pi-cloud-upload text-2xl text-blueberry-400" />
+          </div>
+          <div>
+            <p class="font-semibold text-blueberry-700 text-sm">
+              Drop your file here, or
+              <span class="text-apricot-600 underline">browse</span>
+            </p>
+            <p class="text-xs text-blueberry-400 mt-1">
+              Max {{ MAX_MB }}MB · PDF, Word, Excel, Images, CSV, ZIP
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── File validation error ──────────────────────────────────── -->
+      <div
+        v-if="fileError"
+        class="flex items-start gap-2 text-xs text-red-600 bg-red-50
+               border border-red-200 rounded-xl px-3 py-2"
+      >
+        <i class="pi pi-exclamation-triangle mt-0.5 flex-shrink-0" />
+        <span>{{ fileError }}</span>
+      </div>
+
+      <!-- ── Options ───────────────────────────────────────────────── -->
+      <div class="grid grid-cols-2 gap-4">
+
+        <!-- Storage disk -->
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold text-blueberry-500 uppercase tracking-wide">
+            Storage Disk
+          </label>
+          <Dropdown
+            v-model="disk"
+            :options="DISK_OPTIONS"
+            option-label="label"
+            option-value="value"
+            class="w-full !text-sm !rounded-xl !border-appleCore-200"
           />
         </div>
 
-        <!-- Selected file preview -->
-        <Transition name="slide-down">
-          <div
-            v-if="selectedFile"
-            class="bg-white rounded-xl border border-appleCore-200 px-4 py-3 flex items-center gap-3"
-          >
-            <div class="w-9 h-9 rounded-lg bg-appleCore-50 border border-appleCore-200 flex items-center justify-center flex-shrink-0">
-              <i :class="[fileIcon(selectedFile.type), 'text-blueberry-500 text-sm']" />
-            </div>
-            <div class="min-w-0 flex-1">
-              <p class="text-sm font-medium text-blueberry-700 truncate">
-                {{ selectedFile.name }}
-              </p>
-              <p class="text-xs text-blueberry-400 mt-0.5">
-                <FileSizeLabel :bytes="selectedFile.size" />
-                &nbsp;·&nbsp;
-                {{ selectedFile.type || 'Unknown type' }}
-              </p>
-            </div>
-            <Button
-              icon="pi pi-times"
-              text
-              rounded
-              severity="secondary"
-              size="small"
-              :disabled="submitting"
-              @click.stop="clearFile"
-              class="!text-blueberry-400 hover:!text-blueberry-600"
-            />
-          </div>
-        </Transition>
-
-        <!-- Upload progress -->
-        <Transition name="fade">
-          <div v-if="submitting" class="space-y-2">
-            <div class="flex justify-between text-xs text-blueberry-500">
-              <span>Uploading…</span>
-              <span>{{ progress ?? 0 }}%</span>
-            </div>
-            <ProgressBar
-              :value="progress ?? 0"
-              :pt="{
-                root:  { class: 'h-2 rounded-full bg-appleCore-100' },
-                value: { class: 'bg-blueberry-500 rounded-full' },
-              }"
-            />
-          </div>
-        </Transition>
+        <!-- Encryption toggle -->
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold text-blueberry-500 uppercase tracking-wide">
+            Encryption
+          </label>
+          <ToggleButton
+            v-model="isEncrypted"
+            on-label="Encrypted"
+            off-label="Not Encrypted"
+            on-icon="pi pi-lock"
+            off-icon="pi pi-unlock"
+            class="w-full !text-sm !rounded-xl"
+          />
+        </div>
 
       </div>
-    </template>
 
-    <!-- Footer -->
-    <template #footer>
-      <div class="flex items-center justify-end gap-3">
-        <Button
-          label="Cancel"
-          text
-          severity="secondary"
-          :disabled="submitting"
-          @click="close"
-          class="!text-blueberry-500 hover:!text-blueberry-700"
-        />
-        <Button
-          label="Upload File"
-          icon="pi pi-upload"
-          :loading="submitting"
-          :disabled="!canSubmit"
-          @click="handleSubmit"
+      <!-- ── Upload progress ───────────────────────────────────────── -->
+      <div v-if="props.submitting" class="space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-blueberry-600">
+            Uploading…
+          </span>
+          <span class="text-xs font-bold text-apricot-600 tabular-nums">
+            {{ props.progress }}%
+          </span>
+        </div>
+        <ProgressBar
+          :value="props.progress"
+          :show-value="false"
           :pt="{
-            root: { class: 'bg-blueberry-700 hover:bg-blueberry-800 border-0 text-white rounded-xl px-5' }
+            root:  '!h-2 !rounded-full !bg-appleCore-100',
+            value: '!bg-apricot-500 !rounded-full',
           }"
         />
       </div>
+
+    </div>
+
+    <!-- ── Footer ────────────────────────────────────────────────────── -->
+    <template #footer>
+      <div class="flex justify-end gap-3">
+        <AppButton
+          label="Cancel"
+          variant="neutral"
+          outlined
+          :disabled="props.submitting"
+          @click="close"
+        />
+        <AppButton
+          label="Upload File"
+          variant="accent"
+          icon="pi pi-upload"
+          :loading="props.submitting"
+          :disabled="!selectedFile || !!fileError || props.submitting"
+          @click="submit"
+        />
+      </div>
     </template>
+
   </Dialog>
 </template>
-
-<style scoped>
-.slide-down-enter-active,
-.slide-down-leave-active {
-  transition: all 0.2s ease;
-}
-.slide-down-enter-from,
-.slide-down-leave-to {
-  opacity:   0;
-  transform: translateY(-6px);
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-</style>

@@ -75,7 +75,7 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
         {
           icon: 'pi pi-folder',
           title: 'File Repository',
-          to: '/files',
+          to: '/file-repository',
           permissions: [Perm.fileRepositoryViewAny],
         },
         {

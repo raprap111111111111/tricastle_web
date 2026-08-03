@@ -1,318 +1,397 @@
 <!-- src/features/file-repository/components/FileRepositoryTable.vue -->
 <script setup lang="ts">
-import { ref } from 'vue'
-import DataTable  from 'primevue/datatable'
-import Column     from 'primevue/column'
-import Button     from 'primevue/button'
-import Tooltip    from 'primevue/tooltip'
-import Tag        from 'primevue/tag'
-import FileTypeBadge            from './FileTypeBadge.vue'
-import FileSizeLabel            from './FileSizeLabel.vue'
-import FileRepositoryDeleteDialog from './FileRepositoryDeleteDialog.vue'
-import FileRepositoryPurgeDialog  from './FileRepositoryPurgeDialog.vue'
+import { ref, computed }             from 'vue'
+import DataTable                     from 'primevue/datatable'
+import Column                        from 'primevue/column'
+import Button                        from 'primevue/button'
+import Tag                           from 'primevue/tag'
+import Paginator, { type PageState } from 'primevue/paginator'
+import FileSizeLabel                 from './FileSizeLabel.vue'
+import FileRepositoryDeleteDialog    from './FileRepositoryDeleteDialog.vue'
 import type { FileRepository, Pagination } from '../types'
 
-// ─── Directives ───────────────────────────────────────────────────────
-const vTooltip = Tooltip
-
-// ─── Props / Emits ────────────────────────────────────────────────────
-defineProps<{
-  files:       FileRepository[]
-  pagination:  Pagination
-  loading:     boolean
-  submitting:  boolean
+// ─── Props / Emits ───────────────────────────────────────────────────
+const props = defineProps<{
+  files:      FileRepository[]
+  pagination: Pagination | null
+  loading:    boolean
+  submitting: boolean
 }>()
 
 const emit = defineEmits<{
-  page:   [page: number]   // 0-based
-  delete: [id: number]
-  purge:  [id: number]
+  (e: 'page',   page: number): void
+  (e: 'delete', id:   number): void
+  (e: 'purge',  id:   number): void
 }>()
 
 // ─── Dialog state ─────────────────────────────────────────────────────
-const deleteVisible = ref(false)
-const purgeVisible  = ref(false)
-const targetFile    = ref<FileRepository | null>(null)
+const deleteDialog = ref(false)
+const purgeDialog  = ref(false)
+const selected     = ref<FileRepository | null>(null)
 
+// ─── Pagination helpers ───────────────────────────────────────────────
+const currentLimit = computed(() => props.pagination?.per_page ?? 10)
+
+const currentFirst = computed(() => {
+  if (!props.pagination) return 0
+  return (props.pagination.current_page - 1) * currentLimit.value
+})
+
+// ─── Handlers ─────────────────────────────────────────────────────────
 function openDelete(file: FileRepository) {
-  targetFile.value    = file
-  deleteVisible.value = true
+  selected.value     = file
+  deleteDialog.value = true
 }
 
 function openPurge(file: FileRepository) {
-  targetFile.value   = file
-  purgeVisible.value = true
+  selected.value    = file
+  purgeDialog.value = true
 }
 
-function onDeleteConfirm(id: number) {
-  emit('delete', id)
-  deleteVisible.value = false
+function onDeleteConfirmed() {
+  if (!selected.value) return
+  emit('delete', selected.value.id)
+  deleteDialog.value = false
+  selected.value     = null
 }
 
-function onPurgeConfirm(id: number) {
-  emit('purge', id)
-  purgeVisible.value = false
+function onPurgeConfirmed() {
+  if (!selected.value) return
+  emit('purge', selected.value.id)
+  purgeDialog.value = false
+  selected.value    = null
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-PH', {
-    year:  'numeric',
-    month: 'short',
-    day:   'numeric',
-  })
+function onPageChange(event: PageState) {
+  if (event.rows !== currentLimit.value) {
+    // rows-per-page changed — reset to page 1 with new limit
+    emit('page', 1)
+    return
+  }
+  emit('page', event.page + 1)
 }
 
-function truncateHash(hash: string, len = 16): string {
-  return hash.length > len ? hash.slice(0, len) + '…' : hash
+// ─── Formatters ───────────────────────────────────────────────────────
+function formatDate(d: string | null | undefined): string {
+  if (!d) return '—'
+  try {
+    return new Date(d).toLocaleDateString('en-CA')
+  } catch {
+    return '—'
+  }
 }
 
-function diskSeverity(disk: string): string {
-  if (disk === 's3')     return 'info'
-  if (disk === 'public') return 'warn'
-  return 'secondary'
+function mimeIcon(mime: string): string {
+  if (mime.startsWith('image/'))           return 'pi pi-image'
+  if (mime === 'application/pdf')          return 'pi pi-file-pdf'
+  if (mime.includes('word'))               return 'pi pi-file-word'
+  if (mime.includes('excel') || mime.includes('spreadsheet')) return 'pi pi-file-excel'
+  if (mime.startsWith('text/'))            return 'pi pi-file'
+  if (mime.includes('zip'))                return 'pi pi-box'
+  return 'pi pi-file'
 }
 
-function onPageChange(evt: { page: number }) {
-  emit('page', evt.page)
+function mimeColor(mime: string): string {
+  if (mime.startsWith('image/'))  return 'text-purple-500'
+  if (mime.includes('pdf'))       return 'text-red-500'
+  if (mime.includes('word'))      return 'text-blue-500'
+  if (mime.includes('excel') || mime.includes('spreadsheet')) return 'text-green-600'
+  if (mime.startsWith('text/'))   return 'text-blueberry-400'
+  return 'text-blueberry-400'
+}
+
+function diskSeverity(disk: string) {
+  const map: Record<string, string> = {
+    local:  'info',
+    s3:     'success',
+    public: 'warning',
+  }
+  return map[disk] ?? 'info'
 }
 </script>
 
 <template>
-  <div class="bg-white rounded-2xl border border-appleCore-200 overflow-hidden">
+  <div class="bg-white border border-appleCore-200 rounded-2xl overflow-hidden shadow-sm">
 
+    <!-- ── Card header ───────────────────────────────────────────────── -->
+    <div
+      class="flex items-center justify-between px-5 py-4
+             border-b border-appleCore-100"
+    >
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-blueberry-50 flex items-center justify-center">
+          <i class="pi pi-folder text-blueberry-500 text-sm" />
+        </div>
+        <div>
+          <h2 class="text-sm font-semibold text-blueberry-800">All Files</h2>
+          <p class="text-xs text-blueberry-400">
+            {{ pagination?.total ?? 0 }} file(s) in repository
+          </p>
+        </div>
+      </div>
+
+      <!-- live count badge -->
+      <span
+        class="text-xs font-semibold text-blueberry-600 bg-blueberry-50
+               px-3 py-1 rounded-full border border-blueberry-100"
+      >
+        {{ pagination?.total ?? 0 }} total
+      </span>
+    </div>
+
+    <!-- ── DataTable ──────────────────────────────────────────────────── -->
     <DataTable
-      :value="files"
-      :loading="loading"
-      data-key="id"
-      :rows="pagination.per_page"
-      :total-records="pagination.total"
-      lazy
+      :value="props.files"
+      :loading="props.loading"
+      class="!border-none"
+      size="small"
+      :row-hover="true"
       :pt="{
-        root:       { class: 'w-full' },
-        thead:      { class: 'bg-appleCore-50 border-b border-appleCore-200' },
-        headerCell: { class: 'px-4 py-3 text-left text-xs font-semibold text-blueberry-500 uppercase tracking-wide' },
-        bodyRow:    { class: 'border-b border-appleCore-100 hover:bg-appleCore-50 transition-colors' },
-        bodyCell:   { class: 'px-4 py-3 text-sm text-blueberry-700' },
-        emptyMessage: { class: 'text-center text-blueberry-400 py-16' },
-        loadingOverlay: { class: 'bg-white/60 backdrop-blur-sm' },
+        table:     'text-sm',
+        headerRow: '!bg-appleCore-50/50 !border-b !border-appleCore-100',
+        bodyRow:   '!border-b !border-appleCore-100/60 hover:!bg-appleCore-50/40 transition-colors',
       }"
     >
 
-      <!-- Empty state -->
-      <template #empty>
-        <div class="flex flex-col items-center justify-center py-16 gap-3">
-          <div class="w-14 h-14 rounded-2xl bg-appleCore-50 border border-appleCore-200 flex items-center justify-center">
-            <i class="pi pi-folder-open text-blueberry-300 text-2xl" />
-          </div>
-          <p class="text-blueberry-500 font-medium text-sm">No files found</p>
-          <p class="text-blueberry-400 text-xs">Try adjusting your filters or upload a new file.</p>
-        </div>
-      </template>
-
-      <!-- Loading state -->
-      <template #loading>
-        <div class="flex items-center justify-center py-16 gap-2">
-          <i class="pi pi-spin pi-spinner text-blueberry-400 text-xl" />
-          <span class="text-blueberry-400 text-sm">Loading files…</span>
-        </div>
-      </template>
-
-      <!-- ── Columns ─────────────────────────────────────────────── -->
-
-      <!-- Name + badge -->
-      <Column header="File" :style="{ minWidth: '220px' }">
+      <!-- File Name + Hash ─────────────────────────────────────────── -->
+      <Column header="File" sort-field="original_name" sortable>
+        <template #header>
+          <span class="text-xs font-semibold text-blueberry-500 uppercase tracking-wider">
+            File
+          </span>
+        </template>
         <template #body="{ data }">
-          <div class="flex flex-col gap-1">
-            <span
-              class="font-medium text-blueberry-800 truncate max-w-[200px] block"
-              :title="data.original_name"
+          <div class="flex items-center gap-3 py-1">
+            <!-- MIME icon -->
+            <div
+              class="w-9 h-9 rounded-xl bg-appleCore-50 border border-appleCore-200
+                     flex items-center justify-center flex-shrink-0"
             >
-              {{ data.original_name }}
-            </span>
-            <FileTypeBadge :mime-type="data.mime_type" />
+              <i :class="[mimeIcon(data.mime_type), mimeColor(data.mime_type), 'text-sm']" />
+            </div>
+            <div class="flex flex-col min-w-0">
+              <span
+                class="font-medium text-blueberry-800 text-sm truncate max-w-[220px]"
+                v-tooltip.top="data.original_name"
+              >
+                {{ data.original_name }}
+              </span>
+              <span class="font-mono text-xs text-blueberry-300 truncate max-w-[220px]">
+                {{ data.file_hash.substring(0, 20) }}…
+              </span>
+            </div>
           </div>
         </template>
       </Column>
 
-      <!-- Hash -->
-      <Column header="Hash" :style="{ minWidth: '150px' }">
+      <!-- Size ────────────────────────────────────────────────────────── -->
+      <Column sort-field="file_size" sortable style="width: 100px">
+        <template #header>
+          <span class="text-xs font-semibold text-blueberry-500 uppercase tracking-wider">Size</span>
+        </template>
         <template #body="{ data }">
-          <span
-            v-tooltip="{ value: data.file_hash, showDelay: 300 }"
-            class="font-mono text-xs text-apricot-600 cursor-help"
-          >
-            {{ truncateHash(data.file_hash) }}
+          <span class="text-sm text-blueberry-600">
+            <FileSizeLabel :bytes="data.file_size" :decimals="1" />
           </span>
         </template>
       </Column>
 
-      <!-- Size -->
-      <Column header="Size" :style="{ minWidth: '90px' }">
+      <!-- Type ────────────────────────────────────────────────────────── -->
+      <Column style="width: 130px">
+        <template #header>
+          <span class="text-xs font-semibold text-blueberry-500 uppercase tracking-wider">Type</span>
+        </template>
         <template #body="{ data }">
-          <FileSizeLabel :bytes="data.file_size" />
+          <span
+            class="text-xs text-blueberry-500 bg-appleCore-100 rounded-lg
+                   px-2 py-0.5 font-medium"
+          >
+            {{ data.mime_type.split('/')[1] ?? data.mime_type }}
+          </span>
         </template>
       </Column>
 
-      <!-- Disk -->
-      <Column header="Disk" :style="{ minWidth: '90px' }">
+      <!-- Disk ────────────────────────────────────────────────────────── -->
+      <Column style="width: 90px">
+        <template #header>
+          <span class="text-xs font-semibold text-blueberry-500 uppercase tracking-wider">Disk</span>
+        </template>
         <template #body="{ data }">
           <Tag
             :value="data.disk"
             :severity="diskSeverity(data.disk)"
-            :pt="{ root: { class: 'text-xs rounded-lg px-2 py-0.5 uppercase font-medium' } }"
+            class="!text-xs capitalize"
           />
         </template>
       </Column>
 
-      <!-- Encrypted -->
-      <Column header="Enc." :style="{ minWidth: '64px' }">
-        <template #body="{ data }">
-          <i
-            v-if="data.is_encrypted"
-            class="pi pi-lock text-blueberry-500"
-            v-tooltip="'Encrypted'"
-          />
-          <i
-            v-else
-            class="pi pi-lock-open text-appleCore-300"
-            v-tooltip="'Not encrypted'"
-          />
+      <!-- References ──────────────────────────────────────────────────── -->
+      <Column sort-field="reference_count" sortable style="width: 90px">
+        <template #header>
+          <span class="text-xs font-semibold text-blueberry-500 uppercase tracking-wider">Refs</span>
         </template>
-      </Column>
-
-      <!-- Reference count -->
-      <Column header="Refs" :style="{ minWidth: '64px' }">
         <template #body="{ data }">
-          <span
-            :class="[
-              'inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-semibold',
-              data.reference_count === 0
-                ? 'bg-amber-50 text-amber-600 border border-amber-200'
-                : 'bg-appleCore-50 text-blueberry-600 border border-appleCore-200',
-            ]"
-            :title="data.reference_count === 0 ? 'Unused — safe to purge' : `Referenced by ${data.reference_count} document(s)`"
-          >
-            {{ data.reference_count }}
-          </span>
-        </template>
-      </Column>
-
-      <!-- Uploaded date -->
-      <Column header="Uploaded" :style="{ minWidth: '120px' }">
-        <template #body="{ data }">
-          <span class="text-blueberry-400 text-xs">{{ formatDate(data.created_at) }}</span>
-        </template>
-      </Column>
-
-      <!-- Uploader -->
-      <Column header="By" :style="{ minWidth: '100px' }">
-        <template #body="{ data }">
-          <span v-if="data.uploader" class="text-xs text-blueberry-500">
-            {{ data.uploader.name }}
-          </span>
-          <span v-else class="text-xs text-blueberry-300">—</span>
-        </template>
-      </Column>
-
-      <!-- Actions -->
-      <Column header="Actions" :style="{ minWidth: '120px' }" frozen align-frozen="right">
-        <template #body="{ data }">
-          <div class="flex items-center gap-1">
-
-            <!-- Soft delete -->
-            <Button
-              icon="pi pi-trash"
-              text
-              rounded
-              size="small"
-              severity="danger"
-              v-tooltip="'Soft delete'"
-              :disabled="submitting"
-              @click="openDelete(data)"
-              :pt="{ root: { class: 'w-8 h-8' } }"
-            />
-
-            <!-- Purge -->
-            <Button
-              icon="pi pi-bomb"
-              text
-              rounded
-              size="small"
-              severity="danger"
-              v-tooltip="data.reference_count > 0 ? 'Cannot purge — still referenced' : 'Permanently purge'"
-              :disabled="submitting"
-              @click="openPurge(data)"
-              :pt="{
-                root: {
-                  class: [
-                    'w-8 h-8',
-                    data.reference_count > 0 ? 'opacity-30 cursor-not-allowed' : ''
-                  ]
-                }
-              }"
-            />
-
+          <div class="flex items-center gap-1.5">
+            <span
+              class="text-sm font-bold tabular-nums"
+              :class="data.reference_count === 0
+                ? 'text-red-400'
+                : 'text-blueberry-700'"
+            >
+              {{ data.reference_count }}
+            </span>
+            <span
+              v-if="data.reference_count === 0"
+              class="text-xs text-red-400 italic"
+            >
+              unused
+            </span>
           </div>
         </template>
       </Column>
 
+      <!-- Encrypted ───────────────────────────────────────────────────── -->
+      <Column style="width: 90px">
+        <template #header>
+          <span class="text-xs font-semibold text-blueberry-500 uppercase tracking-wider">Enc.</span>
+        </template>
+        <template #body="{ data }">
+          <i
+            :class="data.is_encrypted
+              ? 'pi pi-lock text-amber-500'
+              : 'pi pi-unlock text-blueberry-200'"
+            v-tooltip.top="data.is_encrypted ? 'Encrypted' : 'Not encrypted'"
+          />
+        </template>
+      </Column>
+
+      <!-- Uploader ────────────────────────────────────────────────────── -->
+      <Column style="width: 130px">
+        <template #header>
+          <span class="text-xs font-semibold text-blueberry-500 uppercase tracking-wider">
+            Uploaded By
+          </span>
+        </template>
+        <template #body="{ data }">
+          <span class="text-sm text-blueberry-600">
+            {{ data.uploader?.name ?? '—' }}
+          </span>
+        </template>
+      </Column>
+
+      <!-- Date ────────────────────────────────────────────────────────── -->
+      <Column sort-field="created_at" sortable style="width: 120px">
+        <template #header>
+          <span class="text-xs font-semibold text-blueberry-500 uppercase tracking-wider">Date</span>
+        </template>
+        <template #body="{ data }">
+          <span class="text-sm text-blueberry-500">
+            {{ formatDate(data.created_at) }}
+          </span>
+        </template>
+      </Column>
+
+      <!-- Actions ─────────────────────────────────────────────────────── -->
+      <Column style="width: 100px">
+        <template #header>
+          <span class="text-xs font-semibold text-blueberry-500 uppercase tracking-wider">
+            Actions
+          </span>
+        </template>
+        <template #body="{ data }">
+          <div class="flex items-center gap-0.5" @click.stop>
+            <Button
+              icon="pi pi-trash"
+              text rounded size="small"
+              class="!text-blueberry-400 hover:!text-amber-500 hover:!bg-amber-50"
+              v-tooltip.top="'Soft Delete'"
+              @click="openDelete(data)"
+            />
+            <Button
+              icon="pi pi-ban"
+              text rounded size="small"
+              class="!text-blueberry-400 hover:!text-red-600 hover:!bg-red-50"
+              v-tooltip.top="'Purge Permanently'"
+              @click="openPurge(data)"
+            />
+          </div>
+        </template>
+      </Column>
+
+      <!-- ── Empty state ──────────────────────────────────────────────── -->
+      <template #empty>
+        <div class="flex flex-col items-center justify-center py-16 gap-3">
+          <div
+            class="w-16 h-16 rounded-full bg-appleCore-50
+                   flex items-center justify-center"
+          >
+            <i class="pi pi-folder-open text-2xl text-blueberry-300" />
+          </div>
+          <p class="text-sm text-blueberry-500 font-medium">No files found</p>
+          <p class="text-xs text-blueberry-400">
+            Try adjusting your filters or upload a new file
+          </p>
+        </div>
+      </template>
+
+      <!-- ── Loading state ────────────────────────────────────────────── -->
+      <template #loading>
+        <div class="flex flex-col items-center justify-center py-16 gap-3">
+          <i class="pi pi-spin pi-spinner text-2xl text-apricot-500" />
+          <p class="text-sm text-blueberry-500">Loading files…</p>
+        </div>
+      </template>
+
     </DataTable>
 
-    <!-- ── Paginator ───────────────────────────────────────────────── -->
+    <!-- ── Pagination Footer ─────────────────────────────────────────── -->
     <div
-      v-if="pagination.last_page > 1"
-      class="flex items-center justify-between px-4 py-3 border-t border-appleCore-100 bg-appleCore-50"
+      v-if="pagination && pagination.total > 0"
+      class="flex flex-col sm:flex-row items-center justify-between gap-3
+             px-5 py-3 border-t border-appleCore-100 bg-appleCore-50/30"
     >
-      <span class="text-xs text-blueberry-400">
+      <!-- Entry count -->
+      <p class="text-xs text-blueberry-500">
         Showing
-        {{ pagination.offset + 1 }}–{{ Math.min(pagination.offset + pagination.per_page, pagination.total) }}
-        of {{ pagination.total }} files
-      </span>
-
-      <div class="flex items-center gap-1">
-        <Button
-          icon="pi pi-angle-left"
-          text
-          rounded
-          size="small"
-          :disabled="pagination.current_page <= 1 || loading"
-          @click="$emit('page', pagination.current_page - 2)"
-          :pt="{ root: { class: 'w-8 h-8 text-blueberry-500' } }"
-        />
-
-        <span class="text-xs text-blueberry-600 px-2 font-medium">
-          {{ pagination.current_page }} / {{ pagination.last_page }}
+        <span class="font-semibold text-blueberry-700">
+          {{ pagination.from ?? currentFirst + 1 }}
         </span>
+        –
+        <span class="font-semibold text-blueberry-700">
+          {{ pagination.to ?? Math.min(currentFirst + currentLimit, pagination.total) }}
+        </span>
+        of
+        <span class="font-semibold text-blueberry-700">{{ pagination.total }}</span>
+        files
+      </p>
 
-        <Button
-          icon="pi pi-angle-right"
-          text
-          rounded
-          size="small"
-          :disabled="pagination.current_page >= pagination.last_page || loading"
-          @click="$emit('page', pagination.current_page)"
-          :pt="{ root: { class: 'w-8 h-8 text-blueberry-500' } }"
-        />
-      </div>
+      <Paginator
+        :rows="currentLimit"
+        :total-records="pagination.total"
+        :first="currentFirst"
+        :rows-per-page-options="[10, 25, 50, 100]"
+        template="PrevPageLink PageLinks NextPageLink RowsPerPageDropdown"
+        class="!bg-transparent !p-0"
+        @page="onPageChange"
+      />
     </div>
 
+    <!-- ── Dialogs ───────────────────────────────────────────────────── -->
+    <FileRepositoryDeleteDialog
+      v-model:visible="deleteDialog"
+      :file="selected"
+      :loading="props.submitting"
+      mode="soft"
+      @confirm="onDeleteConfirmed"
+    />
+
+    <FileRepositoryDeleteDialog
+      v-model:visible="purgeDialog"
+      :file="selected"
+      :loading="props.submitting"
+      mode="purge"
+      @confirm="onPurgeConfirmed"
+    />
+
   </div>
-
-  <!-- ── Dialogs ──────────────────────────────────────────────────────── -->
-  <FileRepositoryDeleteDialog
-    v-model:visible="deleteVisible"
-    :file="targetFile"
-    :submitting="submitting"
-    @confirm="onDeleteConfirm"
-    @cancel="deleteVisible = false"
-  />
-
-  <FileRepositoryPurgeDialog
-    v-model:visible="purgeVisible"
-    :file="targetFile"
-    :submitting="submitting"
-    @confirm="onPurgeConfirm"
-    @cancel="purgeVisible = false"
-  />
 </template>
