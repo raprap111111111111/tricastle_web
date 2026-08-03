@@ -19,9 +19,7 @@ import { documentVersionsRoutes } from './routes/document-versions.routes'
 import { documentExpiryAlertRoutes } from './routes/document-expiry-alert.routes'
 import { fileRepositoryRoutes } from './routes/file-repository.routes'
 import { permissionsRoutes } from './routes/permissions.routes'
-
-
-
+import { correctionRequestRoutes } from './routes/correction-request.routes'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -44,8 +42,7 @@ const router = createRouter({
     ...documentExpiryAlertRoutes,
     ...fileRepositoryRoutes,
     ...permissionsRoutes,
-
-
+    ...correctionRequestRoutes,
 
     { path: '/:pathMatch(.*)*', name: 'NotFound', redirect: '/dashboard' },
   ],
