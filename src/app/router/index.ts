@@ -7,7 +7,7 @@ import { dashboardRoutes } from './routes/dashboard.routes'
 import { profileRoutes } from './routes/profile.routes'
 import { applicantsRoutes } from './routes/applicants.routes'
 import { documentsRoutes } from './routes/documents.routes'
-import { usersRoutes } from './routes/users.routes'
+import { userRoutes } from './routes/user.routes'
 import { rolesRoutes } from './routes/roles.routes'
 import { settingsRoutes } from './routes/settings.routes'
 import { batchRoutes } from './routes/batch.routes'
@@ -29,7 +29,7 @@ const router = createRouter({
     ...profileRoutes,
     ...applicantsRoutes,
     ...documentsRoutes,
-    ...usersRoutes,
+    ...userRoutes,
     ...rolesRoutes,
     ...settingsRoutes,
     ...batchRoutes,
