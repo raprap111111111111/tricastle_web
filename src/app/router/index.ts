@@ -18,6 +18,9 @@ import { verificationRoutes } from './routes/verification.routes'
 import { documentVersionsRoutes } from './routes/document-versions.routes'
 import { documentExpiryAlertRoutes } from './routes/document-expiry-alert.routes'
 import { fileRepositoryRoutes } from './routes/file-repository.routes'
+import { permissionsRoutes } from './routes/permissions.routes'
+
+
 
 
 const router = createRouter({
@@ -40,6 +43,8 @@ const router = createRouter({
     ...documentVersionsRoutes,
     ...documentExpiryAlertRoutes,
     ...fileRepositoryRoutes,
+    ...permissionsRoutes,
+
 
 
     { path: '/:pathMatch(.*)*', name: 'NotFound', redirect: '/dashboard' },

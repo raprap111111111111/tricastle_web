@@ -185,12 +185,6 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
           permissions: [Perm.roleViewAny],
         },
         {
-          icon: 'pi pi-key',
-          title: 'Permissions',
-          to: '/permissions',
-          permissions: [Perm.permissionViewAny],
-        },
-        {
           icon: 'pi pi-lock',
           title: 'Access Control',
           to: '/access-control',
