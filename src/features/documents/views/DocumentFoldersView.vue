@@ -9,6 +9,8 @@ import Paginator, { type PageState } from 'primevue/paginator'
 import { AppCard } from '@shared/ui'
 import { useDocumentStore } from '../stores/document.store'
 import type { ApplicantFolderSummary } from '../types/folders'
+import { useDocumentRealtime } from '@shared/pubnub/useDocumentRealtime'
+
 
 // ⚠️ CRITICAL: this view uses batchId (NOT applicantId)
 const props = defineProps<{ batchId: number }>()
@@ -28,6 +30,13 @@ function load() {
 onMounted(load)
 onActivated(load)
 watch(() => props.batchId, load)
+
+// Listen only to THIS batch's documents
+useDocumentRealtime({
+  onReload: load,
+  batchId: props.batchId,
+})
+
 
 function onSearch() {
   clearTimeout(debounceTimer)

@@ -15,6 +15,8 @@ import { useDocumentStore } from '../stores/document.store'
 import { useDocuments } from '../composables/useDocuments'
 import { documentApi } from '../api/document.api'
 import http from '@shared/api/http'
+import { useDocumentRealtime } from '@shared/pubnub/useDocumentRealtime'
+
 
 const props = defineProps<{ id: number }>()
 
@@ -30,6 +32,15 @@ onMounted(async () => {
 })
 
 const d = computed(() => store.document)
+
+// Listen only to THIS specific document
+useDocumentRealtime({
+  onReload: async () => {
+    await store.fetchDocument(props.id)
+    await loadPreview()
+  },
+  documentId: props.id,
+})
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FILE PREVIEW (auth-safe blob URL)

@@ -1,16 +1,18 @@
 <!-- src/features/documents/views/BatchDocumentListView.vue -->
 <script setup lang="ts">
 import { onMounted, onActivated, computed, ref } from 'vue'
-import { useRouter } from 'vue-router'                      // ✅ ADDED
+import { useRouter } from 'vue-router'                    
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Paginator, { type PageState } from 'primevue/paginator'
 import { AppCard, AppStatCard } from '@shared/ui'
 import { useDocumentStore } from '../stores/document.store'
 import BatchDocumentTable from '../components/BatchDocumentTable.vue'
+import { useDocumentRealtime } from '@shared/pubnub/useDocumentRealtime'
+
 
 const store  = useDocumentStore()
-const router = useRouter()                                   // ✅ ADDED
+const router = useRouter()                              
 
 const search = ref('')
 let debounceTimer: ReturnType<typeof setTimeout>
@@ -22,6 +24,9 @@ function load() {
 
 onMounted(load)
 onActivated(load)
+
+useDocumentRealtime({ onReload: load })   
+
 
 function onSearch() {
   clearTimeout(debounceTimer)

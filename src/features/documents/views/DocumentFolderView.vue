@@ -14,6 +14,8 @@ import { useDocumentStore } from '../stores/document.store'
 import DocumentStatusBadge from '../components/DocumentStatusBadge.vue'
 import type { DocumentStatus } from '../types'
 import type { FolderVersion, DocumentGroup } from '../types/folders'
+import { useDocumentRealtime } from '@shared/pubnub/useDocumentRealtime'
+
 
 const props = defineProps<{ applicantId: number }>()
 
@@ -36,6 +38,12 @@ const error = computed(() => store.folderError)
 // ═══════════════════════════════════════════════════════════════════════════
 const showVerifiedOnly = ref(false)
 const expandedGroups = ref<Set<number>>(new Set())
+
+  // Listen only to THIS applicant's documents
+useDocumentRealtime({
+  onReload: () => store.fetchFolder(numericApplicantId.value),
+  applicantId: numericApplicantId.value,
+})
 
 function toggleExpand(groupId: number) {
   if (expandedGroups.value.has(groupId)) {

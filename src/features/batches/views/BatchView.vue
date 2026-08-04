@@ -6,6 +6,7 @@ import Skeleton from 'primevue/skeleton'
 import BatchStatusBadge from '../components/BatchStatusBadge.vue'
 import { useBatchStore } from '../stores/batch.store'
 import { useBatches } from '../composables/useBatches'
+import { useBatchRealtime } from '@shared/pubnub/useBatchRealtime'
 
 const props = defineProps<{ id: number }>()
 
@@ -16,6 +17,11 @@ const { handleActivate, handleDeactivate } = useBatches()
 onMounted(async () => {
   store.clearBatch()
   await store.fetchBatch(props.id)
+})
+
+useBatchRealtime({
+  onReload: () => store.fetchBatch(props.id),
+  batchId: props.id,
 })
 
 const b = computed(() => store.batch)
