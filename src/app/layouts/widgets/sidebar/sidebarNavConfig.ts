@@ -1,5 +1,4 @@
 // src/shared/constants/nav.config.ts
-
 import { Perm } from '@shared/constants/permissions'
 import type { NavSection } from '@shared/types/nav.types'
 
@@ -56,7 +55,7 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
         {
           icon: 'pi pi-check-square',
           title: 'Verifications',
-          to: '/document-verifications',
+          to: '/verifications',                     // ✅ FIXED (was /document-verifications)
           permissions: [Perm.documentVerificationViewAny],
         },
         {
@@ -81,7 +80,7 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
         {
           icon: 'pi pi-pencil',
           title: 'Correction Requests',
-          to: '/corrections',
+          to: '/correction-requests',               // ✅ FIXED (was /corrections)
           permissions: [Perm.correctionViewAny],
         },
         {

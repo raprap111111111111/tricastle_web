@@ -22,18 +22,30 @@ export const correctionRequestRoutes: RouteRecordRaw[] = [
         },
       },
       {
-        path: ':id',
+        path: ':id(\\d+)',
         name: 'correction-requests.show',
-        component: () =>
-          import(
+        component: () => {
+          console.log('📦 Loading CorrectionRequestDetailView component')
+          return import(
             '@features/correction-requests/views/CorrectionRequestDetailView.vue'
-          ),
+          )
+        },
         meta: {
           title: 'Correction Request Detail',
           requiresAuth: true,
           permissions: [Perm.correctionView],
         },
-        props: (route) => ({ id: Number(route.params.id) }),
+        props: (route) => {
+          const id = Number(route.params.id)
+          console.log('🔑 correction-requests.show props:', {
+            raw: route.params.id,
+            type: typeof route.params.id,
+            converted: id,
+            isNaN: isNaN(id),
+            fullPath: route.fullPath,
+          })
+          return { id }
+        },
       },
     ],
   },

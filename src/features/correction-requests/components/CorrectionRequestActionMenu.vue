@@ -21,11 +21,14 @@ const menu = ref()
 
 const items = computed(() => {
   const s = props.record.status
-  const base = [
+  const base: any[] = [
     {
       label: 'View',
       icon: 'pi pi-eye',
-      command: () => emit('view', props.record),
+      command: () => {
+        console.log('🎯 View command fired for:', props.record.id)
+        emit('view', props.record)
+      },
     },
   ]
 
@@ -33,13 +36,16 @@ const items = computed(() => {
     base.push({
       label: 'Edit',
       icon: 'pi pi-pencil',
-      command: () => emit('edit', props.record),
+      command: () => {
+        console.log('✏️ Edit command fired for:', props.record.id)
+        emit('edit', props.record)
+      },
     })
   }
 
   if (s === 'under_review' && props.record.requires_approval) {
     base.push(
-      { separator: true } as any,
+      { separator: true },
       {
         label: 'Approve',
         icon: 'pi pi-check',
@@ -63,7 +69,7 @@ const items = computed(() => {
 
   if (!['completed', 'cancelled', 'rejected'].includes(s)) {
     base.push(
-      { separator: true } as any,
+      { separator: true },
       {
         label: 'Cancel',
         icon: 'pi pi-ban',
@@ -73,7 +79,7 @@ const items = computed(() => {
   }
 
   base.push(
-    { separator: true } as any,
+    { separator: true },
     {
       label: 'Delete',
       icon: 'pi pi-trash',
@@ -85,20 +91,27 @@ const items = computed(() => {
 })
 
 function toggle(e: Event) {
+  e.stopPropagation()
   menu.value?.toggle(e)
 }
 </script>
 
 <template>
-  <div>
+  <div @click.stop>
     <Button
       icon="pi pi-ellipsis-v"
       size="small"
       text
       rounded
       severity="secondary"
+      aria-haspopup="true"
       @click="toggle"
     />
-    <Menu ref="menu" :model="items" popup />
+    <Menu
+      ref="menu"
+      :model="items"
+      popup
+      append-to="body"
+    />
   </div>
 </template>

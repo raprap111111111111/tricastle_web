@@ -1,12 +1,9 @@
 <!-- src/features/correction-requests/views/CorrectionRequestListView.vue -->
 <script setup lang="ts">
-import { onMounted } from 'vue'
-import Button from 'primevue/button'
-import IconField from 'primevue/iconfield'
-import InputIcon from 'primevue/inputicon'
-import InputText from 'primevue/inputtext'
+import { onMounted, onActivated, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import ConfirmDialog from 'primevue/confirmdialog'
-import { useRouter } from 'vue-router'      
+import { AppButton, AppCard, AppStatCard } from '@shared/ui'
 
 import { useCorrectionRequests } from '../composables/useCorrectionRequests'
 import { useCorrectionRequestForm } from '../composables/useCorrectionRequestForm'
@@ -27,18 +24,28 @@ const form = useCorrectionRequestForm()
 const actions = useCorrectionRequestActions(() => load())
 
 onMounted(() => load())
+onActivated(() => load())
 
-// ── Fix: navigate to detail view instead of just setting store.current ──
-// src/features/correction-requests/views/CorrectionRequestListView.vue
-// ─── SCRIPT SECTION ───────────────────────────────────────
+// ─── Computed Stats ───────────────────────────────────
+const totalCount = computed(() => store.total ?? 0)
 
-// ADD this import at the top
-      // ← ADD
+const pendingCount = computed(
+  () => store.records.filter((r) => r.status === 'pending').length,
+)
+const underReviewCount = computed(
+  () => store.records.filter((r) => r.status === 'under_review').length,
+)
+const approvedCount = computed(
+  () => store.records.filter((r) => r.status === 'approved').length,
+)
+const completedCount = computed(
+  () => store.records.filter((r) => r.status === 'completed').length,
+)
+const rejectedCount = computed(
+  () => store.records.filter((r) => r.status === 'rejected').length,
+)
 
-
-
-
-// ✅ NEW
+// ─── Handlers ─────────────────────────────────────────
 function handleView(record: CorrectionRequest) {
   router.push({
     name: 'correction-requests.show',
@@ -46,60 +53,92 @@ function handleView(record: CorrectionRequest) {
   })
 }
 
-// ── Fix: TS error — extract to a named async function ──────────────────
 async function handleSubmit() {
   const ok = await form.submit()
   if (ok) await load()
 }
+
+function onResetFilters() {
+  load({ status: undefined, severity: undefined })
+}
 </script>
 
 <template>
-  <div class="flex flex-col gap-4 p-4 md:p-6">
+  <div class="flex flex-col gap-8 p-8 max-w-[1400px] mx-auto">
     <ConfirmDialog />
 
-    <!-- Header -->
-    <div class="flex items-center justify-between flex-wrap gap-3">
-      <div>
-        <h1 class="text-lg font-semibold text-surface-800 dark:text-surface-100">
+    <!-- ─── Header ─────────────────────────────────── -->
+    <header class="flex items-start justify-between gap-6">
+      <div class="flex flex-col gap-1">
+        <h1 class="text-3xl font-serif font-semibold text-blueberry-800 tracking-tight">
           Correction Requests
         </h1>
-        <p class="text-xs text-surface-400 mt-0.5">
+        <p class="text-sm text-blueberry-500">
           Manage document correction workflows
         </p>
       </div>
-      <Button
+
+      <AppButton
         label="New Request"
         icon="pi pi-plus"
-        size="small"
+        variant="accent"
         @click="form.openCreate()"
       />
-    </div>
+    </header>
 
-    <!-- Toolbar -->
-    <div class="flex flex-wrap items-center gap-3">
-      <IconField class="flex-1 min-w-48">
-        <InputIcon class="pi pi-search" />
-        <InputText
-          placeholder="Search requests..."
-          class="w-full"
-          size="small"
-          @input="onSearch(($event.target as HTMLInputElement).value)"
-        />
-      </IconField>
-      <CorrectionRequestFilters
-        @filter="onFilter"
-        @reset="load({ status: undefined, severity: undefined })"
+    <!-- ─── Stats Cards ───────────────────────────── -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      <AppStatCard
+        label="Total Requests"
+        :value="totalCount"
+        icon="pi pi-file-edit"
+        variant="blueberry"
+      />
+      <AppStatCard
+        label="Pending"
+        :value="pendingCount"
+        icon="pi pi-hourglass"
+        variant="citrus"
+      />
+      <AppStatCard
+        label="Under Review"
+        :value="underReviewCount"
+        icon="pi pi-clock"
+        variant="apricot"
+      />
+      <AppStatCard
+        label="Approved"
+        :value="approvedCount"
+        icon="pi pi-verified"
+        variant="green"
+      />
+      <AppStatCard
+        label="Completed"
+        :value="completedCount"
+        icon="pi pi-check-circle"
+        variant="green"
       />
     </div>
 
-    <!-- Table -->
-    <div
-      class="rounded-xl border border-surface-200 dark:border-surface-700 overflow-hidden"
+    <!-- ─── Filters ────────────────────────────────── -->
+    <AppCard
+      :padding="'small'"
+      :shadow="'none'"
+      class="!bg-transparent !border-appleCore-200/60"
     >
+      <CorrectionRequestFilters
+        @filter="onFilter"
+        @reset="onResetFilters"
+      />
+    </AppCard>
+
+    <!-- ─── Table ──────────────────────────────────── -->
+    <AppCard :padding="'none'" :shadow="'soft'">
       <CorrectionRequestTable
         :records="store.records"
         :total="store.total"
         :loading="store.loading"
+        :submitting="store.submitting"
         :rows="params.limit ?? 10"
         :offset="params.offset ?? 0"
         @page="onPage"
@@ -112,9 +151,9 @@ async function handleSubmit() {
         @cancel="actions.openCancel"
         @delete="actions.confirmDelete"
       />
-    </div>
+    </AppCard>
 
-    <!-- Create / Edit Dialog -->
+    <!-- ─── Create / Edit Dialog ─────────────────── -->
     <CorrectionRequestCreateDialog
       v-model:visible="form.visible.value"
       :edit-target="form.editTarget.value"
@@ -123,7 +162,7 @@ async function handleSubmit() {
       @submit="handleSubmit"
     />
 
-    <!-- Action Dialogs -->
+    <!-- ─── Action Dialogs ───────────────────────── -->
     <CorrectionRequestDetailPanel
       :record="actions.actionTarget.value"
       :approve-visible="actions.approveDialog.value"

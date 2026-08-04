@@ -1,3 +1,4 @@
+// src/app/router/routes/verification.routes.ts
 import type { RouteRecordRaw } from 'vue-router'
 import { Perm } from '@shared/constants/permissions'
 
@@ -19,7 +20,7 @@ export const verificationRoutes: RouteRecordRaw[] = [
         },
       },
       {
-        path: ':id/review',
+        path: ':id(\\d+)/review',
         name: 'verification.review',
         component: () =>
           import('@features/verification/views/VerificationReviewView.vue'),
@@ -34,7 +35,7 @@ export const verificationRoutes: RouteRecordRaw[] = [
         props: (route) => ({ id: Number(route.params.id) }),
       },
       {
-        path: ':id',
+        path: ':id(\\d+)',
         name: 'verification.detail',
         component: () =>
           import('@features/verification/views/VerificationDetailView.vue'),
