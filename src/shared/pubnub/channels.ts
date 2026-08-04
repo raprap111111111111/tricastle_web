@@ -6,6 +6,8 @@ export const PubNubChannels = {
   BATCHES:       'tricastle.batches',
   DOCUMENTS:     'tricastle.documents',      
   NOTIFICATIONS: 'tricastle.notifications',
+  ACTIVITY_LOGS: 'tricastle.activity_logs',
+  
 
   // User-specific
   forUser:      (id: number) => `tricastle.user.${id}`,
