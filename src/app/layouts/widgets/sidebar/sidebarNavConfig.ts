@@ -1,4 +1,4 @@
-// src/shared/constants/nav.config.ts
+// src/app/layouts/widgets/sidebar/sidebarNavConfig.ts
 import { Perm } from '@shared/constants/permissions'
 import type { NavSection } from '@shared/types/nav.types'
 
@@ -7,9 +7,7 @@ interface PermissionContext {
   isSuperAdmin: boolean
 }
 
-export function buildNavSections(ctx: PermissionContext): NavSection[] {
-  const isApplicant = ctx.role === 'applicant'
-
+export function buildNavSections(_ctx: PermissionContext): NavSection[] {
   return [
     // ─── MAIN ──────────────────────────────────────────────
     {
@@ -23,9 +21,16 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
         },
         {
           icon: 'pi pi-users',
-          title: isApplicant ? 'My Application' : 'Applicants',
+          title: 'Applicants',
           to: '/applicants',
-          permissions: [Perm.applicantViewAny, Perm.applicantView],
+          exact: true,
+          permissions: [Perm.applicantViewAny],
+        },
+        {
+          icon: 'pi pi-folder-open',
+          title: 'Final List',
+          to: '/applicants/final-list',
+          permissions: [Perm.applicantViewAny],
         },
         {
           icon: 'pi pi-graduation-cap',
@@ -50,69 +55,13 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
           icon: 'pi pi-file',
           title: 'Documents',
           to: '/documents',
-          permissions: [Perm.documentViewAny, Perm.documentView],
-        },
-        {
-          icon: 'pi pi-check-square',
-          title: 'Verifications',
-          to: '/verifications',                     
-          permissions: [Perm.documentVerificationViewAny],
+          permissions: [Perm.documentViewAny],
         },
         {
           icon: 'pi pi-clock',
           title: 'Expiring Soon',
           to: '/document-expiry-alerts',
           permissions: [Perm.documentExpiryAlertViewAny],
-        },
-        {
-          icon: 'pi pi-history',
-          title: 'Version History',
-          to: '/document-versions',
-          permissions: [Perm.documentVersionViewAny],
-        },
-      ],
-    },
-
-    // ─── WORKFLOW ──────────────────────────────────────────
-    {
-      title: 'WORKFLOW',
-      items: [
-        {
-          icon: 'pi pi-pencil',
-          title: 'Correction Requests',
-          to: '/correction-requests',               
-          permissions: [Perm.correctionViewAny],
-        },
-        {
-          icon: 'pi pi-check-square',
-          title: 'Correction Approvals',
-          to: '/correction-approvals',  
-          permissions: [Perm.correctionApprovalViewAny],
-        },
-        {
-          icon: 'pi pi-exclamation-triangle',
-          title: 'Issues & Mismatches',
-          to: '/mismatches',
-          permissions: [Perm.verificationMismatchViewAny],
-        },
-      ],
-    },
-
-    // ─── COMMUNICATION ─────────────────────────────────────
-    {
-      title: 'COMMUNICATION',
-      items: [
-        {
-          icon: 'pi pi-bell',
-          title: 'Notifications',
-          to: '/notifications',
-          permissions: [Perm.notificationView],
-        },
-        {
-          icon: 'pi pi-comments',
-          title: 'Comments',
-          to: '/comments',
-          permissions: [Perm.commentViewAny],
         },
       ],
     },
@@ -153,12 +102,6 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
           permissions: [Perm.companyCategoryViewAny],
         },
         {
-          icon: 'pi pi-folder',
-          title: 'File Storage',
-          to: '/file-repository',
-          permissions: [Perm.fileRepositoryViewAny],
-        },
-        {
           icon: 'pi pi-cog',
           title: 'Settings',
           to: '/settings',
@@ -188,18 +131,6 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
           title: 'Activity Logs',
           to: '/activity-logs',
           permissions: [Perm.activityLogViewAny],
-        },
-        {
-          icon: 'pi pi-sign-in',
-          title: 'Login History',
-          to: '/login-history',
-          permissions: [Perm.loginHistoryViewAny],
-        },
-        {
-          icon: 'pi pi-share-alt',
-          title: 'Social Accounts',
-          to: '/social-accounts',
-          permissions: [Perm.socialAccountViewAny],
         },
       ],
     },

@@ -34,6 +34,23 @@ function formatDate(dateStr: string | null | undefined): string {
   }
 }
 
+function formatDateTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—'
+  try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return '—'
+    return d.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return '—'
+  }
+}
+
 function display(val: any, fallback = '—'): string {
   if (val === null || val === undefined || val === '') return fallback
   return String(val)
@@ -61,23 +78,18 @@ function getInitials(first?: string | null, last?: string | null): string {
   return (f + l).toUpperCase() || '?'
 }
 
-// ─── Batch pivot helpers ──────────────────────────────────
-function batchPivot(batch: any) {
-  return batch?.pivot ?? {}
-}
-
+// ─── Batch status color ───────────────────────────────────
 function batchStatusColor(status?: string): string {
   const map: Record<string, string> = {
-    applied:             'bg-blue-50 text-blue-700 ring-blue-200',
-    shortlisted:         'bg-purple-50 text-purple-700 ring-purple-200',
+    assigned:            'bg-blue-50 text-blue-700 ring-blue-200',
     interview_scheduled: 'bg-cyan-50 text-cyan-700 ring-cyan-200',
-    interview_passed:    'bg-green-50 text-green-700 ring-green-200',
+    interview_passed:    'bg-teal-50 text-teal-700 ring-teal-200',
     interview_failed:    'bg-red-50 text-red-700 ring-red-200',
     medical_pending:     'bg-yellow-50 text-yellow-700 ring-yellow-200',
-    medical_passed:      'bg-green-50 text-green-700 ring-green-200',
+    medical_passed:      'bg-teal-50 text-teal-700 ring-teal-200',
     medical_failed:      'bg-red-50 text-red-700 ring-red-200',
     exam_pending:        'bg-yellow-50 text-yellow-700 ring-yellow-200',
-    exam_passed:         'bg-green-50 text-green-700 ring-green-200',
+    exam_passed:         'bg-teal-50 text-teal-700 ring-teal-200',
     exam_failed:         'bg-red-50 text-red-700 ring-red-200',
     accepted:            'bg-emerald-50 text-emerald-700 ring-emerald-200',
     rejected:            'bg-red-50 text-red-700 ring-red-200',
@@ -90,7 +102,8 @@ function batchStatusColor(status?: string): string {
 
 <template>
   <div class="flex flex-col gap-6 p-6 max-w-6xl mx-auto">
-    <!-- Header Nav -->
+
+    <!-- ─── Header Nav ─────────────────────────────────── -->
     <div class="flex items-center justify-between gap-3">
       <div class="flex items-center gap-3">
         <Button
@@ -120,14 +133,14 @@ function batchStatusColor(status?: string): string {
       </div>
     </div>
 
-    <!-- Loading -->
+    <!-- ─── Loading ───────────────────────────────────── -->
     <template v-if="store.loading">
       <Skeleton height="200px" border-radius="16px" />
       <Skeleton height="300px" border-radius="16px" />
       <Skeleton height="300px" border-radius="16px" />
     </template>
 
-    <!-- Not Found -->
+    <!-- ─── Not Found ─────────────────────────────────── -->
     <template v-else-if="!a">
       <div class="text-center py-16 text-blueberry-400">
         <i class="pi pi-exclamation-circle text-4xl mb-3" />
@@ -135,11 +148,13 @@ function batchStatusColor(status?: string): string {
       </div>
     </template>
 
-    <!-- Full Details -->
+    <!-- ─── Full Details ──────────────────────────────── -->
     <template v-else>
-      <!-- ─── Profile Header Card ────────────────────── -->
+
+      <!-- ─── Profile Header Card ──────────────────────── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
         <div class="flex items-start gap-5">
+
           <!-- Avatar -->
           <div
             class="w-20 h-20 rounded-full bg-apricot-500 text-white
@@ -152,17 +167,22 @@ function batchStatusColor(status?: string): string {
           <!-- Info -->
           <div class="flex-1 min-w-0">
             <div class="flex flex-wrap items-center gap-2 mb-1">
-              <span class="font-mono text-xs text-apricot-600 font-semibold bg-apricot-50 px-2 py-0.5 rounded">
+              <span
+                class="font-mono text-xs text-apricot-600 font-semibold
+                       bg-apricot-50 px-2 py-0.5 rounded"
+              >
                 {{ a.applicant_code }}
               </span>
               <ApplicantStatusBadge :status="a.status" />
             </div>
+
             <h2 class="text-2xl font-serif font-semibold text-blueberry-800">
               {{ a.first_name }}
               {{ a.middle_name ? a.middle_name + ' ' : '' }}
               {{ a.last_name }}
               {{ a.suffix ?? '' }}
             </h2>
+
             <div class="flex flex-wrap gap-4 mt-2 text-sm text-blueberry-500">
               <span class="flex items-center gap-1.5">
                 <i class="pi pi-envelope text-xs" />
@@ -188,7 +208,8 @@ function batchStatusColor(status?: string): string {
               {{ a.quality_score }}%
             </p>
             <span
-              class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ring-1 ring-inset mt-1"
+              class="inline-flex items-center px-2 py-0.5 rounded text-xs
+                     font-bold ring-1 ring-inset mt-1"
               :class="gradeColor(a.quality_grade)"
             >
               Grade {{ a.quality_grade }}
@@ -196,22 +217,73 @@ function batchStatusColor(status?: string): string {
           </div>
         </div>
 
-        <!-- Staff info -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-appleCore-100">
+        <!-- ─── Status Timestamps ──────────────────────── -->
+        <div
+          v-if="a.final_listed_at || a.rejected_at || a.rejection_reason"
+          class="mt-4 pt-4 border-t border-appleCore-100"
+        >
+          <!-- Final List Info -->
+          <div
+            v-if="a.status === 'final_list' && a.final_listed_at"
+            class="flex items-center gap-2 text-sm text-green-700
+                   bg-green-50 px-3 py-2 rounded-lg"
+          >
+            <i class="pi pi-check-circle text-green-600" />
+            <span>
+              Moved to Final List on
+              <strong>{{ formatDateTime(a.final_listed_at) }}</strong>
+              <span v-if="a.reviewer">
+                by <strong>{{ a.reviewer?.full_name }}</strong>
+              </span>
+            </span>
+          </div>
+
+          <!-- Rejected Info -->
+          <div
+            v-if="a.status === 'rejected'"
+            class="flex flex-col gap-1 bg-red-50 px-3 py-2 rounded-lg"
+          >
+            <div class="flex items-center gap-2 text-sm text-red-700">
+              <i class="pi pi-times-circle text-red-600" />
+              <span>
+                Rejected on
+                <strong>{{ formatDateTime(a.rejected_at) }}</strong>
+                <span v-if="a.reviewer">
+                  by <strong>{{ a.reviewer?.full_name }}</strong>
+                </span>
+              </span>
+            </div>
+            <p v-if="a.rejection_reason" class="text-sm text-red-600 ml-6 italic">
+              "{{ a.rejection_reason }}"
+            </p>
+          </div>
+        </div>
+
+        <!-- ─── Staff Info ─────────────────────────────── -->
+        <div
+          class="grid grid-cols-1 sm:grid-cols-3 gap-4
+                 mt-6 pt-6 border-t border-appleCore-100"
+        >
           <div>
-            <p class="text-xs text-blueberry-400 uppercase tracking-wider">Assigned Staff</p>
+            <p class="text-xs text-blueberry-400 uppercase tracking-wider">
+              Assigned Staff
+            </p>
             <p class="text-sm font-medium text-blueberry-800 mt-1">
-              {{ a.assigned_staff?.name ?? '—' }}
+              {{ a.assigned_staff?.full_name ?? '—' }}
             </p>
           </div>
           <div>
-            <p class="text-xs text-blueberry-400 uppercase tracking-wider">Created By</p>
+            <p class="text-xs text-blueberry-400 uppercase tracking-wider">
+              Created By
+            </p>
             <p class="text-sm font-medium text-blueberry-800 mt-1">
-              {{ a.creator?.name ?? '—' }}
+              {{ a.creator?.full_name ?? '—' }}
             </p>
           </div>
           <div>
-            <p class="text-xs text-blueberry-400 uppercase tracking-wider">Created At</p>
+            <p class="text-xs text-blueberry-400 uppercase tracking-wider">
+              Created At
+            </p>
             <p class="text-sm font-medium text-blueberry-800 mt-1">
               {{ formatDate(a.created_at) }}
             </p>
@@ -219,9 +291,12 @@ function batchStatusColor(status?: string): string {
         </div>
       </section>
 
-      <!-- ─── Personal Information ────────────────────── -->
+      <!-- ─── Personal Information ──────────────────────── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
-        <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
+        <h3
+          class="text-base font-serif font-semibold text-blueberry-800
+                 mb-4 flex items-center gap-2"
+        >
           <i class="pi pi-user text-apricot-500" />
           Personal Information
         </h3>
@@ -281,9 +356,12 @@ function batchStatusColor(status?: string): string {
         </dl>
       </section>
 
-      <!-- ─── Physical Information ────────────────────── -->
+      <!-- ─── Physical Information ──────────────────────── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
-        <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
+        <h3
+          class="text-base font-serif font-semibold text-blueberry-800
+                 mb-4 flex items-center gap-2"
+        >
           <i class="pi pi-heart text-apricot-500" />
           Physical Information
         </h3>
@@ -312,9 +390,12 @@ function batchStatusColor(status?: string): string {
         </dl>
       </section>
 
-      <!-- ─── Address Information ─────────────────────── -->
+      <!-- ─── Address ───────────────────────────────────── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
-        <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
+        <h3
+          class="text-base font-serif font-semibold text-blueberry-800
+                 mb-4 flex items-center gap-2"
+        >
           <i class="pi pi-map-marker text-apricot-500" />
           Address
         </h3>
@@ -343,9 +424,12 @@ function batchStatusColor(status?: string): string {
         </dl>
       </section>
 
-      <!-- ─── Documents ────────────────────────────────── -->
+      <!-- ─── Documents & Government IDs ────────────────── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
-        <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
+        <h3
+          class="text-base font-serif font-semibold text-blueberry-800
+                 mb-4 flex items-center gap-2"
+        >
           <i class="pi pi-id-card text-apricot-500" />
           Documents & Government IDs
         </h3>
@@ -378,21 +462,24 @@ function batchStatusColor(status?: string): string {
         </dl>
       </section>
 
-      <!-- ─── Lifestyle ────────────────────────────────── -->
+      <!-- ─── Lifestyle ──────────────────────────────────── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
-        <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
+        <h3
+          class="text-base font-serif font-semibold text-blueberry-800
+                 mb-4 flex items-center gap-2"
+        >
           <i class="pi pi-shield text-apricot-500" />
           Lifestyle & Health
         </h3>
 
         <template v-if="a.lifestyle">
-          <!-- Current habits -->
           <div class="mb-4">
             <p class="text-xs text-blueberry-400 uppercase tracking-wider mb-2">Current Habits</p>
             <div class="flex flex-wrap gap-2">
               <span
                 v-if="a.lifestyle.is_smoking"
-                class="inline-flex items-center gap-1 px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-xs font-medium ring-1 ring-orange-200"
+                class="inline-flex items-center gap-1 px-3 py-1 bg-orange-50
+                       text-orange-700 rounded-full text-xs font-medium ring-1 ring-orange-200"
               >
                 🚬 Smoking
                 <span v-if="a.lifestyle.smoking_frequency" class="text-orange-500">
@@ -401,7 +488,8 @@ function batchStatusColor(status?: string): string {
               </span>
               <span
                 v-if="a.lifestyle.is_drinking_alcohol"
-                class="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium ring-1 ring-blue-200"
+                class="inline-flex items-center gap-1 px-3 py-1 bg-blue-50
+                       text-blue-700 rounded-full text-xs font-medium ring-1 ring-blue-200"
               >
                 🍺 Drinking
                 <span v-if="a.lifestyle.drinking_frequency" class="text-blue-500">
@@ -410,7 +498,8 @@ function batchStatusColor(status?: string): string {
               </span>
               <span
                 v-if="a.lifestyle.is_using_drugs"
-                class="inline-flex items-center gap-1 px-3 py-1 bg-red-50 text-red-700 rounded-full text-xs font-medium ring-1 ring-red-200"
+                class="inline-flex items-center gap-1 px-3 py-1 bg-red-50
+                       text-red-700 rounded-full text-xs font-medium ring-1 ring-red-200"
               >
                 💊 Drug Use
               </span>
@@ -423,7 +512,6 @@ function batchStatusColor(status?: string): string {
             </div>
           </div>
 
-          <!-- Past habits -->
           <div class="mb-4">
             <p class="text-xs text-blueberry-400 uppercase tracking-wider mb-2">Past Habits</p>
             <div class="flex flex-wrap gap-2">
@@ -446,12 +534,13 @@ function batchStatusColor(status?: string): string {
             </div>
           </div>
 
-          <!-- Health -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="bg-appleCore-50/50 rounded-lg p-3">
               <div class="flex items-center gap-2 mb-1">
                 <i
-                  :class="a.lifestyle.has_medical_condition ? 'pi pi-exclamation-triangle text-red-500' : 'pi pi-check-circle text-green-500'"
+                  :class="a.lifestyle.has_medical_condition
+                    ? 'pi pi-exclamation-triangle text-red-500'
+                    : 'pi pi-check-circle text-green-500'"
                   class="text-sm"
                 />
                 <span class="text-xs font-semibold text-blueberry-700 uppercase tracking-wider">
@@ -459,14 +548,18 @@ function batchStatusColor(status?: string): string {
                 </span>
               </div>
               <p class="text-sm text-blueberry-800">
-                {{ a.lifestyle.has_medical_condition ? (a.lifestyle.medical_notes || 'Yes (no notes)') : 'None' }}
+                {{ a.lifestyle.has_medical_condition
+                    ? (a.lifestyle.medical_notes || 'Yes (no notes)')
+                    : 'None' }}
               </p>
             </div>
 
             <div class="bg-appleCore-50/50 rounded-lg p-3">
               <div class="flex items-center gap-2 mb-1">
                 <i
-                  :class="a.lifestyle.has_allergies ? 'pi pi-exclamation-triangle text-yellow-500' : 'pi pi-check-circle text-green-500'"
+                  :class="a.lifestyle.has_allergies
+                    ? 'pi pi-exclamation-triangle text-yellow-500'
+                    : 'pi pi-check-circle text-green-500'"
                   class="text-sm"
                 />
                 <span class="text-xs font-semibold text-blueberry-700 uppercase tracking-wider">
@@ -474,18 +567,25 @@ function batchStatusColor(status?: string): string {
                 </span>
               </div>
               <p class="text-sm text-blueberry-800">
-                {{ a.lifestyle.has_allergies ? (a.lifestyle.allergies_notes || 'Yes (no notes)') : 'None' }}
+                {{ a.lifestyle.has_allergies
+                    ? (a.lifestyle.allergies_notes || 'Yes (no notes)')
+                    : 'None' }}
               </p>
             </div>
           </div>
         </template>
 
-        <p v-else class="text-blueberry-400 italic text-sm">No lifestyle information recorded</p>
+        <p v-else class="text-blueberry-400 italic text-sm">
+          No lifestyle information recorded
+        </p>
       </section>
 
-      <!-- ─── Education ────────────────────────────────── -->
+      <!-- ─── Education ──────────────────────────────────── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
-        <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
+        <h3
+          class="text-base font-serif font-semibold text-blueberry-800
+                 mb-4 flex items-center gap-2"
+        >
           <i class="pi pi-book text-apricot-500" />
           Education
           <span class="text-xs text-blueberry-400 font-sans font-normal ml-1">
@@ -497,30 +597,25 @@ function batchStatusColor(status?: string): string {
           <div
             v-for="edu in a.educations"
             :key="edu.id"
-            class="border border-appleCore-100 rounded-lg p-4 hover:bg-appleCore-50/30 transition-colors"
+            class="border border-appleCore-100 rounded-lg p-4
+                   hover:bg-appleCore-50/30 transition-colors"
           >
-            <div class="flex items-start justify-between gap-3">
-              <div class="flex-1 min-w-0">
-                <p class="font-semibold text-blueberry-800">{{ edu.school_name }}</p>
-                <p class="text-sm text-blueberry-600 mt-0.5">
-                  {{ capitalize(edu.education_level) }}
-                  <span v-if="edu.course"> · {{ edu.course }}</span>
-                </p>
-                <div class="flex flex-wrap items-center gap-2 mt-2 text-xs text-blueberry-500">
-                  <span
-                    class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 ring-1 ring-blue-200"
-                  >
-                    {{ capitalize(edu.education_status) }}
-                  </span>
-                  <span v-if="edu.year_started || edu.year_ended">
-                    <i class="pi pi-calendar text-[10px] mr-1" />
-                    {{ edu.year_started ?? '?' }} — {{ edu.year_ended ?? 'Present' }}
-                  </span>
-                  <span v-if="edu.honors" class="text-yellow-600 font-medium">
-                    🏆 {{ edu.honors }}
-                  </span>
-                </div>
-              </div>
+            <p class="font-semibold text-blueberry-800">{{ edu.school_name }}</p>
+            <p class="text-sm text-blueberry-600 mt-0.5">
+              {{ capitalize(edu.education_level) }}
+              <span v-if="edu.course"> · {{ edu.course }}</span>
+            </p>
+            <div class="flex flex-wrap items-center gap-2 mt-2 text-xs text-blueberry-500">
+              <span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 ring-1 ring-blue-200">
+                {{ capitalize(edu.education_status) }}
+              </span>
+              <span v-if="edu.year_started || edu.year_ended">
+                <i class="pi pi-calendar text-[10px] mr-1" />
+                {{ edu.year_started ?? '?' }} — {{ edu.year_ended ?? 'Present' }}
+              </span>
+              <span v-if="edu.honors" class="text-yellow-600 font-medium">
+                🏆 {{ edu.honors }}
+              </span>
             </div>
           </div>
         </div>
@@ -528,9 +623,12 @@ function batchStatusColor(status?: string): string {
         <p v-else class="text-blueberry-400 italic text-sm">No education records</p>
       </section>
 
-      <!-- ─── Employment ───────────────────────────────── -->
+      <!-- ─── Employment ─────────────────────────────────── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
-        <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
+        <h3
+          class="text-base font-serif font-semibold text-blueberry-800
+                 mb-4 flex items-center gap-2"
+        >
           <i class="pi pi-briefcase text-apricot-500" />
           Employment History
           <span class="text-xs text-blueberry-400 font-sans font-normal ml-1">
@@ -542,54 +640,56 @@ function batchStatusColor(status?: string): string {
           <div
             v-for="emp in a.employments"
             :key="emp.id"
-            class="border border-appleCore-100 rounded-lg p-4 hover:bg-appleCore-50/30 transition-colors"
+            class="border border-appleCore-100 rounded-lg p-4
+                   hover:bg-appleCore-50/30 transition-colors"
           >
-            <div class="flex items-start justify-between gap-3">
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2">
-                  <p class="font-semibold text-blueberry-800">{{ emp.position }}</p>
-                  <span
-                    v-if="emp.is_current"
-                    class="px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-xs font-medium ring-1 ring-green-200"
-                  >
-                    Current
-                  </span>
-                </div>
-                <p class="text-sm text-blueberry-600 mt-0.5">
-                  {{ emp.company_name }}
-                  <span v-if="emp.industry" class="text-blueberry-400"> · {{ emp.industry }}</span>
-                </p>
-                <div class="flex flex-wrap items-center gap-3 mt-2 text-xs text-blueberry-500">
-                  <span>
-                    <i class="pi pi-calendar text-[10px] mr-1" />
-                    {{ formatDate(emp.date_started) }} — {{ emp.date_ended ? formatDate(emp.date_ended) : 'Present' }}
-                  </span>
-                  <span v-if="emp.city || emp.country">
-                    <i class="pi pi-map-marker text-[10px] mr-1" />
-                    {{ [emp.city, emp.country].filter(Boolean).join(', ') }}
-                  </span>
-                  <span v-if="emp.salary">
-                    <i class="pi pi-money-bill text-[10px] mr-1" />
-                    {{ emp.salary_currency }} {{ emp.salary.toLocaleString() }}
-                  </span>
-                </div>
-                <p v-if="emp.job_description" class="text-sm text-blueberry-600 mt-2 leading-relaxed">
-                  {{ emp.job_description }}
-                </p>
-                <p v-if="emp.reason_for_leaving" class="text-xs text-blueberry-500 mt-2 italic">
-                  Reason for leaving: {{ emp.reason_for_leaving }}
-                </p>
-              </div>
+            <div class="flex items-center gap-2">
+              <p class="font-semibold text-blueberry-800">{{ emp.position }}</p>
+              <span
+                v-if="emp.is_current"
+                class="px-2 py-0.5 rounded-full bg-green-50 text-green-700
+                       text-xs font-medium ring-1 ring-green-200"
+              >
+                Current
+              </span>
             </div>
+            <p class="text-sm text-blueberry-600 mt-0.5">
+              {{ emp.company_name }}
+              <span v-if="emp.industry" class="text-blueberry-400"> · {{ emp.industry }}</span>
+            </p>
+            <div class="flex flex-wrap items-center gap-3 mt-2 text-xs text-blueberry-500">
+              <span>
+                <i class="pi pi-calendar text-[10px] mr-1" />
+                {{ formatDate(emp.date_started) }} —
+                {{ emp.date_ended ? formatDate(emp.date_ended) : 'Present' }}
+              </span>
+              <span v-if="emp.city || emp.country">
+                <i class="pi pi-map-marker text-[10px] mr-1" />
+                {{ [emp.city, emp.country].filter(Boolean).join(', ') }}
+              </span>
+              <span v-if="emp.salary">
+                <i class="pi pi-money-bill text-[10px] mr-1" />
+                {{ emp.salary_currency }} {{ emp.salary.toLocaleString() }}
+              </span>
+            </div>
+            <p v-if="emp.job_description" class="text-sm text-blueberry-600 mt-2 leading-relaxed">
+              {{ emp.job_description }}
+            </p>
+            <p v-if="emp.reason_for_leaving" class="text-xs text-blueberry-500 mt-2 italic">
+              Reason for leaving: {{ emp.reason_for_leaving }}
+            </p>
           </div>
         </div>
 
         <p v-else class="text-blueberry-400 italic text-sm">No employment history</p>
       </section>
 
-      <!-- ─── Tattoos ──────────────────────────────────── -->
+      <!-- ─── Tattoos ────────────────────────────────────── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
-        <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
+        <h3
+          class="text-base font-serif font-semibold text-blueberry-800
+                 mb-4 flex items-center gap-2"
+        >
           <i class="pi pi-palette text-apricot-500" />
           Tattoo Records
           <span class="text-xs text-blueberry-400 font-sans font-normal ml-1">
@@ -601,119 +701,150 @@ function batchStatusColor(status?: string): string {
           <div
             v-for="tattoo in a.tattoos"
             :key="tattoo.id"
-            class="border border-appleCore-100 rounded-lg p-4 hover:bg-appleCore-50/30 transition-colors"
+            class="border border-appleCore-100 rounded-lg p-4
+                   hover:bg-appleCore-50/30 transition-colors"
           >
-            <div class="flex items-start justify-between gap-3">
-              <div class="flex-1">
-                <p class="font-semibold text-blueberry-800">{{ tattoo.location }}</p>
-                <div class="flex flex-wrap items-center gap-2 mt-1 text-xs text-blueberry-500">
-                  <span v-if="tattoo.size" class="capitalize">
-                    <i class="pi pi-info-circle text-[10px] mr-1" />
-                    {{ tattoo.size }}
-                  </span>
-                  <span
-                    :class="tattoo.is_visible ? 'text-red-600' : 'text-green-600'"
-                  >
-                    <i :class="tattoo.is_visible ? 'pi pi-eye' : 'pi pi-eye-slash'" class="text-[10px] mr-1" />
-                    {{ tattoo.is_visible ? 'Visible' : 'Hidden' }}
-                  </span>
-                </div>
-                <p v-if="tattoo.description" class="text-sm text-blueberry-600 mt-2">
-                  {{ tattoo.description }}
-                </p>
-              </div>
+            <p class="font-semibold text-blueberry-800">{{ tattoo.location }}</p>
+            <div class="flex flex-wrap items-center gap-2 mt-1 text-xs text-blueberry-500">
+              <span v-if="tattoo.size" class="capitalize">
+                <i class="pi pi-info-circle text-[10px] mr-1" />
+                {{ tattoo.size }}
+              </span>
+              <span :class="tattoo.is_visible ? 'text-red-600' : 'text-green-600'">
+                <i
+                  :class="tattoo.is_visible ? 'pi pi-eye' : 'pi pi-eye-slash'"
+                  class="text-[10px] mr-1"
+                />
+                {{ tattoo.is_visible ? 'Visible' : 'Hidden' }}
+              </span>
             </div>
+            <p v-if="tattoo.description" class="text-sm text-blueberry-600 mt-2">
+              {{ tattoo.description }}
+            </p>
           </div>
         </div>
 
         <p v-else class="text-blueberry-400 italic text-sm">No tattoo records</p>
       </section>
 
-      <!-- ─── Batches (Enhanced with pivot data) ───────── -->
+      <!-- ─── Batch Assignments ──────────────────────────── -->
+      <!-- Only shown when applicant is in final_list or beyond -->
       <section
-        v-if="a.batches && a.batches.length > 0"
+        v-if="a.applicant_batches && a.applicant_batches.length > 0"
         class="bg-white rounded-2xl border border-appleCore-100 p-6"
       >
-        <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
+        <h3
+          class="text-base font-serif font-semibold text-blueberry-800
+                 mb-4 flex items-center gap-2"
+        >
           <i class="pi pi-users text-apricot-500" />
-          Batch Applications
+          Batch Assignments
           <span class="text-xs text-blueberry-400 font-sans font-normal ml-1">
-            ({{ a.batches.length }})
+            ({{ a.applicant_batches.length }})
           </span>
         </h3>
 
         <div class="space-y-3">
           <div
-            v-for="batch in (a.batches as any[])"
-            :key="batch.id"
-            class="border border-appleCore-100 rounded-lg p-4 hover:bg-appleCore-50/30 transition-colors"
+            v-for="ab in a.applicant_batches"
+            :key="ab.id"
+            class="border border-appleCore-100 rounded-lg p-4
+                   hover:bg-appleCore-50/30 transition-colors"
           >
-            <div class="flex items-start justify-between gap-3">
-              <div class="flex-1 min-w-0">
-                <!-- Header row -->
-                <div class="flex items-center gap-2 flex-wrap mb-2">
-                  <span class="font-mono text-xs text-apricot-600 font-semibold bg-apricot-50 px-2 py-0.5 rounded">
-                    Batch #{{ batch.batch_number ?? batch.id }}
-                  </span>
-                  <span
-                    class="px-2 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset"
-                    :class="batchStatusColor(batchPivot(batch).status)"
-                  >
-                    {{ capitalize(batchPivot(batch).status ?? batch.status) }}
-                  </span>
-                </div>
-
-                <!-- Batch info -->
-                <p class="font-semibold text-blueberry-800">{{ batch.name }}</p>
-                <p v-if="batch.country" class="text-sm text-blueberry-500 mt-0.5">
-                  <i class="pi pi-globe text-xs mr-1" />
-                  {{ batch.country }}
-                </p>
-
-                <!-- Pivot dates -->
-                <div class="flex flex-wrap gap-3 mt-2 text-xs text-blueberry-500">
-                  <span v-if="batchPivot(batch).applied_at">
-                    <i class="pi pi-calendar text-[10px] mr-1" />
-                    Applied: {{ formatDate(batchPivot(batch).applied_at) }}
-                  </span>
-                  <span v-if="batchPivot(batch).interview_date">
-                    <i class="pi pi-comments text-[10px] mr-1" />
-                    Interview: {{ formatDate(batchPivot(batch).interview_date) }}
-                  </span>
-                  <span v-if="batchPivot(batch).medical_date">
-                    <i class="pi pi-heart text-[10px] mr-1" />
-                    Medical: {{ formatDate(batchPivot(batch).medical_date) }}
-                  </span>
-                  <span v-if="batchPivot(batch).exam_date">
-                    <i class="pi pi-book text-[10px] mr-1" />
-                    Exam: {{ formatDate(batchPivot(batch).exam_date) }}
-                  </span>
-                  <span v-if="batchPivot(batch).deployed_at">
-                    <i class="pi pi-send text-[10px] mr-1" />
-                    Deployed: {{ formatDate(batchPivot(batch).deployed_at) }}
-                  </span>
-                </div>
-
-                <!-- Notes / Score -->
-                <div v-if="batchPivot(batch).exam_score" class="mt-2 text-sm">
-                  <span class="text-blueberry-500">Exam Score:</span>
-                  <span class="font-semibold text-blueberry-800 ml-1">
-                    {{ batchPivot(batch).exam_score }}%
-                  </span>
-                </div>
-
-                <p v-if="batchPivot(batch).interview_notes" class="text-sm text-blueberry-600 mt-2 italic">
-                  <strong>Interview notes:</strong> {{ batchPivot(batch).interview_notes }}
-                </p>
-
-                <p v-if="batchPivot(batch).rejection_reason" class="text-sm text-red-600 mt-2">
-                  <strong>Rejection:</strong> {{ batchPivot(batch).rejection_reason }}
-                </p>
-              </div>
+            <!-- Header row -->
+            <div class="flex items-center gap-2 flex-wrap mb-2">
+              <span
+                class="font-mono text-xs text-apricot-600 font-semibold
+                       bg-apricot-50 px-2 py-0.5 rounded"
+              >
+                Batch #{{ ab.batch?.batch_number ?? ab.batch_id }}
+              </span>
+              <span
+                class="px-2 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset"
+                :class="batchStatusColor(ab.status)"
+              >
+                {{ capitalize(ab.status) }}
+              </span>
             </div>
+
+            <!-- Batch info -->
+            <p class="font-semibold text-blueberry-800">{{ ab.batch?.name ?? '—' }}</p>
+            <p v-if="ab.batch?.country" class="text-sm text-blueberry-500 mt-0.5">
+              <i class="pi pi-globe text-xs mr-1" />
+              {{ ab.batch.country }}
+            </p>
+
+            <!-- Dates -->
+            <div class="flex flex-wrap gap-3 mt-2 text-xs text-blueberry-500">
+              <span v-if="ab.assigned_at">
+                <i class="pi pi-calendar text-[10px] mr-1" />
+                Assigned: {{ formatDateTime(ab.assigned_at) }}
+              </span>
+              <span v-if="ab.interview_date">
+                <i class="pi pi-comments text-[10px] mr-1" />
+                Interview: {{ formatDate(ab.interview_date) }}
+              </span>
+              <span v-if="ab.medical_date">
+                <i class="pi pi-heart text-[10px] mr-1" />
+                Medical: {{ formatDate(ab.medical_date) }}
+              </span>
+              <span v-if="ab.exam_date">
+                <i class="pi pi-book text-[10px] mr-1" />
+                Exam: {{ formatDate(ab.exam_date) }}
+              </span>
+              <span v-if="ab.accepted_at">
+                <i class="pi pi-check-circle text-[10px] mr-1" />
+                Accepted: {{ formatDateTime(ab.accepted_at) }}
+              </span>
+              <span v-if="ab.deployed_at">
+                <i class="pi pi-send text-[10px] mr-1" />
+                Deployed: {{ formatDateTime(ab.deployed_at) }}
+              </span>
+            </div>
+
+            <!-- Exam score -->
+            <div v-if="ab.exam_score" class="mt-2 text-sm">
+              <span class="text-blueberry-500">Exam Score:</span>
+              <span class="font-semibold text-blueberry-800 ml-1">{{ ab.exam_score }}%</span>
+            </div>
+
+            <!-- Notes -->
+            <p v-if="ab.interview_notes" class="text-sm text-blueberry-600 mt-2 italic">
+              <strong>Interview notes:</strong> {{ ab.interview_notes }}
+            </p>
+            <p v-if="ab.medical_notes" class="text-sm text-blueberry-600 mt-1 italic">
+              <strong>Medical notes:</strong> {{ ab.medical_notes }}
+            </p>
+            <p v-if="ab.remarks" class="text-sm text-blueberry-600 mt-1 italic">
+              <strong>Remarks:</strong> {{ ab.remarks }}
+            </p>
+            <p v-if="ab.rejection_reason" class="text-sm text-red-600 mt-2">
+              <strong>Rejection reason:</strong> {{ ab.rejection_reason }}
+            </p>
+
+            <!-- Processed by -->
+            <p v-if="ab.processed_by" class="text-xs text-blueberry-400 mt-2">
+              Processed by: {{ ab.processed_by?.full_name }}
+            </p>
           </div>
         </div>
       </section>
+
+      <!-- No batch yet (still in review process) -->
+      <section
+        v-else-if="a.status !== 'final_list'"
+        class="bg-appleCore-50 rounded-2xl border border-dashed
+               border-appleCore-200 p-6 text-center"
+      >
+        <i class="pi pi-info-circle text-blueberry-400 text-2xl mb-2" />
+        <p class="text-sm text-blueberry-500">
+          This applicant has not been assigned to a batch yet.
+          <span v-if="a.status !== 'rejected'">
+            Move the applicant to <strong>Final List</strong> to enable batch assignment.
+          </span>
+        </p>
+      </section>
+
     </template>
   </div>
 </template>

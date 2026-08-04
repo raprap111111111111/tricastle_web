@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 import DataTable, { type DataTableRowClickEvent } from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
 import Paginator, { type PageState } from 'primevue/paginator'
+import Menu from 'primevue/menu'
 import ApplicantStatusBadge from './ApplicantStatusBadge.vue'
 import ApplicantDeleteDialog from './ApplicantDeleteDialog.vue'
+import RejectApplicantDialog from './RejectApplicantDialog.vue'
+import { useApplicantStore } from '../stores/applicant.store'
 import type { Applicant, Pagination } from '../types'
 
 const props = defineProps<{
@@ -22,10 +27,66 @@ const emit = defineEmits<{
   (e: 'delete', id: number): void
 }>()
 
-const router = useRouter()
-const deleteDialog      = ref(false)
-const selectedApplicant = ref<Applicant | null>(null)
+const router  = useRouter()
+const toast   = useToast()
+const confirm = useConfirm()
+const store   = useApplicantStore()
 
+const deleteDialog       = ref(false)
+const rejectDialog       = ref(false)
+const selectedApplicant  = ref<Applicant | null>(null)
+
+// ─── Row menu ────────────────────────────────────────────
+const menuRefs = ref<Record<number, InstanceType<typeof Menu> | null>>({})
+const activeApplicant = ref<Applicant | null>(null)
+
+function toggleMenu(event: Event, applicant: Applicant) {
+  activeApplicant.value = applicant
+  menuRefs.value[applicant.id]?.toggle(event)
+}
+
+const menuItems = computed(() => {
+  const a = activeApplicant.value
+  if (!a) return []
+
+  const items: any[] = [
+    { label: 'View Details', icon: 'pi pi-eye',    command: () => goToView(a.id) },
+    { label: 'Edit',         icon: 'pi pi-pencil', command: () => goToEdit(a.id) },
+    { separator: true },
+  ]
+
+  if (a.status !== 'final_list' && a.status !== 'rejected') {
+    items.push({
+      label: 'Move to Final List',
+      icon: 'pi pi-check-circle',
+      class: '!text-green-600',
+      command: () => handleMoveToFinalList(a),
+    })
+  }
+
+  if (a.status !== 'rejected') {
+    items.push({
+      label: 'Reject',
+      icon: 'pi pi-times-circle',
+      class: '!text-red-600',
+      command: () => openRejectDialog(a),
+    })
+  }
+
+  items.push(
+    { separator: true },
+    {
+      label: 'Delete',
+      icon: 'pi pi-trash',
+      class: '!text-red-600',
+      command: () => confirmDelete(a),
+    },
+  )
+
+  return items
+})
+
+// ─── Pagination ───────────────────────────────────────────
 const currentLimit = computed(
   () => props.pagination?.per_page ?? props.pagination?.limit ?? 10,
 )
@@ -37,7 +98,7 @@ const currentFirst = computed(() => {
   return props.pagination?.offset ?? 0
 })
 
-// ─── Handlers ──────────────────────────────────────────
+// ─── Handlers ─────────────────────────────────────────────
 function confirmDelete(applicant: Applicant) {
   selectedApplicant.value = applicant
   deleteDialog.value = true
@@ -66,15 +127,101 @@ function goToEdit(id: number) {
   router.push({ name: 'applicants.edit', params: { id } })
 }
 
-// Row click → navigate to view
 function onRowClick(event: DataTableRowClickEvent) {
   const target = event.originalEvent?.target as HTMLElement | null
-  // Safety: ignore clicks bubbling from buttons/links inside the row
-  if (target?.closest('button, a, .p-button')) return
+  if (target?.closest('button, a, .p-button, .p-menu')) return
   goToView((event.data as Applicant).id)
 }
 
-// ─── Formatters ────────────────────────────────────────
+// ─── Remove row locally ──────────────────────────────────
+function removeFromList(id: number) {
+  const idx = store.applicants.findIndex((a) => a.id === id)
+  if (idx !== -1) store.applicants.splice(idx, 1)
+}
+
+// ─── Status Actions ───────────────────────────────────────
+function handleMoveToFinalList(applicant: Applicant) {
+  confirm.require({
+    header: 'Move to Final List',
+    message: `Move ${applicant.first_name} ${applicant.last_name} to the Final List? They will be auto-assigned to the active batch.`,
+    icon: 'pi pi-check-circle',
+    acceptLabel: 'Yes, Move',
+    rejectLabel: 'Cancel',
+    acceptClass: '!bg-green-600 !border-green-600',
+    accept: async () => {
+      try {
+        const updated = await store.moveToFinalList(applicant.id)
+
+        // Extract batch info from response
+        const batch = updated.applicant_batches?.[0]?.batch
+        const batchName = batch?.name
+
+        // Remove from Applicants list (now in Final List)
+        removeFromList(applicant.id)
+
+        // Show smart toast — different message if batch was assigned
+        if (batchName) {
+          toast.add({
+            severity: 'success',
+            summary: 'Moved to Final List',
+            detail: `${applicant.applicant_code} auto-assigned to batch: ${batchName}`,
+            life: 4000,
+          })
+        } else {
+          toast.add({
+            severity: 'warn',
+            summary: 'Moved to Final List',
+            detail: `${applicant.applicant_code} is in Final List, but no active batch exists. Create/activate a batch to auto-assign.`,
+            life: 5000,
+          })
+        }
+      } catch (e: any) {
+        toast.add({
+          severity: 'error',
+          summary: 'Failed',
+          detail: e?.response?.data?.message ?? 'Could not update status',
+          life: 4000,
+        })
+      }
+    },
+  })
+}
+
+function openRejectDialog(applicant: Applicant) {
+  selectedApplicant.value = applicant
+  rejectDialog.value = true
+}
+
+async function onRejectConfirmed(reason: string) {
+  if (!selectedApplicant.value) return
+
+  const id = selectedApplicant.value.id
+  const code = selectedApplicant.value.applicant_code
+
+  try {
+    await store.rejectApplicant(id, reason)
+
+    // Remove from Applicants list (now rejected)
+    removeFromList(id)
+
+    toast.add({
+      severity: 'success',
+      summary: 'Applicant Rejected',
+      detail: `${code} has been rejected.`,
+      life: 3000,
+    })
+    rejectDialog.value = false
+  } catch (e: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Failed',
+      detail: e?.response?.data?.message ?? 'Could not reject applicant',
+      life: 4000,
+    })
+  }
+}
+
+// ─── Formatters ───────────────────────────────────────────
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—'
   try {
@@ -114,7 +261,6 @@ function gradeColor(grade: string) {
         bodyRow: 'cursor-pointer hover:!bg-appleCore-50/40 !border-b !border-appleCore-100/60 transition-colors',
       }"
     >
-      <!-- Code -->
       <Column field="applicant_code" header="Code" sortable style="width: 150px">
         <template #body="{ data }">
           <span class="font-mono text-xs text-apricot-600 font-semibold">
@@ -123,7 +269,6 @@ function gradeColor(grade: string) {
         </template>
       </Column>
 
-      <!-- Applicant name -->
       <Column header="Applicant" sortable sort-field="last_name">
         <template #body="{ data }">
           <div class="flex flex-col items-start text-left">
@@ -182,8 +327,7 @@ function gradeColor(grade: string) {
         </template>
       </Column>
 
-      <!-- Actions (View, Edit, Delete) — stopPropagation so row click doesn't fire -->
-      <Column header="Actions" style="width: 140px">
+      <Column header="Actions" style="width: 180px">
         <template #body="{ data }">
           <div class="flex items-center gap-0.5" @click.stop>
             <Button
@@ -195,6 +339,7 @@ function gradeColor(grade: string) {
               v-tooltip.top="'View'"
               @click="goToView(data.id)"
             />
+
             <Button
               icon="pi pi-pencil"
               text
@@ -204,14 +349,44 @@ function gradeColor(grade: string) {
               v-tooltip.top="'Edit'"
               @click="goToEdit(data.id)"
             />
+
             <Button
-              icon="pi pi-trash"
+              v-if="data.status !== 'final_list' && data.status !== 'rejected'"
+              icon="pi pi-check-circle"
+              text
+              rounded
+              size="small"
+              class="!text-blueberry-500 hover:!text-green-600 hover:!bg-green-50"
+              v-tooltip.top="'Move to Final List'"
+              :loading="props.submitting"
+              @click="handleMoveToFinalList(data)"
+            />
+
+            <Button
+              v-if="data.status !== 'rejected'"
+              icon="pi pi-times-circle"
               text
               rounded
               size="small"
               class="!text-blueberry-500 hover:!text-red-500 hover:!bg-red-50"
-              v-tooltip.top="'Delete'"
-              @click="confirmDelete(data)"
+              v-tooltip.top="'Reject'"
+              @click="openRejectDialog(data)"
+            />
+
+            <Button
+              icon="pi pi-ellipsis-v"
+              text
+              rounded
+              size="small"
+              class="!text-blueberry-500 hover:!text-blueberry-800 hover:!bg-appleCore-100"
+              v-tooltip.top="'More'"
+              @click="toggleMenu($event, data)"
+            />
+            <Menu
+              :ref="(el: any) => (menuRefs[data.id] = el)"
+              :model="menuItems"
+              :popup="true"
+              :append-to="'body'"
             />
           </div>
         </template>
@@ -222,8 +397,8 @@ function gradeColor(grade: string) {
           <div class="w-16 h-16 rounded-full bg-appleCore-50 flex items-center justify-center">
             <i class="pi pi-inbox text-2xl text-blueberry-300" />
           </div>
-          <p class="text-sm text-blueberry-500 font-medium">No applicants found</p>
-          <p class="text-xs text-blueberry-400">Try adjusting your filters</p>
+          <p class="text-sm text-blueberry-500 font-medium">No applicants in review</p>
+          <p class="text-xs text-blueberry-400">All applicants have been processed</p>
         </div>
       </template>
 
@@ -235,14 +410,15 @@ function gradeColor(grade: string) {
       </template>
     </DataTable>
 
-    <!-- Pagination Footer -->
     <div
       v-if="props.pagination && props.pagination.total > 0"
       class="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-appleCore-100 bg-appleCore-50/30"
     >
       <div class="text-xs text-blueberry-500">
         Showing
-        <span class="font-semibold text-blueberry-700">{{ props.pagination.from ?? currentFirst + 1 }}</span>
+        <span class="font-semibold text-blueberry-700">
+          {{ props.pagination.from ?? currentFirst + 1 }}
+        </span>
         to
         <span class="font-semibold text-blueberry-700">
           {{ props.pagination.to ?? Math.min(currentFirst + currentLimit, props.pagination.total) }}
@@ -268,6 +444,13 @@ function gradeColor(grade: string) {
       :applicant="selectedApplicant"
       :loading="props.submitting"
       @confirm="onDeleteConfirmed"
+    />
+
+    <RejectApplicantDialog
+      v-model:visible="rejectDialog"
+      :applicant="selectedApplicant"
+      :loading="props.submitting"
+      @confirm="onRejectConfirmed"
     />
   </div>
 </template>

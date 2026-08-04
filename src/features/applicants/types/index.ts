@@ -1,11 +1,14 @@
-// ─── Enums / Literals ─────────────────────────────────────
+// src/features/applicants/types/index.ts
+
+// ─── Enums / Literals ─────────────────────────────────────────────────────────
 
 export type ApplicantStatus =
   | 'pending'
   | 'under_review'
   | 'verified'
-  | 'rejected'
   | 'incomplete'
+  | 'final_list'
+  | 'rejected'
 
 export type ApplicantGender = 'male' | 'female'
 
@@ -17,9 +20,7 @@ export type CivilStatus =
   | 'divorced'
 
 export type DominantHand = 'left' | 'right' | 'both'
-
 export type BloodType = 'A' | 'B' | 'AB' | 'O'
-
 export type QualityGrade = 'A' | 'B' | 'C' | 'D' | 'F'
 
 export type EducationLevel =
@@ -31,12 +32,10 @@ export type EducationLevel =
   | 'post_graduate'
 
 export type EducationStatus = 'graduate' | 'undergraduate' | 'ongoing'
-
 export type TattooSize = 'small' | 'medium' | 'large'
 
 export type ApplicantBatchStatus =
-  | 'applied'
-  | 'shortlisted'
+  | 'assigned'
   | 'interview_scheduled'
   | 'interview_passed'
   | 'interview_failed'
@@ -51,20 +50,76 @@ export type ApplicantBatchStatus =
   | 'withdrawn'
   | 'deployed'
 
-// ─── Shared / Relation Types ──────────────────────────────
+// ─── Shared / Relation Types ──────────────────────────────────────────────────
 
 export interface StaffRef {
   id: number
-  name: string
+  full_name: string
+  first_name?: string | null
+  last_name?: string | null
+  email?: string | null
 }
 
-// ─── Main Applicant ───────────────────────────────────────
+// ─── Batch Summary (minimal — for relations) ──────────────────────────────────
+
+// src/features/applicants/types/index.ts
+
+// ─── Batch Summary (minimal — for relations) ──────────────────────────────────
+
+export interface BatchSummary {
+  id: number
+  batch_number?: string | number | null
+  name: string
+  country?: string | null
+  status?: string | null
+  is_active?: boolean
+  applicant_count?: number   // ← ADD THIS LINE
+}
+
+// ─── Batch Option (for filter dropdowns) ──────────────────────────────────────
+
+export interface BatchOption {
+  id: number
+  name: string
+  batch_number: number | string
+  country: string | null
+  is_active: boolean
+}
+
+// ─── Applicant Batch (direct HasMany relation) ────────────────────────────────
+
+export interface ApplicantBatch {
+  id: number
+  applicant_id: number
+  batch_id: number
+  status: ApplicantBatchStatus
+
+  assigned_at: string | null
+  interview_date: string | null
+  medical_date: string | null
+  exam_date: string | null
+  accepted_at: string | null
+  deployed_at: string | null
+
+  exam_score: number | null
+  interview_notes: string | null
+  medical_notes: string | null
+  rejection_reason: string | null
+  remarks: string | null
+
+  processed_by?: StaffRef | null
+  batch?: BatchSummary | null
+
+  created_at: string
+  updated_at: string
+}
+
+// ─── Main Applicant ───────────────────────────────────────────────────────────
 
 export interface Applicant {
   id: number
   applicant_code: string
 
-  // Personal
   first_name: string
   middle_name: string | null
   last_name: string
@@ -80,20 +135,17 @@ export interface Applicant {
   number_of_children: number
   nationality: string | null
 
-  // Physical
   height_cm: number | null
   weight_kg: number | null
   dominant_hand: DominantHand | null
   blood_type: BloodType | null
 
-  // Address
   current_address: string | null
   permanent_address: string | null
   city: string | null
   province: string | null
   postal_code: string | null
 
-  // Documents
   passport_number: string | null
   passport_expiry: string | null
   sss_number: string | null
@@ -101,30 +153,33 @@ export interface Applicant {
   philhealth_number: string | null
   pagibig_number: string | null
 
-  // Status
   status: ApplicantStatus
+  rejection_reason: string | null
+  final_listed_at: string | null
+  rejected_at: string | null
+
   quality_score: number
   quality_grade: QualityGrade
 
-  // Staff (both id + relation object from backend)
   assigned_staff_id?: number | null
   assigned_staff?: StaffRef | null
+  reviewed_by?: number | null
+  reviewer?: StaffRef | null
   created_by?: number | null
   creator?: StaffRef | null
 
-  // Timestamps
   created_at: string
   updated_at: string
+  deleted_at?: string | null
 
-  // Relations (loaded via whenLoaded on backend)
   lifestyle?: ApplicantLifestyle | null
   educations?: ApplicantEducation[]
   employments?: ApplicantEmployment[]
   tattoos?: ApplicantTattoo[]
-  batches?: ApplicantBatch[]
+  applicant_batches?: ApplicantBatch[]
 }
 
-// ─── Lifestyle ────────────────────────────────────────────
+// ─── Lifestyle ────────────────────────────────────────────────────────────────
 
 export interface ApplicantLifestyle {
   id: number
@@ -146,7 +201,7 @@ export interface ApplicantLifestyle {
   updated_at: string
 }
 
-// ─── Education ────────────────────────────────────────────
+// ─── Education ────────────────────────────────────────────────────────────────
 
 export interface ApplicantEducation {
   id: number
@@ -162,7 +217,7 @@ export interface ApplicantEducation {
   updated_at: string
 }
 
-// ─── Employment ───────────────────────────────────────────
+// ─── Employment ───────────────────────────────────────────────────────────────
 
 export interface ApplicantEmployment {
   id: number
@@ -183,7 +238,7 @@ export interface ApplicantEmployment {
   updated_at: string
 }
 
-// ─── Tattoo ───────────────────────────────────────────────
+// ─── Tattoo ───────────────────────────────────────────────────────────────────
 
 export interface ApplicantTattoo {
   id: number
@@ -197,37 +252,7 @@ export interface ApplicantTattoo {
   updated_at: string
 }
 
-// ─── Applicant Batch ──────────────────────────────────────
-
-export interface ApplicantBatch {
-  id: number
-  applicant_id: number
-  batch_id: number
-  status: ApplicantBatchStatus
-  applied_at: string
-  interview_date: string | null
-  medical_date: string | null
-  exam_date: string | null
-  accepted_at: string | null
-  deployed_at: string | null
-  exam_score: number | null
-  interview_notes: string | null
-  medical_notes: string | null
-  rejection_reason: string | null
-  processed_by: number | null
-  created_at: string
-  updated_at: string
-}
-
-// ─── Batch Assignment (for create payload) ────────────────
-
-export interface BatchAssignmentPayload {
-  batch_id: number
-  batch_status?: ApplicantBatchStatus
-}
-
-
-// ─── Create / Update Payloads ─────────────────────────────
+// ─── Create / Update Payloads ─────────────────────────────────────────────────
 
 export interface CreateApplicantPayload {
   first_name: string
@@ -257,12 +282,18 @@ export interface CreateApplicantPayload {
   tin_number?: string | null
   philhealth_number?: string | null
   pagibig_number?: string | null
-  status?: ApplicantStatus
+  assigned_staff_id?: number | null
 }
 
-export type UpdateApplicantPayload = Partial<CreateApplicantPayload>
+export interface UpdateApplicantPayload extends Partial<CreateApplicantPayload> {
+  status?: ApplicantStatus
+  rejection_reason?: string | null
+  quality_score?: number
+  quality_grade?: QualityGrade
+  assigned_staff_id?: number | null
+}
 
-// ─── Lifestyle Payload ────────────────────────────────────
+// ─── Sub-resource Payloads ────────────────────────────────────────────────────
 
 export interface UpsertLifestylePayload {
   applicant_id: number
@@ -281,8 +312,6 @@ export interface UpsertLifestylePayload {
   allergies_notes?: string | null
 }
 
-// ─── Education Payloads ───────────────────────────────────
-
 export interface CreateEducationPayload {
   applicant_id: number
   education_level: EducationLevel
@@ -294,11 +323,7 @@ export interface CreateEducationPayload {
   honors?: string | null
 }
 
-export type UpdateEducationPayload = Partial<
-  Omit<CreateEducationPayload, 'applicant_id'>
->
-
-// ─── Employment Payloads ──────────────────────────────────
+export type UpdateEducationPayload = Partial<Omit<CreateEducationPayload, 'applicant_id'>>
 
 export interface CreateEmploymentPayload {
   applicant_id: number
@@ -316,11 +341,7 @@ export interface CreateEmploymentPayload {
   reason_for_leaving?: string | null
 }
 
-export type UpdateEmploymentPayload = Partial<
-  Omit<CreateEmploymentPayload, 'applicant_id'>
->
-
-// ─── Tattoo Payloads ─────────────────────────────────────
+export type UpdateEmploymentPayload = Partial<Omit<CreateEmploymentPayload, 'applicant_id'>>
 
 export interface CreateTattooPayload {
   applicant_id: number
@@ -331,11 +352,9 @@ export interface CreateTattooPayload {
   is_visible?: boolean
 }
 
-export type UpdateTattooPayload = Partial<
-  Omit<CreateTattooPayload, 'applicant_id'>
->
+export type UpdateTattooPayload = Partial<Omit<CreateTattooPayload, 'applicant_id'>>
 
-// ─── Filters ──────────────────────────────────────────────
+// ─── Filters ──────────────────────────────────────────────────────────────────
 
 export interface ApplicantFilters {
   search?: string
@@ -344,10 +363,17 @@ export interface ApplicantFilters {
   order_by?: string
   order_dir?: 'asc' | 'desc'
   status?: ApplicantStatus | ''
+  exclude_statuses?: string
+  gender?: ApplicantGender | ''
+  civil_status?: CivilStatus | ''
+  nationality?: string
+  quality_grade?: QualityGrade | ''
   assigned_staff_id?: number | null
+  batch_id?: number | null           // ← added for batch filtering
+  passport_expiring_within_months?: number | null
 }
 
-// ─── Pagination ───────────────────────────────────────────
+// ─── Pagination ───────────────────────────────────────────────────────────────
 
 export interface Pagination {
   current_page: number
@@ -380,9 +406,7 @@ export interface ApiResponse<T> {
   data: T
 }
 
-// Add these to your existing types file
-
-// ─── Duplicate Detection ──────────────────────────────────
+// ─── Duplicate Detection ──────────────────────────────────────────────────────
 
 export type DuplicateType =
   | 'email'
@@ -424,7 +448,7 @@ export interface DuplicateCheckPayload {
   exclude_id?: number
 }
 
-// ─── Address Cascade ──────────────────────────────────────
+// ─── Address Cascade ──────────────────────────────────────────────────────────
 
 export interface PsgcRegion {
   code: string
@@ -450,4 +474,27 @@ export interface PsgcBarangay {
   code: string
   name: string
   cityCode: string
+}
+
+// ─── Final List Folder Grouping ───────────────────────────────────────────────
+
+export interface FinalListFolder {
+  key: string
+  label: string
+  year: number
+  month?: number
+  day?: number
+  count: number
+  applicants: Applicant[]
+  latest_date: string
+}
+
+export type FinalListGroupBy = 'day' | 'week' | 'month' | 'year'
+
+export interface FinalListStats {
+  total: number
+  this_month: number
+  this_week: number
+  today: number
+  ready_for_batch: number
 }

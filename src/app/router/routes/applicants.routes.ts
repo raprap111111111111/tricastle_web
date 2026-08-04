@@ -8,6 +8,7 @@ export const applicantsRoutes: RouteRecordRaw[] = [
     component: () => import('@app/layouts/MainLayout.vue'),
     meta: { requiresAuth: true },
     children: [
+      // ─── List ────────────────────────────────────────
       {
         path: '',
         name: 'applicants.index',
@@ -19,6 +20,33 @@ export const applicantsRoutes: RouteRecordRaw[] = [
           permissions: [Perm.applicantViewAny],
         },
       },
+
+      // ─── Final List ──────────────────────────────────
+      {
+        path: 'final-list',
+        name: 'applicants.final-list',
+        component: () =>
+          import('@features/applicants/views/FinalListView.vue'),
+        meta: {
+          title: 'Final List',
+          requiresAuth: true,
+          permissions: [Perm.applicantViewAny],
+        },
+      },
+      {
+        path: 'final-list/:folderKey',
+        name: 'applicants.final-list.folder',
+        component: () =>
+          import('@features/applicants/views/FinalListFolderView.vue'),
+        props: (route) => ({ folderKey: String(route.params.folderKey) }),
+        meta: {
+          title: 'Final List Folder',
+          requiresAuth: true,
+          permissions: [Perm.applicantViewAny],
+        },
+      },
+
+      // ─── Create ──────────────────────────────────────
       {
         path: 'create',
         name: 'applicants.create',
@@ -30,6 +58,8 @@ export const applicantsRoutes: RouteRecordRaw[] = [
           permissions: [Perm.applicantCreate],
         },
       },
+
+      // ─── View / Edit ─────────────────────────────────
       {
         path: ':id',
         name: 'applicants.show',

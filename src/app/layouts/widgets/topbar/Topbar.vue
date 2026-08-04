@@ -4,22 +4,42 @@
       {{ pageTitle }}
     </h2>
 
-    <div class="flex items-center gap-4">
-      <div class="text-right hidden sm:block">
-        <p class="text-sm font-medium text-blueberry-800">{{ authStore.fullName }}</p>
-        <p class="text-xs text-blueberry-500 capitalize">{{ role.replace('_', ' ') }}</p>
-      </div>
+    <div class="flex items-center gap-2 sm:gap-4">
+      <!-- Notifications -->
+      <Button
+        icon="pi pi-bell"
+        text
+        rounded
+        severity="secondary"
+        aria-label="Notifications"
+        @click="router.push('/notifications')"
+      />
 
-      <div class="w-10 h-10 bg-apricot-500 text-white rounded-full flex items-center justify-center font-bold">
-        {{ initials }}
-      </div>
+      <!-- Clickable Profile -->
+      <button
+        type="button"
+        class="flex items-center gap-3 rounded-full px-2 py-1 hover:bg-appleCore-100 transition-colors"
+        aria-label="Open profile"
+        @click="goToProfile"
+      >
+        <div class="text-right hidden sm:block">
+          <p class="text-sm font-medium text-blueberry-800">{{ authStore.fullName }}</p>
+          <p class="text-xs text-blueberry-500 capitalize">{{ role.replace('_', ' ') }}</p>
+        </div>
 
+        <div class="w-10 h-10 bg-apricot-500 text-white rounded-full flex items-center justify-center font-bold">
+          {{ initials }}
+        </div>
+      </button>
+
+      <!-- Logout -->
       <Button
         icon="pi pi-sign-out"
         text
         rounded
         severity="secondary"
         :loading="loggingOut"
+        aria-label="Sign out"
         @click="handleLogout"
       />
     </div>
@@ -34,11 +54,11 @@ import Button from 'primevue/button'
 import { useAuthStore } from '@features/auth/stores/auth.store'
 import { usePermissions } from '@shared/composables/usePermissions'
 
-const route     = useRoute()
-const router    = useRouter()
-const toast     = useToast()
+const route = useRoute()
+const router = useRouter()
+const toast = useToast()
 const authStore = useAuthStore()
-const { role }  = usePermissions()
+const { role } = usePermissions()
 
 const loggingOut = ref(false)
 const pageTitle = computed(() => (route.meta?.title as string) ?? 'Dashboard')
@@ -46,9 +66,13 @@ const pageTitle = computed(() => (route.meta?.title as string) ?? 'Dashboard')
 const initials = computed(() => {
   if (!authStore.user) return '?'
   const first = authStore.user.first_name?.[0] ?? ''
-  const last  = authStore.user.last_name?.[0]  ?? ''
+  const last = authStore.user.last_name?.[0] ?? ''
   return (first + last).toUpperCase() || '?'
 })
+
+function goToProfile() {
+  router.push('/profile') // or router.push({ name: 'Profile' })
+}
 
 async function handleLogout() {
   loggingOut.value = true

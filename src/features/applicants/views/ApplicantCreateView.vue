@@ -16,7 +16,6 @@ import LifestyleTab from '../components/tabs/LifestyleTab.vue'
 import EducationTab from '../components/tabs/EducationTab.vue'
 import EmploymentTab from '../components/tabs/EmploymentTab.vue'
 import TattooTab from '../components/tabs/TattooTab.vue'
-import BatchAssignmentTab from '../components/tabs/BatchAssignmentTab.vue'
 import ReviewTab from '../components/tabs/ReviewTab.vue'
 import DuplicateWarningDialog from '../components/DuplicateWarningDialog.vue'
 
@@ -28,7 +27,6 @@ import type {
   EducationEntryValues,
   EmploymentEntryValues,
   TattooEntryValues,
-  BatchAssignmentValues,
 } from '../schemas/applicant.schema'
 import type { CreateApplicantPayload, DuplicateItem } from '../types'
 
@@ -53,6 +51,8 @@ const {
 } = useApplicantWizard()
 
 // ─── Wizard State ─────────────────────────────────────────
+// No batchData — applicants start as pending
+// Batch assignment only happens after final_list status
 const personalData    = ref<PersonalFormValues | null>(null)
 const physicalData    = ref<PhysicalAddressFormValues | null>(null)
 const documentsData   = ref<DocumentsFormValues | null>(null)
@@ -60,11 +60,10 @@ const lifestyleData   = ref<LifestyleFormValues | null>(null)
 const educationsData  = ref<EducationEntryValues[]>([])
 const employmentsData = ref<EmploymentEntryValues[]>([])
 const tattoosData     = ref<TattooEntryValues[]>([])
-const batchData       = ref<BatchAssignmentValues | null>(null)
 
 // ─── Duplicate Dialog State ───────────────────────────────
-const duplicateDialog     = ref(false)
-const foundDuplicates     = ref<DuplicateItem[]>([])
+const duplicateDialog = ref(false)
+const foundDuplicates = ref<DuplicateItem[]>([])
 
 // ─── Validation Handlers ──────────────────────────────────
 function onPersonalValidate(values: PersonalFormValues | null) {
@@ -101,11 +100,6 @@ function onLifestyleValidate(values: LifestyleFormValues | null) {
   } else {
     setStepState('lifestyle', 'invalid')
   }
-}
-
-function onBatchValidate(values: BatchAssignmentValues | null) {
-  batchData.value = values
-  setStepState('batch', 'valid')
 }
 
 // ─── Step Next Handlers ───────────────────────────────────
@@ -151,13 +145,7 @@ function onTattooNext(values: { tattoos: TattooEntryValues[] }) {
   goNext()
 }
 
-function onBatchNext(values: BatchAssignmentValues) {
-  batchData.value = values
-  setStepState('batch', 'valid')
-  goNext()
-}
-
-// ─── Pre-check duplicates when moving forward ─────────────
+// ─── Duplicate Pre-check ──────────────────────────────────
 async function preCheckDuplicates(): Promise<boolean> {
   if (!personalData.value) return true
 
@@ -168,7 +156,6 @@ async function preCheckDuplicates(): Promise<boolean> {
     last_name:       personalData.value.last_name,
     date_of_birth:   personalData.value.date_of_birth ?? undefined,
     passport_number: documentsData.value?.passport_number ?? undefined,
-    batch_id:        batchData.value?.batch_id ?? undefined,
   })
 
   if (result.has_blockers) {
@@ -177,7 +164,6 @@ async function preCheckDuplicates(): Promise<boolean> {
     return false
   }
 
-  // Show warnings but allow continue
   if (result.has_duplicates) {
     const warnings = result.duplicates.filter((d) => d.severity === 'warn')
     if (warnings.length > 0) {
@@ -220,26 +206,22 @@ async function onFinalSubmit() {
     return
   }
 
-  // ─── Pre-check for duplicates ───────────────────────────
   const canProceed = await preCheckDuplicates()
   if (!canProceed) return
 
   try {
+    // ── Build payload — NO batch fields
+    // Applicant always starts as 'pending'
+    // Batch assignment happens separately after final_list
     const payload: CreateApplicantPayload = {
       ...personalData.value,
       ...physicalData.value,
       ...documentsData.value,
-      ...(batchData.value?.batch_id
-        ? {
-            batch_id:     batchData.value.batch_id,
-            batch_status: batchData.value.batch_status ?? 'applied',
-          }
-        : {}),
     }
 
     const created = await store.createApplicant(payload)
 
-    // ─── Sub-resources ─────────────────────────────────
+    // ── Sub-resources ──────────────────────────────────
     if (lifestyleData.value) {
       await subStore.upsertLifestyle({
         applicant_id: created.id,
@@ -261,22 +243,22 @@ async function onFinalSubmit() {
 
     toast.add({
       severity: 'success',
-      summary: 'Success',
-      detail: `Applicant ${created.applicant_code} created successfully`,
+      summary: 'Applicant Created',
+      detail: `${created.applicant_code} created — status: Pending`,
       life: 3000,
     })
 
     await store.fetchApplicants()
     router.push({ name: 'applicants.index' })
   } catch (e: any) {
-    // ─── Handle duplicate error from backend ───────────
-    if (e?.response?.status === 422 && e?.response?.data?.duplicates?.length) {
+    // Handle duplicate error from backend
+    if (e?.response?.status === 409 && e?.response?.data?.duplicates?.length) {
       foundDuplicates.value = e.response.data.duplicates
       duplicateDialog.value = true
       return
     }
 
-    // ─── Validation error ──────────────────────────────
+    // Handle validation errors
     if (e?.response?.status === 422) {
       const errors = e.response.data.errors ?? {}
       const firstError = Object.values(errors)[0] as string[] | undefined
@@ -286,14 +268,12 @@ async function onFinalSubmit() {
         detail: firstError?.[0] ?? e.response.data.message ?? 'Please check your inputs.',
         life: 5000,
       })
-
       if (errors.email) {
         goToStep(steps.findIndex((s) => s.key === 'personal'))
       }
       return
     }
 
-    // ─── Other errors ──────────────────────────────────
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -304,14 +284,14 @@ async function onFinalSubmit() {
 }
 
 function onDuplicateDialogClose() {
-  // Navigate back to personal step so user can adjust
   goToStep(steps.findIndex((s) => s.key === 'personal'))
 }
 </script>
 
 <template>
   <div class="flex flex-col gap-6 p-6 max-w-5xl mx-auto">
-    <!-- Header -->
+
+    <!-- ─── Header ─────────────────────────────────────── -->
     <div class="flex items-center gap-3">
       <Button
         icon="pi pi-arrow-left"
@@ -320,12 +300,21 @@ function onDuplicateDialogClose() {
         @click="router.push({ name: 'applicants.index' })"
       />
       <div>
-        <h1 class="text-2xl font-serif font-bold text-blueberry-800">Create Applicant</h1>
+        <h1 class="text-2xl font-serif font-bold text-blueberry-800">
+          Create Applicant
+        </h1>
         <p class="text-sm text-blueberry-500">{{ currentStep.description }}</p>
       </div>
     </div>
 
-    <!-- Stepper -->
+    <!-- ─── Info Banner ────────────────────────────────── -->
+    <div class="flex items-center gap-2 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+      <i class="pi pi-info-circle text-blue-500" />
+      Applicant will start as <strong class="mx-1">Pending</strong>.
+      Batch assignment is available after moving to <strong class="ml-1">Final List</strong>.
+    </div>
+
+    <!-- ─── Stepper ────────────────────────────────────── -->
     <WizardStepper
       :steps="steps"
       :current-index="currentStepIndex"
@@ -334,7 +323,7 @@ function onDuplicateDialogClose() {
       @go-to="goToStep"
     />
 
-    <!-- Error Summary -->
+    <!-- ─── Error Summary ─────────────────────────────── -->
     <div
       v-if="hasErrors"
       class="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg"
@@ -349,7 +338,9 @@ function onDuplicateDialogClose() {
             v-for="step in invalidSteps"
             :key="step.key"
             type="button"
-            class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-red-700 rounded-md text-xs font-medium border border-red-200 hover:bg-red-100 transition-colors"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-red-700
+                   rounded-md text-xs font-medium border border-red-200
+                   hover:bg-red-100 transition-colors"
             @click="goToStep(steps.findIndex((s) => s.key === step.key))"
           >
             <i class="pi pi-arrow-right text-[10px]" />
@@ -359,7 +350,7 @@ function onDuplicateDialogClose() {
       </div>
     </div>
 
-    <!-- Steps -->
+    <!-- ─── Steps ─────────────────────────────────────── -->
     <PersonalTab
       v-if="currentStep.key === 'personal'"
       :initial-values="personalData ?? undefined"
@@ -412,14 +403,6 @@ function onDuplicateDialogClose() {
       @back="goBack"
     />
 
-    <BatchAssignmentTab
-      v-else-if="currentStep.key === 'batch'"
-      :initial-values="batchData"
-      @next="onBatchNext"
-      @validate="onBatchValidate"
-      @back="goBack"
-    />
-
     <ReviewTab
       v-else-if="currentStep.key === 'review'"
       :personal="personalData"
@@ -429,7 +412,6 @@ function onDuplicateDialogClose() {
       :educations="educationsData"
       :employments="employmentsData"
       :tattoos="tattoosData"
-      :batch="batchData"
       :steps="steps"
       :loading="store.submitting || subStore.submitting"
       :has-errors="hasErrors"
@@ -440,7 +422,7 @@ function onDuplicateDialogClose() {
       @go-to="goToStep"
     />
 
-    <!-- ─── Duplicate Warning Dialog ────────────────────── -->
+    <!-- ─── Duplicate Warning Dialog ──────────────────── -->
     <DuplicateWarningDialog
       v-model:visible="duplicateDialog"
       :duplicates="foundDuplicates"

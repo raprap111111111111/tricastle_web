@@ -4,6 +4,7 @@ import { applicantApi } from '../api/applicant.api'
 import type {
   Applicant,
   ApplicantFilters,
+  ApplicantStatus,
   CreateApplicantPayload,
   DuplicateCheckPayload,
   DuplicateCheckResult,
@@ -13,23 +14,25 @@ import type {
 } from '../types'
 
 export const useApplicantStore = defineStore('applicants', () => {
-  const applicants  = ref<Applicant[]>([])
-  const applicant   = ref<Applicant | null>(null)
-  const loading     = ref(false)
-  const submitting  = ref(false)
-  const error       = ref<string | null>(null)
-  const duplicates  = ref<DuplicateItem[]>([])
-  const pagination  = ref<Pagination | null>(null)
+  const applicants = ref<Applicant[]>([])
+  const applicant  = ref<Applicant | null>(null)
+  const loading    = ref(false)
+  const submitting = ref(false)
+  const error      = ref<string | null>(null)
+  const duplicates = ref<DuplicateItem[]>([])
+  const pagination = ref<Pagination | null>(null)
 
   const filters = ref<ApplicantFilters>({
     offset: 0,
     limit: 10,
     search: '',
     status: '',
+    exclude_statuses: '',
     order_by: 'created_at',
     order_dir: 'desc',
   })
 
+  // ─── Helpers ────────────────────────────────────────────
   function cleanParams(obj: Record<string, any>): Record<string, any> {
     const cleaned: Record<string, any> = {}
     for (const key in obj) {
@@ -46,6 +49,13 @@ export const useApplicantStore = defineStore('applicants', () => {
     duplicates.value = []
   }
 
+  function replaceInList(updated: Applicant) {
+    const idx = applicants.value.findIndex((a) => a.id === updated.id)
+    if (idx !== -1) applicants.value.splice(idx, 1, updated)
+    if (applicant.value?.id === updated.id) applicant.value = updated
+  }
+
+  // ─── Fetch ──────────────────────────────────────────────
   async function fetchApplicants() {
     loading.value = true
     clearError()
@@ -84,22 +94,22 @@ export const useApplicantStore = defineStore('applicants', () => {
     }
   }
 
+  // ─── Create / Update / Delete ───────────────────────────
   async function createApplicant(payload: CreateApplicantPayload) {
     submitting.value = true
     clearError()
     try {
       const created = await applicantApi.create(payload)
-      // Optimistically add to top of list
       applicants.value.unshift(created)
       return created
     } catch (e: any) {
-      // ─── Extract duplicate info from 422 response ─────
-      if (e?.response?.status === 422) {
+      if (e?.response?.status === 422 || e?.response?.status === 409) {
         const data = e.response.data
         error.value = data?.message ?? 'Duplicate detected'
         duplicates.value = data?.duplicates ?? []
       } else {
-        error.value = e?.response?.data?.message ?? e?.message ?? 'Failed to create applicant'
+        error.value =
+          e?.response?.data?.message ?? e?.message ?? 'Failed to create applicant'
       }
       throw e
     } finally {
@@ -112,9 +122,7 @@ export const useApplicantStore = defineStore('applicants', () => {
     clearError()
     try {
       const updated = await applicantApi.update(id, payload)
-      const index = applicants.value.findIndex((a) => a.id === id)
-      if (index !== -1) applicants.value[index] = updated
-      applicant.value = updated
+      replaceInList(updated)
       return updated
     } catch (e: any) {
       if (e?.response?.status === 422) {
@@ -122,7 +130,8 @@ export const useApplicantStore = defineStore('applicants', () => {
         error.value = data?.message ?? 'Duplicate detected'
         duplicates.value = data?.duplicates ?? []
       } else {
-        error.value = e?.response?.data?.message ?? e?.message ?? 'Failed to update applicant'
+        error.value =
+          e?.response?.data?.message ?? e?.message ?? 'Failed to update applicant'
       }
       throw e
     } finally {
@@ -144,7 +153,66 @@ export const useApplicantStore = defineStore('applicants', () => {
     }
   }
 
-  // ─── NEW: Duplicate check ───────────────────────────────
+  // ═══════════════════════════════════════════════════════
+  // Status Actions
+  // ═══════════════════════════════════════════════════════
+
+  async function moveToFinalList(id: number): Promise<Applicant> {
+    submitting.value = true
+    clearError()
+    try {
+      const updated = await applicantApi.moveToFinalList(id)
+      replaceInList(updated)
+      return updated
+    } catch (e: any) {
+      error.value =
+        e?.response?.data?.message ?? e?.message ?? 'Failed to move to final list'
+      throw e
+    } finally {
+      submitting.value = false
+    }
+  }
+
+  async function rejectApplicant(
+    id: number,
+    reason: string,
+  ): Promise<Applicant> {
+    submitting.value = true
+    clearError()
+    try {
+      const updated = await applicantApi.reject(id, reason)
+      replaceInList(updated)
+      return updated
+    } catch (e: any) {
+      error.value =
+        e?.response?.data?.message ?? e?.message ?? 'Failed to reject applicant'
+      throw e
+    } finally {
+      submitting.value = false
+    }
+  }
+
+  async function updateStatus(
+    id: number,
+    status: ApplicantStatus,
+    rejectionReason?: string,
+  ): Promise<Applicant> {
+    submitting.value = true
+    clearError()
+    try {
+      const updated = await applicantApi.updateStatus(id, status, rejectionReason)
+      replaceInList(updated)
+      return updated
+    } catch (e: any) {
+      error.value =
+        e?.response?.data?.message ?? e?.message ?? 'Failed to update status'
+      throw e
+    } finally {
+      submitting.value = false
+    }
+  }
+
+  // ─── Duplicate check ────────────────────────────────────
   async function checkDuplicates(
     payload: DuplicateCheckPayload,
   ): Promise<DuplicateCheckResult> {
@@ -156,6 +224,7 @@ export const useApplicantStore = defineStore('applicants', () => {
     }
   }
 
+  // ─── Filter management ──────────────────────────────────
   function setFilters(newFilters: Partial<ApplicantFilters>) {
     filters.value = { ...filters.value, ...newFilters, offset: 0 }
   }
@@ -176,6 +245,7 @@ export const useApplicantStore = defineStore('applicants', () => {
       limit: 10,
       search: '',
       status: '',
+      exclude_statuses: '',
       order_by: 'created_at',
       order_dir: 'desc',
     }
@@ -186,6 +256,7 @@ export const useApplicantStore = defineStore('applicants', () => {
   }
 
   return {
+    // State
     applicants,
     applicant,
     loading,
@@ -194,11 +265,20 @@ export const useApplicantStore = defineStore('applicants', () => {
     duplicates,
     pagination,
     filters,
+
+    // Actions
     fetchApplicants,
     fetchApplicant,
     createApplicant,
     updateApplicant,
     deleteApplicant,
+
+    // Status transitions
+    moveToFinalList,
+    rejectApplicant,
+    updateStatus,
+
+    // Utilities
     checkDuplicates,
     setFilters,
     setPage,
@@ -206,5 +286,6 @@ export const useApplicantStore = defineStore('applicants', () => {
     resetFilters,
     clearApplicant,
     clearError,
+    replaceInList,
   }
 })

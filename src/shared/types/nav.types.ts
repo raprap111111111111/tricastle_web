@@ -6,6 +6,7 @@ export interface NavItem {
   to: string
   permissions: (Permission | string)[]
   activeRoutes?: string[]
+  exact?: boolean          // ← added
 }
 
 export interface NavSection {

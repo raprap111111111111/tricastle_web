@@ -13,21 +13,19 @@ const emit = defineEmits<{
 const search = ref('')
 const status = ref<ApplicantStatus | ''>('')
 
+// Only in-progress statuses — final_list & rejected are on separate pages
 const statusOptions = [
-  { label: 'All Status',   value: '' },
-  { label: 'Pending',      value: 'pending' },
-  { label: 'Under Review', value: 'under_review' },
-  { label: 'Verified',     value: 'verified' },
-  { label: 'Rejected',     value: 'rejected' },
-  { label: 'Incomplete',   value: 'incomplete' },
+  { label: 'All (In Progress)', value: '' },
+  { label: 'Pending',           value: 'pending' },
+  { label: 'Under Review',      value: 'under_review' },
+  { label: 'Verified',          value: 'verified' },
+  { label: 'Incomplete',        value: 'incomplete' },
 ]
 
-// Search only fires on Enter or Search button click
 function onSearch(value: string) {
   emit('filter', { search: value })
 }
 
-// Status fires immediately (cheap, small option list)
 function onStatusChange() {
   emit('filter', { status: status.value })
 }
@@ -41,7 +39,6 @@ function reset() {
 
 <template>
   <div class="flex flex-wrap items-center gap-3">
-    <!-- Search (reusable, click/Enter only) -->
     <AppSearchBar
       v-model="search"
       placeholder="Search name, email, or code..."
@@ -50,7 +47,6 @@ function reset() {
       @search="onSearch"
     />
 
-    <!-- Status filter -->
     <Select
       v-model="status"
       :options="statusOptions"
@@ -61,7 +57,6 @@ function reset() {
       @change="onStatusChange"
     />
 
-    <!-- Reset -->
     <Button
       icon="pi pi-refresh"
       severity="secondary"

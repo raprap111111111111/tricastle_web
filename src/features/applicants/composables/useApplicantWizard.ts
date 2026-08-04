@@ -17,7 +17,6 @@ const STEPS: WizardStep[] = [
   { key: 'education',  label: 'Education',          icon: 'pi pi-book',         description: 'Educational background' },
   { key: 'employment', label: 'Employment',         icon: 'pi pi-briefcase',    description: 'Work experience' },
   { key: 'tattoos',    label: 'Tattoos',            icon: 'pi pi-palette',      description: 'Tattoo records' },
-  { key: 'batch',      label: 'Batch',              icon: 'pi pi-users',        description: 'Assign to a deployment batch (optional)' },
   { key: 'review',     label: 'Review',             icon: 'pi pi-check-circle', description: 'Review and submit' },
 ]
 
