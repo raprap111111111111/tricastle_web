@@ -55,7 +55,7 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
         {
           icon: 'pi pi-check-square',
           title: 'Verifications',
-          to: '/verifications',                     // ✅ FIXED (was /document-verifications)
+          to: '/verifications',                     
           permissions: [Perm.documentVerificationViewAny],
         },
         {
@@ -80,13 +80,13 @@ export function buildNavSections(ctx: PermissionContext): NavSection[] {
         {
           icon: 'pi pi-pencil',
           title: 'Correction Requests',
-          to: '/correction-requests',               // ✅ FIXED (was /corrections)
+          to: '/correction-requests',               
           permissions: [Perm.correctionViewAny],
         },
         {
           icon: 'pi pi-check-square',
-          title: 'Pending Approvals',
-          to: '/correction-approvals',
+          title: 'Correction Approvals',
+          to: '/correction-approvals',  
           permissions: [Perm.correctionApprovalViewAny],
         },
         {
