@@ -58,6 +58,19 @@ export const applicantsRoutes: RouteRecordRaw[] = [
           permissions: [Perm.applicantCreate],
         },
       },
+      
+      {
+        path: 'rejected',                    
+        name: 'applicants.rejected',
+        component: () =>
+          import('@features/applicants/views/RejectedApplicantsView.vue'),
+        meta: {
+          title: 'Rejected Applicants',
+          requiresAuth: true,
+          permissions: [Perm.applicantViewAny],
+        },
+      },
+
 
       // ─── View / Edit ─────────────────────────────────
       {

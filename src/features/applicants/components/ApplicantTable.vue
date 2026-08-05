@@ -36,6 +36,23 @@ const deleteDialog       = ref(false)
 const rejectDialog       = ref(false)
 const selectedApplicant  = ref<Applicant | null>(null)
 
+// ─── 🎯 Per-row loading tracker ─────────────────────────
+const loadingIds = ref<Set<number>>(new Set())
+
+function isRowLoading(id: number): boolean {
+  return loadingIds.value.has(id)
+}
+
+function setRowLoading(id: number, loading: boolean) {
+  const next = new Set(loadingIds.value)
+  if (loading) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+  loadingIds.value = next
+}
+
 // ─── Row menu ────────────────────────────────────────────
 const menuRefs = ref<Record<number, InstanceType<typeof Menu> | null>>({})
 const activeApplicant = ref<Applicant | null>(null)
@@ -149,6 +166,7 @@ function handleMoveToFinalList(applicant: Applicant) {
     rejectLabel: 'Cancel',
     acceptClass: '!bg-green-600 !border-green-600',
     accept: async () => {
+      setRowLoading(applicant.id, true)   // 🎯 START loading for THIS row only
       try {
         const updated = await store.moveToFinalList(applicant.id)
 
@@ -182,6 +200,8 @@ function handleMoveToFinalList(applicant: Applicant) {
           detail: e?.response?.data?.message ?? 'Could not update status',
           life: 4000,
         })
+      } finally {
+        setRowLoading(applicant.id, false)   // 🎯 STOP loading for THIS row
       }
     },
   })
@@ -195,9 +215,10 @@ function openRejectDialog(applicant: Applicant) {
 async function onRejectConfirmed(reason: string) {
   if (!selectedApplicant.value) return
 
-  const id = selectedApplicant.value.id
+  const id   = selectedApplicant.value.id
   const code = selectedApplicant.value.applicant_code
 
+  setRowLoading(id, true)   // 🎯 START loading for THIS row
   try {
     await store.rejectApplicant(id, reason)
 
@@ -218,6 +239,8 @@ async function onRejectConfirmed(reason: string) {
       detail: e?.response?.data?.message ?? 'Could not reject applicant',
       life: 4000,
     })
+  } finally {
+    setRowLoading(id, false)   // 🎯 STOP loading
   }
 }
 
@@ -337,6 +360,7 @@ function gradeColor(grade: string) {
               size="small"
               class="!text-blueberry-500 hover:!text-blue-600 hover:!bg-blue-50"
               v-tooltip.top="'View'"
+              :disabled="isRowLoading(data.id)"
               @click="goToView(data.id)"
             />
 
@@ -347,6 +371,7 @@ function gradeColor(grade: string) {
               size="small"
               class="!text-blueberry-500 hover:!text-apricot-600 hover:!bg-apricot-50"
               v-tooltip.top="'Edit'"
+              :disabled="isRowLoading(data.id)"
               @click="goToEdit(data.id)"
             />
 
@@ -358,7 +383,7 @@ function gradeColor(grade: string) {
               size="small"
               class="!text-blueberry-500 hover:!text-green-600 hover:!bg-green-50"
               v-tooltip.top="'Move to Final List'"
-              :loading="props.submitting"
+              :loading="isRowLoading(data.id)"
               @click="handleMoveToFinalList(data)"
             />
 
@@ -370,6 +395,7 @@ function gradeColor(grade: string) {
               size="small"
               class="!text-blueberry-500 hover:!text-red-500 hover:!bg-red-50"
               v-tooltip.top="'Reject'"
+              :disabled="isRowLoading(data.id)"
               @click="openRejectDialog(data)"
             />
 
@@ -380,6 +406,7 @@ function gradeColor(grade: string) {
               size="small"
               class="!text-blueberry-500 hover:!text-blueberry-800 hover:!bg-appleCore-100"
               v-tooltip.top="'More'"
+              :disabled="isRowLoading(data.id)"
               @click="toggleMenu($event, data)"
             />
             <Menu
@@ -442,14 +469,14 @@ function gradeColor(grade: string) {
     <ApplicantDeleteDialog
       v-model:visible="deleteDialog"
       :applicant="selectedApplicant"
-      :loading="props.submitting"
+      :loading="selectedApplicant ? isRowLoading(selectedApplicant.id) : false"
       @confirm="onDeleteConfirmed"
     />
 
     <RejectApplicantDialog
       v-model:visible="rejectDialog"
       :applicant="selectedApplicant"
-      :loading="props.submitting"
+      :loading="selectedApplicant ? isRowLoading(selectedApplicant.id) : false"
       @confirm="onRejectConfirmed"
     />
   </div>

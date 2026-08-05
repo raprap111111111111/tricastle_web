@@ -33,6 +33,12 @@ export function buildNavSections(_ctx: PermissionContext): NavSection[] {
           permissions: [Perm.applicantViewAny],
         },
         {
+          icon: 'pi pi-times-circle',
+          title: 'Rejected',
+          to: '/applicants/rejected',
+          permissions: [Perm.applicantViewAny],
+        },
+        {
           icon: 'pi pi-graduation-cap',
           title: 'Batches',
           to: '/batches',
@@ -100,12 +106,6 @@ export function buildNavSections(_ctx: PermissionContext): NavSection[] {
           title: 'Company Categories',
           to: '/company-categories',
           permissions: [Perm.companyCategoryViewAny],
-        },
-        {
-          icon: 'pi pi-cog',
-          title: 'Settings',
-          to: '/settings',
-          permissions: [Perm.settingView],
         },
       ],
     },

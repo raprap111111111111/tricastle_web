@@ -15,6 +15,29 @@
         @click="router.push('/notifications')"
       />
 
+      <!-- ⚙️ Settings Menu -->
+      <Button
+        icon="pi pi-cog"
+        text
+        rounded
+        severity="secondary"
+        aria-label="Settings"
+        aria-haspopup="true"
+        aria-controls="settings-menu"
+        v-tooltip.bottom="'Settings'"
+        @click="toggleSettingsMenu"
+      />
+      <Menu
+        id="settings-menu"
+        ref="settingsMenu"
+        :model="settingsMenuItems"
+        :popup="true"
+        :append-to="'body'"
+      />
+
+      <!-- Divider -->
+      <div class="hidden sm:block h-8 w-px bg-appleCore-200" />
+
       <!-- Clickable Profile -->
       <button
         type="button"
@@ -40,6 +63,7 @@
         severity="secondary"
         :loading="loggingOut"
         aria-label="Sign out"
+        v-tooltip.bottom="'Sign out'"
         @click="handleLogout"
       />
     </div>
@@ -51,27 +75,63 @@ import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
+import Menu from 'primevue/menu'
 import { useAuthStore } from '@features/auth/stores/auth.store'
 import { usePermissions } from '@shared/composables/usePermissions'
 
-const route = useRoute()
-const router = useRouter()
-const toast = useToast()
+const route     = useRoute()
+const router    = useRouter()
+const toast     = useToast()
 const authStore = useAuthStore()
-const { role } = usePermissions()
+const { role }  = usePermissions()
 
-const loggingOut = ref(false)
-const pageTitle = computed(() => (route.meta?.title as string) ?? 'Dashboard')
+const loggingOut  = ref(false)
+const settingsMenu = ref()
+const pageTitle   = computed(() => (route.meta?.title as string) ?? 'Dashboard')
 
 const initials = computed(() => {
   if (!authStore.user) return '?'
   const first = authStore.user.first_name?.[0] ?? ''
-  const last = authStore.user.last_name?.[0] ?? ''
+  const last  = authStore.user.last_name?.[0] ?? ''
   return (first + last).toUpperCase() || '?'
 })
 
+// ─── Settings dropdown items ─────────────────────────────
+const settingsMenuItems = ref([
+  {
+    label: 'General Settings',
+    icon: 'pi pi-sliders-h',
+    command: () => router.push('/settings'),
+  },
+  {
+    label: 'Document Types',
+    icon: 'pi pi-tag',
+    command: () => router.push('/document-types'),
+  },
+  {
+    label: 'Company Categories',
+    icon: 'pi pi-tags',
+    command: () => router.push('/company-categories'),
+  },
+  { separator: true },
+  {
+    label: 'My Profile',
+    icon: 'pi pi-user',
+    command: () => router.push('/profile'),
+  },
+  {
+    label: 'Preferences',
+    icon: 'pi pi-palette',
+    command: () => router.push('/profile?tab=preferences'),
+  },
+])
+
+function toggleSettingsMenu(event: Event) {
+  settingsMenu.value.toggle(event)
+}
+
 function goToProfile() {
-  router.push('/profile') // or router.push({ name: 'Profile' })
+  router.push('/profile')
 }
 
 async function handleLogout() {

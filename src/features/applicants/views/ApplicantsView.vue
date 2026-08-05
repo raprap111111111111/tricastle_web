@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, onActivated, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, onActivated, computed, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { AppButton, AppCard, AppStatCard } from '@shared/ui'
 import { useApplicants } from '../composables/useApplicants'
@@ -11,6 +11,7 @@ import ApplicantTable from '../components/ApplicantTable.vue'
 import ApplicantFilters from '../components/ApplicantFilters.vue'
 import type { ApplicantFilters as IFilters } from '../types'
 
+const route  = useRoute()
 const router = useRouter()
 const toast  = useToast()
 const store  = useApplicantStore()
@@ -18,14 +19,37 @@ const { handleDelete } = useApplicants()
 
 // ─── Load applicants excluding final_list and rejected ─────
 async function loadInProgress() {
+  // 🧹 FORCE-RESET all filters to prevent leaks from other pages
   store.setFilters({
-    exclude_statuses: 'final_list,rejected',
-  })
+    search: '',
+    status: '',                                // ← MUST be empty
+    gender: '',
+    civil_status: '',
+    nationality: '',
+    quality_grade: '',
+    assigned_staff_id: '',
+    exclude_statuses: 'final_list,rejected',   // ← Our exclusion
+    batch_id: '',                              // ← clear batch filter
+    batch_status: '',
+    offset: 0,
+    limit: 10,
+  } as any)
+
   await store.fetchApplicants()
 }
 
 onMounted(loadInProgress)
 onActivated(loadInProgress)
+
+// 🎯 Watch route — reload whenever we land back on /applicants
+watch(
+  () => route.path,
+  (newPath) => {
+    if (newPath === '/applicants') {
+      loadInProgress()
+    }
+  },
+)
 
 // ─── 📡 PubNub Real-time Updates ──────────────────────
 usePubNub([PubNubChannels.APPLICANTS], (msg) => {
@@ -56,7 +80,6 @@ function handleStatusChange(payload: any) {
     life: 4000,
   })
 
-  // Refresh list so removed applicants disappear
   loadInProgress()
 }
 
@@ -97,7 +120,6 @@ const verifiedCount = computed(
 
 // ─── Handlers ─────────────────────────────────────────
 function onFilter(filters: Partial<IFilters>) {
-  // Always keep exclude_statuses active
   store.setFilters({
     ...filters,
     exclude_statuses: 'final_list,rejected',
@@ -128,7 +150,7 @@ async function onDelete(id: number) {
   <div class="flex flex-col gap-8 p-8 max-w-[1400px] mx-auto">
 
     <!-- ─── Header ─────────────────────────────────── -->
-    <header class="flex items-start justify-between gap-6">
+    <header class="flex items-start justify-between gap-6 flex-wrap">
       <div class="flex flex-col gap-1">
         <div class="flex items-center gap-2">
           <h1 class="text-3xl font-serif font-semibold text-blueberry-800 tracking-tight">
@@ -154,12 +176,34 @@ async function onDelete(id: number) {
         </p>
       </div>
 
-      <AppButton
-        label="New Applicant"
-        icon="pi pi-plus"
-        variant="accent"
-        @click="router.push({ name: 'applicants.create' })"
-      />
+      <!-- 🎯 Action Buttons Group -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <!-- Quick shortcut: View Final List -->
+        <AppButton
+          label="Final List"
+          icon="pi pi-folder-open"
+          variant="secondary"
+          class="!text-green-700 !border-green-200 hover:!bg-green-50"
+          @click="router.push('/applicants/final-list')"
+        />
+
+        <!-- Quick shortcut: View Rejected -->
+        <AppButton
+          label="Rejected"
+          icon="pi pi-times-circle"
+          variant="secondary"
+          class="!text-red-600 !border-red-200 hover:!bg-red-50"
+          @click="router.push('/applicants/rejected')"
+        />
+
+        <!-- Primary CTA: New Applicant -->
+        <AppButton
+          label="New Applicant"
+          icon="pi pi-plus"
+          variant="accent"
+          @click="router.push({ name: 'applicants.create' })"
+        />
+      </div>
     </header>
 
     <!-- ─── Info Banner ────────────────────────────── -->
@@ -170,7 +214,9 @@ async function onDelete(id: number) {
       <i class="pi pi-info-circle text-blue-500" />
       Approved applicants are moved to the
       <strong class="mx-1">Final List</strong>
-      and are no longer shown here.
+      and rejected ones go to
+      <strong class="mx-1">Rejected</strong>
+      — they are no longer shown here.
     </div>
 
     <!-- ─── Stats Cards ───────────────────────────── -->

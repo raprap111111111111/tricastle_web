@@ -1,4 +1,5 @@
 <template>
+  <ThemeProvider />
   <RouterView />
   <Toast position="top-right" />
   <ConfirmDialog />
@@ -8,4 +9,5 @@
 import { RouterView } from 'vue-router'
 import Toast from 'primevue/toast'
 import ConfirmDialog from 'primevue/confirmdialog'
+import ThemeProvider from '@features/settings/theme/ThemeProvider.vue'
 </script>
