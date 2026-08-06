@@ -1,19 +1,15 @@
 <template>
-  <header class="h-16 bg-white border-b border-appleCore-200 px-6 flex items-center justify-between flex-shrink-0">
+  <header
+    class="h-16 bg-white border-b border-appleCore-200 px-6
+           flex items-center justify-between flex-shrink-0"
+  >
     <h2 class="text-lg font-serif font-semibold text-blueberry-800">
       {{ pageTitle }}
     </h2>
 
     <div class="flex items-center gap-2 sm:gap-4">
-      <!-- Notifications -->
-      <Button
-        icon="pi pi-bell"
-        text
-        rounded
-        severity="secondary"
-        aria-label="Notifications"
-        @click="router.push('/notifications')"
-      />
+      <!-- 🔔 Notifications Bell with dropdown + live badge -->
+      <NotificationBell />
 
       <!-- ⚙️ Settings Menu -->
       <Button
@@ -41,7 +37,8 @@
       <!-- Clickable Profile -->
       <button
         type="button"
-        class="flex items-center gap-3 rounded-full px-2 py-1 hover:bg-appleCore-100 transition-colors"
+        class="flex items-center gap-3 rounded-full px-2 py-1
+               hover:bg-appleCore-100 transition-colors"
         aria-label="Open profile"
         @click="goToProfile"
       >
@@ -50,7 +47,10 @@
           <p class="text-xs text-blueberry-500 capitalize">{{ role.replace('_', ' ') }}</p>
         </div>
 
-        <div class="w-10 h-10 bg-apricot-500 text-white rounded-full flex items-center justify-center font-bold">
+        <div
+          class="w-10 h-10 bg-apricot-500 text-white rounded-full
+                 flex items-center justify-center font-bold"
+        >
           {{ initials }}
         </div>
       </button>
@@ -78,6 +78,7 @@ import Button from 'primevue/button'
 import Menu from 'primevue/menu'
 import { useAuthStore } from '@features/auth/stores/auth.store'
 import { usePermissions } from '@shared/composables/usePermissions'
+import NotificationBell from '@features/notifications/components/NotificationBell.vue'
 
 const route     = useRoute()
 const router    = useRouter()
@@ -85,9 +86,9 @@ const toast     = useToast()
 const authStore = useAuthStore()
 const { role }  = usePermissions()
 
-const loggingOut  = ref(false)
+const loggingOut   = ref(false)
 const settingsMenu = ref()
-const pageTitle   = computed(() => (route.meta?.title as string) ?? 'Dashboard')
+const pageTitle    = computed(() => (route.meta?.title as string) ?? 'Dashboard')
 
 const initials = computed(() => {
   if (!authStore.user) return '?'
