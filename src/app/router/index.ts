@@ -50,7 +50,8 @@ const router = createRouter({
     ...correctionApprovalRoutes,
     ...verificationMismatchRoutes,
     ...activityLogRoutes,
-    ...notificationsRoutes,   // ✅ ADD THIS
+    ...notificationsRoutes,   
+    
 
     { path: '/:pathMatch(.*)*', name: 'NotFound', redirect: '/dashboard' },
   ],
