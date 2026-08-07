@@ -44,6 +44,13 @@ export function buildNavSections(_ctx: PermissionContext): NavSection[] {
           to: '/batches',
           permissions: [Perm.batchViewAny],
         },
+        // 🚀 NEW: Deployments
+        {
+          icon: 'pi pi-send',
+          title: 'Deployments',
+          to: '/deployments',
+          permissions: [Perm.applicantViewAny],
+        },
         {
           icon: 'pi pi-building',
           title: 'Companies',

@@ -23,7 +23,10 @@ import { correctionRequestRoutes } from './routes/correction-request.routes'
 import { correctionApprovalRoutes } from './routes/correction-approval.routes'
 import { verificationMismatchRoutes } from './routes/verification-mismatch.routes'
 import { activityLogRoutes } from './routes/activity-log.routes'
-import { notificationsRoutes } from './routes/notifications.routes'   // ✅ ADD THIS
+import { notificationsRoutes } from './routes/notifications.routes'
+import { deploymentRoutes } from './routes/deployment.routes'
+
+
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -50,8 +53,9 @@ const router = createRouter({
     ...correctionApprovalRoutes,
     ...verificationMismatchRoutes,
     ...activityLogRoutes,
-    ...notificationsRoutes,   
-    
+    ...notificationsRoutes,
+    ...deploymentRoutes,
+
 
     { path: '/:pathMatch(.*)*', name: 'NotFound', redirect: '/dashboard' },
   ],

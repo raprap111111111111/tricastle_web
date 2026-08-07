@@ -13,9 +13,19 @@ import { useBatchStore } from '@features/batches/stores/batch.store'
 import ApplicantTable from '../components/ApplicantTable.vue'
 import type { BatchSummary, Pagination } from '../types'
 
+// 🚀 Deployment imports
+import BulkDeployDialog from '@features/deployments/components/BulkDeployDialog.vue'
+import { useDeployments } from '@features/deployments/composables/useDeployments'
+import { useDeploymentStore } from '@features/deployments/stores/deployment.store'
+import type { DeployApplicantPayload } from '@features/deployments/types'
+
 const router = useRouter()
 const store = useApplicantStore()
 const batchStore = useBatchStore()
+
+// 🚀 Deployment store + composable
+const deploymentStore = useDeploymentStore()
+const { handleBulkDeploy } = useDeployments()
 
 // ─── PSGC ──────────────────────────────────────────────
 const {
@@ -35,6 +45,10 @@ const selectedBatchId = ref<number | null>(null)
 // ─── Client-side pagination ────────────────────────────
 const currentPage = ref(1)
 const perPage = ref(10)
+
+// ─── 🚀 Bulk Deploy state ──────────────────────────────
+const selectedIds = ref<number[]>([])
+const bulkDeployDialog = ref(false)
 
 // ─── Advanced (staged) ─────────────────────────────────
 const gender = ref<string>('')
@@ -160,6 +174,8 @@ watch(
   [searchQuery, selectedBatchId, appliedAdvanced],
   () => {
     currentPage.value = 1
+    // Also clear selection when filters change (since visible rows change)
+    selectedIds.value = []
   },
   { deep: true },
 )
@@ -478,10 +494,73 @@ function resetFilters() {
   selectedBatchId.value = null
   clearAdvanced()
   currentPage.value = 1
+  selectedIds.value = []
 }
 
 function goBack() {
   router.push({ name: 'applicants.index' })
+}
+
+// ═══════════════════════════════════════════════════════
+// 🚀 BULK DEPLOY LOGIC
+// ═══════════════════════════════════════════════════════
+
+// Get applicant_batch_ids for selected applicants (only those with batches)
+const selectedApplicantBatchIds = computed<number[]>(() => {
+  return store.applicants
+    .filter((a) => selectedIds.value.includes(a.id))
+    .map((a) => a.applicant_batches?.[0]?.id)
+    .filter((id): id is number => id !== undefined)
+})
+
+// Count of selected applicants who can actually be deployed (have a batch)
+const deployableCount = computed(() => selectedApplicantBatchIds.value.length)
+
+// Count of selected applicants who CANNOT be deployed (no batch)
+const nonDeployableCount = computed(
+  () => selectedIds.value.length - deployableCount.value,
+)
+
+// Get selected applicant names for display in dialog
+const selectedApplicantNames = computed(() => {
+  return store.applicants
+    .filter((a) => selectedIds.value.includes(a.id))
+    .map((a) => `${a.first_name} ${a.last_name}`)
+})
+
+function openBulkDeploy() {
+  if (selectedApplicantBatchIds.value.length === 0) return
+  bulkDeployDialog.value = true
+}
+
+async function onBulkDeploySubmit(payload: DeployApplicantPayload) {
+  const success = await handleBulkDeploy({
+    ...payload,
+    applicant_batch_ids: selectedApplicantBatchIds.value,
+  })
+
+  if (success) {
+    bulkDeployDialog.value = false
+
+    // Remove deployed applicants from local list
+    const deployedIds = selectedIds.value.filter((id) => {
+      const applicant = store.applicants.find((a) => a.id === id)
+      return applicant?.applicant_batches?.[0]?.id !== undefined
+    })
+
+    store.applicants = store.applicants.filter(
+      (a) => !deployedIds.includes(a.id),
+    )
+
+    selectedIds.value = []
+
+    // Reload to sync with server
+    await loadFinalList()
+  }
+}
+
+function clearSelection() {
+  selectedIds.value = []
 }
 </script>
 
@@ -673,6 +752,52 @@ function goBack() {
       </div>
     </div>
 
+    <!-- 🚀 BULK ACTIONS BAR (visible when applicants are selected) -->
+    <div
+      v-if="selectedIds.length > 0"
+      class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4
+             bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200
+             rounded-xl shadow-sm"
+    >
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-green-500 flex items-center justify-center shadow-sm">
+          <i class="pi pi-check-square text-white" />
+        </div>
+        <div>
+          <p class="text-sm font-semibold text-green-900">
+            {{ selectedIds.length }} applicant{{ selectedIds.length > 1 ? 's' : '' }} selected
+          </p>
+          <p class="text-xs text-green-700 mt-0.5">
+            <span v-if="deployableCount > 0">
+              <strong>{{ deployableCount }}</strong> ready to deploy
+            </span>
+            <span v-if="nonDeployableCount > 0" class="text-amber-700 ml-2">
+              ⚠️ {{ nonDeployableCount }} without batch (will be skipped)
+            </span>
+          </p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <Button
+          label="Clear Selection"
+          icon="pi pi-times"
+          severity="secondary"
+          text
+          size="small"
+          @click="clearSelection"
+        />
+        <Button
+          :label="`Deploy Selected (${deployableCount})`"
+          icon="pi pi-send"
+          :disabled="deployableCount === 0"
+          :loading="deploymentStore.submitting"
+          class="!bg-green-600 hover:!bg-green-700 !border-green-600 !text-white !shadow-sm"
+          @click="openBulkDeploy"
+        />
+      </div>
+    </div>
+
     <!-- ─── Loading skeleton ───────────────────────── -->
     <template v-if="store.loading && store.applicants.length === 0">
       <Skeleton height="400px" border-radius="16px" />
@@ -685,6 +810,8 @@ function goBack() {
         :pagination="paginationInfo"
         :loading="store.loading"
         :submitting="false"
+        :selectable="true"
+        v-model:selectedIds="selectedIds"
         @page-change="onPageChange"
         @limit-change="onLimitChange"
         @delete="() => {}"
@@ -954,7 +1081,15 @@ function goBack() {
             </div>
           </div>
         </div>
-      </template> 
+      </template>
     </Dialog>
+
+    <!-- 🚀 Bulk Deploy Dialog -->
+    <BulkDeployDialog
+      v-model:visible="bulkDeployDialog"
+      :applicant-batch-ids="selectedApplicantBatchIds"
+      :submitting="deploymentStore.submitting"
+      @submit="onBulkDeploySubmit"
+    />
   </div>
 </template>

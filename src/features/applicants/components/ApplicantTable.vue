@@ -11,6 +11,7 @@ import Menu from 'primevue/menu'
 import ApplicantStatusBadge from './ApplicantStatusBadge.vue'
 import ApplicantDeleteDialog from './ApplicantDeleteDialog.vue'
 import RejectApplicantDialog from './RejectApplicantDialog.vue'
+import DeployButton from '@features/deployments/components/DeployButton.vue'
 import { useApplicantStore } from '../stores/applicant.store'
 import type { Applicant, Pagination } from '../types'
 
@@ -19,12 +20,15 @@ const props = defineProps<{
   pagination: Pagination | null
   loading: boolean
   submitting: boolean
+  selectable?: boolean                        // 👈 NEW
+  selectedIds?: number[]                      // 👈 NEW
 }>()
 
 const emit = defineEmits<{
   (e: 'page-change', page: number): void
   (e: 'limit-change', limit: number): void
   (e: 'delete', id: number): void
+  (e: 'update:selectedIds', ids: number[]): void   // 👈 NEW
 }>()
 
 const router  = useRouter()
@@ -36,7 +40,18 @@ const deleteDialog       = ref(false)
 const rejectDialog       = ref(false)
 const selectedApplicant  = ref<Applicant | null>(null)
 
-// ─── 🎯 Per-row loading tracker ─────────────────────────
+// ─── Selection support ─────────────────────────────
+const selectedRows = computed<Applicant[]>({
+  get() {
+    if (!props.selectedIds) return []
+    return props.applicants.filter((a) => props.selectedIds!.includes(a.id))
+  },
+  set(rows) {
+    emit('update:selectedIds', rows.map((r) => r.id))
+  },
+})
+
+// ─── Per-row loading tracker ─────────────────────────
 const loadingIds = ref<Set<number>>(new Set())
 
 function isRowLoading(id: number): boolean {
@@ -53,7 +68,7 @@ function setRowLoading(id: number, loading: boolean) {
   loadingIds.value = next
 }
 
-// ─── Row menu ────────────────────────────────────────────
+// ─── Row menu ────────────────────────────────────────
 const menuRefs = ref<Record<number, InstanceType<typeof Menu> | null>>({})
 const activeApplicant = ref<Applicant | null>(null)
 
@@ -103,7 +118,7 @@ const menuItems = computed(() => {
   return items
 })
 
-// ─── Pagination ───────────────────────────────────────────
+// ─── Pagination ──────────────────────────────────────
 const currentLimit = computed(
   () => props.pagination?.per_page ?? props.pagination?.limit ?? 10,
 )
@@ -115,7 +130,7 @@ const currentFirst = computed(() => {
   return props.pagination?.offset ?? 0
 })
 
-// ─── Handlers ─────────────────────────────────────────────
+// ─── Handlers ────────────────────────────────────────
 function confirmDelete(applicant: Applicant) {
   selectedApplicant.value = applicant
   deleteDialog.value = true
@@ -146,53 +161,49 @@ function goToEdit(id: number) {
 
 function onRowClick(event: DataTableRowClickEvent) {
   const target = event.originalEvent?.target as HTMLElement | null
-  if (target?.closest('button, a, .p-button, .p-menu')) return
+  if (target?.closest('button, a, .p-button, .p-menu, .p-checkbox')) return
   goToView((event.data as Applicant).id)
 }
 
-// ─── Remove row locally ──────────────────────────────────
 function removeFromList(id: number) {
   const idx = store.applicants.findIndex((a) => a.id === id)
   if (idx !== -1) store.applicants.splice(idx, 1)
 }
 
-// ─── Status Actions ───────────────────────────────────────
+function onDeployed(applicantId: number) {
+  removeFromList(applicantId)
+  toast.add({
+    severity: 'success',
+    summary: '🚀 Deployed',
+    detail: 'Applicant is now in the Deployments page',
+    life: 4000,
+  })
+}
+
+// ─── Status Actions ──────────────────────────────────
 function handleMoveToFinalList(applicant: Applicant) {
   confirm.require({
     header: 'Move to Final List',
-    message: `Move ${applicant.first_name} ${applicant.last_name} to the Final List? They will be auto-assigned to the active batch.`,
+    message: `Move ${applicant.first_name} ${applicant.last_name} to the Final List?`,
     icon: 'pi pi-check-circle',
     acceptLabel: 'Yes, Move',
     rejectLabel: 'Cancel',
     acceptClass: '!bg-green-600 !border-green-600',
     accept: async () => {
-      setRowLoading(applicant.id, true)   // 🎯 START loading for THIS row only
+      setRowLoading(applicant.id, true)
       try {
         const updated = await store.moveToFinalList(applicant.id)
-
-        // Extract batch info from response
-        const batch = updated.applicant_batches?.[0]?.batch
-        const batchName = batch?.name
-
-        // Remove from Applicants list (now in Final List)
+        const batchName = updated.applicant_batches?.[0]?.batch?.name
         removeFromList(applicant.id)
 
-        // Show smart toast — different message if batch was assigned
-        if (batchName) {
-          toast.add({
-            severity: 'success',
-            summary: 'Moved to Final List',
-            detail: `${applicant.applicant_code} auto-assigned to batch: ${batchName}`,
-            life: 4000,
-          })
-        } else {
-          toast.add({
-            severity: 'warn',
-            summary: 'Moved to Final List',
-            detail: `${applicant.applicant_code} is in Final List, but no active batch exists. Create/activate a batch to auto-assign.`,
-            life: 5000,
-          })
-        }
+        toast.add({
+          severity: batchName ? 'success' : 'warn',
+          summary: 'Moved to Final List',
+          detail: batchName
+            ? `${applicant.applicant_code} auto-assigned to batch: ${batchName}`
+            : `${applicant.applicant_code} is in Final List (no active batch)`,
+          life: 4000,
+        })
       } catch (e: any) {
         toast.add({
           severity: 'error',
@@ -201,7 +212,7 @@ function handleMoveToFinalList(applicant: Applicant) {
           life: 4000,
         })
       } finally {
-        setRowLoading(applicant.id, false)   // 🎯 STOP loading for THIS row
+        setRowLoading(applicant.id, false)
       }
     },
   })
@@ -218,11 +229,9 @@ async function onRejectConfirmed(reason: string) {
   const id   = selectedApplicant.value.id
   const code = selectedApplicant.value.applicant_code
 
-  setRowLoading(id, true)   // 🎯 START loading for THIS row
+  setRowLoading(id, true)
   try {
     await store.rejectApplicant(id, reason)
-
-    // Remove from Applicants list (now rejected)
     removeFromList(id)
 
     toast.add({
@@ -240,11 +249,11 @@ async function onRejectConfirmed(reason: string) {
       life: 4000,
     })
   } finally {
-    setRowLoading(id, false)   // 🎯 STOP loading
+    setRowLoading(id, false)
   }
 }
 
-// ─── Formatters ───────────────────────────────────────────
+// ─── Formatters ──────────────────────────────────────
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—'
   try {
@@ -273,6 +282,9 @@ function gradeColor(grade: string) {
     <DataTable
       :value="props.applicants"
       :loading="props.loading"
+      v-model:selection="selectedRows"
+      :selection-mode="selectable ? 'multiple' : undefined"
+      :data-key="'id'"
       class="!border-none"
       size="small"
       :row-hover="true"
@@ -284,6 +296,14 @@ function gradeColor(grade: string) {
         bodyRow: 'cursor-pointer hover:!bg-appleCore-50/40 !border-b !border-appleCore-100/60 transition-colors',
       }"
     >
+      <!-- 🎯 Selection checkbox column -->
+      <Column
+        v-if="selectable"
+        selection-mode="multiple"
+        header-style="width: 40px"
+        :exportable="false"
+      />
+
       <Column field="applicant_code" header="Code" sortable style="width: 150px">
         <template #body="{ data }">
           <span class="font-mono text-xs text-apricot-600 font-semibold">
@@ -350,7 +370,7 @@ function gradeColor(grade: string) {
         </template>
       </Column>
 
-      <Column header="Actions" style="width: 180px">
+      <Column header="Actions" style="width: 220px">
         <template #body="{ data }">
           <div class="flex items-center gap-0.5" @click.stop>
             <Button
@@ -385,6 +405,15 @@ function gradeColor(grade: string) {
               v-tooltip.top="'Move to Final List'"
               :loading="isRowLoading(data.id)"
               @click="handleMoveToFinalList(data)"
+            />
+
+            <!-- 🚀 DEPLOY BUTTON -->
+            <DeployButton
+              v-if="data.status === 'final_list' && data.applicant_batches?.[0]?.id"
+              :applicant-batch-id="data.applicant_batches[0].id"
+              :applicant-name="`${data.first_name} ${data.last_name}`"
+              :applicant-code="data.applicant_code"
+              @deployed="onDeployed(data.id)"
             />
 
             <Button
