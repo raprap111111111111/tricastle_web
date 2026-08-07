@@ -8,8 +8,7 @@ import RoleFormDialog from '../components/RoleFormDialog.vue'
 import RolePermissionPanel from '../components/RolePermissionPanel.vue'
 import RoleDeleteDialog from '../components/RoleDeleteDialog.vue'
 import type { Role, RoleDialogMode } from '../types'
-import { AppButton, AppCard, AppStatCard } from '@shared/ui'
-import InputText from 'primevue/inputtext'
+import { AppButton, AppCard, AppStatCard, AppSearchBar } from '@shared/ui'
 import Select from 'primevue/select'
 import Button from 'primevue/button'
 
@@ -17,68 +16,88 @@ const store = useRoleStore()
 const { loadRoles, handleCreate, handleUpdate, handleDelete } = useRole()
 
 // ─── Search / filters ───────────────────────────────────
-const search   = ref('')
+const search = ref('')
 const isSystem = ref<boolean | null>(null)
 
 const systemOptions = [
-  { label: 'All roles',    value: null  },
-  { label: 'System only',  value: true  },
-  { label: 'Custom only',  value: false },
+  { label: 'All roles', value: null },
+  { label: 'System only', value: true },
+  { label: 'Custom only', value: false },
 ]
-
-let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 function applyFilters(): void {
   store.setFilters({
-    search:    search.value.trim() || undefined,
+    search: search.value.trim() || undefined,
     is_system: isSystem.value,
-    offset:    0,
+    offset: 0,
   })
   loadRoles()
 }
 
-function onSearchInput(): void {
-  if (searchTimer) clearTimeout(searchTimer)
-  searchTimer = setTimeout(applyFilters, 300)
+function onSearch(value: string): void {
+  search.value = value.trim()
+  applyFilters()
 }
 
 function onResetFilters(): void {
-  search.value   = ''
+  search.value = ''
   isSystem.value = null
   store.resetFilters()
   loadRoles()
 }
 
-const hasActiveFilters = computed<boolean>(
-  () => !!(search.value.trim() || isSystem.value !== null),
-)
+// ─── Active filter chips ──────────────────────────────
+const activeFilters = computed(() => {
+  const filters: { key: string; label: string; value: string }[] = []
+
+  if (search.value.trim()) {
+    filters.push({ key: 'search', label: 'Search', value: search.value })
+  }
+  if (isSystem.value !== null) {
+    filters.push({
+      key: 'is_system',
+      label: 'Type',
+      value: isSystem.value ? 'System' : 'Custom',
+    })
+  }
+
+  return filters
+})
+
+const hasActiveFilters = computed<boolean>(() => activeFilters.value.length > 0)
+
+function removeFilter(key: string): void {
+  if (key === 'search') search.value = ''
+  if (key === 'is_system') isSystem.value = null
+  applyFilters()
+}
 
 // ─── Dialog state ───────────────────────────────────────
-const formDialogVisible      = ref(false)
+const formDialogVisible = ref(false)
 const permissionPanelVisible = ref(false)
-const deleteDialogVisible    = ref(false)
-const dialogMode             = ref<RoleDialogMode>('create')
-const activeRole             = ref<Role | null>(null)
+const deleteDialogVisible = ref(false)
+const dialogMode = ref<RoleDialogMode>('create')
+const activeRole = ref<Role | null>(null)
 
 function openCreate(): void {
-  dialogMode.value        = 'create'
-  activeRole.value        = null
+  dialogMode.value = 'create'
+  activeRole.value = null
   formDialogVisible.value = true
 }
 
 function openEdit(role: Role): void {
-  dialogMode.value        = 'edit'
-  activeRole.value        = role
+  dialogMode.value = 'edit'
+  activeRole.value = role
   formDialogVisible.value = true
 }
 
 function openPermissions(role: Role): void {
-  activeRole.value             = role
+  activeRole.value = role
   permissionPanelVisible.value = true
 }
 
 function openDelete(role: Role): void {
-  activeRole.value          = role
+  activeRole.value = role
   deleteDialogVisible.value = true
 }
 
@@ -89,28 +108,29 @@ async function onFormSubmit(
 
   if (dialogMode.value === 'create') {
     success = await handleCreate({
-      name:        payload.name,
+      name: payload.name,
       description: payload.description,
     })
   } else if (activeRole.value) {
     success = await handleUpdate(activeRole.value.id, {
-      name:        payload.name,
+      name: payload.name,
       description: payload.description,
     })
   }
 
   if (success) {
     formDialogVisible.value = false
-    activeRole.value        = null
+    activeRole.value = null
   }
 }
 
 async function onDeleteConfirm(): Promise<void> {
   if (!activeRole.value) return
+
   const ok = await handleDelete(activeRole.value)
   if (ok) {
     deleteDialogVisible.value = false
-    activeRole.value          = null
+    activeRole.value = null
   }
 }
 
@@ -140,59 +160,30 @@ onMounted(() => loadRoles())
         </p>
       </div>
 
-      <AppButton
-        label="Create Role"
-        icon="pi pi-plus"
-        variant="accent"
-        @click="openCreate"
-      />
+      <AppButton label="Create Role" icon="pi pi-plus" variant="accent" @click="openCreate" />
     </header>
 
     <!-- Stats -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <AppStatCard
-        label="Total Roles"
-        :value="store.totalRoles"
-        icon="pi pi-shield"
-        variant="blueberry"
-      />
-      <AppStatCard
-        label="System Roles"
-        :value="store.systemRoles.length"
-        icon="pi pi-lock"
-        variant="citrus"
-      />
-      <AppStatCard
-        label="Custom Roles"
-        :value="store.editableRoles.length"
-        icon="pi pi-users"
-        variant="apricot"
-      />
-      <AppStatCard
-        label="Status"
-        :value="store.loading ? '…' : 'Ready'"
-        icon="pi pi-check-circle"
-        variant="green"
-      />
+      <AppStatCard label="Total Roles" :value="store.totalRoles" icon="pi pi-shield" variant="blueberry" />
+      <AppStatCard label="System Roles" :value="store.systemRoles.length" icon="pi pi-lock" variant="citrus" />
+      <AppStatCard label="Custom Roles" :value="store.editableRoles.length" icon="pi pi-users" variant="apricot" />
+      <AppStatCard label="Status" :value="store.loading ? '…' : 'Ready'" icon="pi pi-check-circle" variant="green" />
     </div>
 
     <!-- Filters -->
-    <AppCard
-      :padding="'small'"
-      :shadow="'none'"
-      class="!bg-transparent !border-appleCore-200/60"
-    >
-      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-        <div class="relative flex-1">
-          <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-blueberry-400 text-sm" />
-          <InputText
-            v-model="search"
-            placeholder="Search roles by name…"
-            class="w-full !pl-9"
-            @input="onSearchInput"
-          />
-        </div>
+    <div class="flex flex-col gap-3 p-4 bg-white border border-appleCore-100 rounded-xl">
+      <div class="flex flex-wrap items-center gap-3">
+        <!-- Search -->
+        <AppSearchBar
+          v-model="search"
+          placeholder="Search roles by name…"
+          button-label=""
+          class="flex-1 min-w-[280px]"
+          @search="onSearch"
+        />
 
+        <!-- Role Type Select -->
         <Select
           v-model="isSystem"
           :options="systemOptions"
@@ -203,16 +194,43 @@ onMounted(() => loadRoles())
           @change="applyFilters"
         />
 
+        <!-- Reset Button -->
         <Button
           v-if="hasActiveFilters"
-          label="Reset"
-          icon="pi pi-filter-slash"
+          icon="pi pi-refresh"
+          severity="secondary"
           text
-          class="!text-blueberry-500"
+          rounded
+          v-tooltip.top="'Reset all filters'"
           @click="onResetFilters"
         />
       </div>
-    </AppCard>
+
+      <!-- Active filter chips -->
+      <div
+        v-if="hasActiveFilters"
+        class="flex items-center flex-wrap gap-2 pt-2 border-t border-appleCore-100"
+      >
+        <span class="text-xs text-blueberry-500 font-medium">Active:</span>
+
+        <span
+          v-for="f in activeFilters"
+          :key="f.key"
+          class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-apricot-50 text-apricot-700
+                 rounded-full text-xs font-medium ring-1 ring-apricot-200"
+        >
+          <span class="font-semibold">{{ f.label }}:</span>
+          <span>{{ f.value }}</span>
+          <button
+            type="button"
+            class="ml-0.5 hover:text-apricot-900 transition-colors"
+            @click="removeFilter(f.key)"
+          >
+            <i class="pi pi-times text-[10px]" />
+          </button>
+        </span>
+      </div>
+    </div>
 
     <!-- Table -->
     <AppCard :padding="'none'" :shadow="'soft'">
@@ -238,7 +256,7 @@ onMounted(() => loadRoles())
       @submit="onFormSubmit"
     />
 
-    <!-- ✅ FIXED — removed :loading prop, panel manages its own loading state -->
+    <!-- Role Permission Panel -->
     <RolePermissionPanel
       v-model:visible="permissionPanelVisible"
       :role="activeRole"

@@ -1,11 +1,11 @@
-// src/features/applicants/api/psgc.api.ts
+// src/shared/api/psgc.api.ts
 import axios from 'axios'
 import type {
   PsgcRegion,
   PsgcProvince,
   PsgcCity,
   PsgcBarangay,
-} from '../types'
+} from '@features/applicants/types'   // ← FIXED: use alias path
 
 // Public Philippine PSGC API
 const psgc = axios.create({
@@ -21,7 +21,7 @@ export const psgcApi = {
 
   /**
    * Get ALL provinces (used for filter dropdown)
-   * No region needed - returns all 81 provinces
+   * Returns all 81 provinces at once
    */
   async allProvinces(): Promise<PsgcProvince[]> {
     const { data } = await psgc.get<PsgcProvince[]>('/provinces')
@@ -29,7 +29,7 @@ export const psgcApi = {
   },
 
   /**
-   * Get provinces filtered by region (for cascading region → province)
+   * Get provinces by region (for cascading form)
    */
   async provinces(regionCode: string): Promise<PsgcProvince[]> {
     const { data } = await psgc.get<PsgcProvince[]>(

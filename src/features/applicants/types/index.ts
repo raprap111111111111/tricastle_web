@@ -356,6 +356,8 @@ export type UpdateTattooPayload = Partial<Omit<CreateTattooPayload, 'applicant_i
 
 // ─── Filters ──────────────────────────────────────────────────────────────────
 
+// ─── Filters ──────────────────────────────────────────────────────────────────
+
 export interface ApplicantFilters {
   search?: string
   offset?: number
@@ -369,10 +371,15 @@ export interface ApplicantFilters {
   nationality?: string
   quality_grade?: QualityGrade | ''
   assigned_staff_id?: number | null
-  batch_id?: number | null           // ← added for batch filtering
+  batch_id?: number | null
+  batch_status?: ApplicantBatchStatus | ''
   passport_expiring_within_months?: number | null
-}
 
+  // 🗺️ NEW: Location filters
+  city?: string
+  province?: string
+  address?: string
+}
 // ─── Pagination ───────────────────────────────────────────────────────────────
 
 export interface Pagination {
