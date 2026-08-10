@@ -107,4 +107,22 @@ export const deploymentApi = {
     const { data } = await http.get(`${BASE}/countries`)
     return unwrap<string[]>(data)
   },
+
+  // ═══════════════════════════════════════════════════════
+  // 🏠 Mark returned home early
+  // PATCH /applicant-batches/{id}/return
+  // ═══════════════════════════════════════════════════════
+  async markReturned(applicantBatchId: number, payload: { return_reason: string }): Promise<any> {
+    const { data } = await http.patch(`/applicant-batches/${applicantBatchId}/return`, payload)
+    return unwrap(data)
+  },
+
+  // ═══════════════════════════════════════════════════════
+  // ✅ Mark contract completed
+  // PATCH /applicant-batches/{id}/complete
+  // ═══════════════════════════════════════════════════════
+  async markCompleted(applicantBatchId: number, payload: { completion_notes?: string | null }): Promise<any> {
+    const { data } = await http.patch(`/applicant-batches/${applicantBatchId}/complete`, payload)
+    return unwrap(data)
+  },
 }

@@ -10,18 +10,11 @@ import type {
   BulkDeployPayload,
 } from '../types'
 
-/**
- * 🎯 Composable for deployment actions with toast notifications.
- * Use this in components instead of calling the store directly.
- */
 export function useDeployments() {
-  const toast   = useToast()
+  const toast = useToast()
   const confirm = useConfirm()
-  const store   = useDeploymentStore()
+  const store = useDeploymentStore()
 
-  // ═══════════════════════════════════════════════════════
-  // Deploy applicant
-  // ═══════════════════════════════════════════════════════
   async function handleDeploy(
     applicantBatchId: number,
     payload: DeployApplicantPayload,
@@ -51,9 +44,6 @@ export function useDeployments() {
     }
   }
 
-  // ═══════════════════════════════════════════════════════
-  // Update deployment
-  // ═══════════════════════════════════════════════════════
   async function handleUpdate(
     deploymentId: number,
     payload: UpdateDeploymentPayload,
@@ -83,9 +73,6 @@ export function useDeployments() {
     }
   }
 
-  // ═══════════════════════════════════════════════════════
-  // Cancel deployment (with confirmation)
-  // ═══════════════════════════════════════════════════════
   async function handleCancel(
     deploymentId: number,
     reason: string,
@@ -117,12 +104,7 @@ export function useDeployments() {
     }
   }
 
-  // ═══════════════════════════════════════════════════════
-  // Bulk deploy
-  // ═══════════════════════════════════════════════════════
-  async function handleBulkDeploy(
-    payload: BulkDeployPayload,
-  ): Promise<boolean> {
+  async function handleBulkDeploy(payload: BulkDeployPayload): Promise<boolean> {
     try {
       const result = await store.bulkDeploy(payload)
 
@@ -155,13 +137,91 @@ export function useDeployments() {
     }
   }
 
-  // ═══════════════════════════════════════════════════════
-  // Confirm before cancel (uses PrimeVue confirm)
-  // ═══════════════════════════════════════════════════════
-  function confirmCancel(
-    deployment: Deployment,
-    onConfirm: () => void,
-  ): void {
+  // 🏠 Mark returned home
+  async function handleMarkReturned(
+    applicantBatchId: number,
+    reason: string,
+    applicantName?: string,
+  ): Promise<boolean> {
+    console.log('🏠 [Return] Sending:', { applicantBatchId, reason })
+
+    try {
+      const result = await store.markReturned(applicantBatchId, reason)
+      console.log('✅ [Return] Success:', result)
+
+      toast.add({
+        severity: 'warn',
+        summary: '🏠 Marked as Returned',
+        detail: applicantName
+          ? `${applicantName} has been marked as returned home`
+          : 'Applicant marked as returned home',
+        life: 4000,
+      })
+      return true
+    } catch (e: any) {
+      console.error('❌ [Return] Full error:', e)
+      console.error('❌ [Return] Status:', e?.response?.status)
+      console.error('❌ [Return] Response data:', e?.response?.data)
+      console.error('❌ [Return] Request URL:', e?.config?.url)
+
+      const detailMsg = e?.response?.data?.message
+        ?? e?.response?.data?.error
+        ?? e?.message
+        ?? 'Could not mark as returned'
+
+      toast.add({
+        severity: 'error',
+        summary: `Failed (${e?.response?.status ?? '?'})`,
+        detail: detailMsg,
+        life: 8000,
+      })
+      return false
+    }
+  }
+
+  // ✅ Mark completed
+  async function handleMarkCompleted(
+    applicantBatchId: number,
+    notes?: string | null,
+    applicantName?: string,
+  ): Promise<boolean> {
+    console.log('✅ [Complete] Sending:', { applicantBatchId, notes })
+
+    try {
+      const result = await store.markCompleted(applicantBatchId, notes)
+      console.log('✅ [Complete] Success:', result)
+
+      toast.add({
+        severity: 'success',
+        summary: '✅ Contract Completed',
+        detail: applicantName
+          ? `${applicantName}'s contract successfully marked as completed`
+          : 'Contract marked as completed',
+        life: 4000,
+      })
+      return true
+    } catch (e: any) {
+      console.error('❌ [Complete] Full error:', e)
+      console.error('❌ [Complete] Status:', e?.response?.status)
+      console.error('❌ [Complete] Response data:', e?.response?.data)
+      console.error('❌ [Complete] Request URL:', e?.config?.url)
+
+      const detailMsg = e?.response?.data?.message
+        ?? e?.response?.data?.error
+        ?? e?.message
+        ?? 'Could not mark as completed'
+
+      toast.add({
+        severity: 'error',
+        summary: `Failed (${e?.response?.status ?? '?'})`,
+        detail: detailMsg,
+        life: 8000,
+      })
+      return false
+    }
+  }
+
+  function confirmCancel(deployment: Deployment, onConfirm: () => void): void {
     const name = deployment.applicant?.full_name ?? 'this applicant'
     confirm.require({
       header: 'Cancel Deployment?',
@@ -180,5 +240,7 @@ export function useDeployments() {
     handleCancel,
     handleBulkDeploy,
     confirmCancel,
+    handleMarkReturned,
+    handleMarkCompleted,
   }
 }

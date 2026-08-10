@@ -6,6 +6,7 @@ import Skeleton from 'primevue/skeleton'
 import { useApplicantStore } from '../stores/applicant.store'
 import ApplicantStatusBadge from '../components/ApplicantStatusBadge.vue'
 import AppAddressMap from '@shared/ui/map/AppAddressMap.vue'
+import DeploymentHistorySection from '@features/deployments/components/DeploymentHistorySection.vue'
 
 const props = defineProps<{ id: number }>()
 
@@ -32,6 +33,44 @@ onMounted(async () => {
 })
 
 const a = computed(() => store.applicant)
+
+// 🚀 Extract deployments from applicant_batches
+// 🚀 Extract deployments from applicant_batches
+const applicantDeployments = computed(() => {
+  if (!a.value?.applicant_batches) return []
+
+  return a.value.applicant_batches
+    .filter((ab: any) => ab.deployment_country || ab.deployed_at)
+    .map((ab: any) => ({
+      id: ab.id,
+      status: ab.cancelled_at
+        ? 'cancelled'
+        : ab.completed_at
+          ? 'completed'
+          : ab.returned_at
+            ? 'returned'
+            : (ab.status === 'deployed' ? 'deployed' : 'active'),
+      deployment_country: ab.deployment_country,
+      deployment_company: ab.deployment_company,
+      deployment_position: ab.deployment_position,
+      deployed_at: ab.deployed_at,
+      contract_duration_months: ab.contract_duration_months,
+      contract_start_date: ab.contract_start_date,
+      contract_end_date: ab.contract_end_date,
+      monthly_salary: ab.monthly_salary,
+      salary_currency: ab.salary_currency,
+      flight_date: ab.flight_date,
+      visa_type: ab.visa_type,
+      deployment_notes: ab.deployment_notes,
+      cancellation_reason: ab.cancellation_reason,
+      cancelled_at: ab.cancelled_at,
+      returned_at: ab.returned_at,     
+      return_reason: ab.return_reason,   
+      completed_at: ab.completed_at,       
+      completion_notes: ab.completion_notes,  
+      batch: ab.batch,
+    }))
+})
 
 // ─── Formatters ────────────────────────────────────────────
 function formatDate(dateStr: string | null | undefined): string {
@@ -134,12 +173,7 @@ function batchStatusColor(status?: string): string {
     <!-- ─── Header Nav ─────────────────────────────────── -->
     <div class="flex items-center justify-between gap-3">
       <div class="flex items-center gap-3">
-        <Button
-          icon="pi pi-arrow-left"
-          text
-          rounded
-          @click="router.push({ name: 'applicants.index' })"
-        />
+        <Button icon="pi pi-arrow-left" text rounded @click="router.push({ name: 'applicants.index' })" />
         <div>
           <h1 class="text-2xl font-serif font-bold text-blueberry-800">
             Applicant Details
@@ -151,22 +185,10 @@ function batchStatusColor(status?: string): string {
       </div>
 
       <div v-if="a" class="flex items-center gap-2">
-        <!-- Toggle map button -->
-        <Button
-          v-if="a.city || a.current_address"
-          :label="showMap ? 'Hide Map' : 'Show Map'"
-          :icon="showMap ? 'pi pi-eye-slash' : 'pi pi-map-marker'"
-          severity="secondary"
-          text
-          @click="toggleMap"
-        />
-        <Button
-          label="Edit"
-          icon="pi pi-pencil"
-          severity="secondary"
-          outlined
-          @click="router.push({ name: 'applicants.edit', params: { id: a.id } })"
-        />
+        <Button v-if="a.city || a.current_address" :label="showMap ? 'Hide Map' : 'Show Map'"
+          :icon="showMap ? 'pi pi-eye-slash' : 'pi pi-map-marker'" severity="secondary" text @click="toggleMap" />
+        <Button label="Edit" icon="pi pi-pencil" severity="secondary" outlined
+          @click="router.push({ name: 'applicants.edit', params: { id: a.id } })" />
       </div>
     </div>
 
@@ -189,19 +211,12 @@ function batchStatusColor(status?: string): string {
     <template v-else>
 
       <!-- ─── 🗺️ HERO MAP CARD (Collapsible) ──────────── -->
-      <Transition
-        enter-active-class="transition-all duration-300 ease-out"
-        enter-from-class="opacity-0 -translate-y-4 max-h-0"
-        enter-to-class="opacity-100 translate-y-0 max-h-[500px]"
-        leave-active-class="transition-all duration-200 ease-in"
-        leave-from-class="opacity-100 max-h-[500px]"
-        leave-to-class="opacity-0 -translate-y-4 max-h-0"
-      >
-        <section
-          v-if="showMap && (a.city || a.current_address)"
-          class="bg-white rounded-2xl border border-appleCore-100 overflow-hidden"
-        >
-          <!-- Map header bar -->
+      <Transition enter-active-class="transition-all duration-300 ease-out"
+        enter-from-class="opacity-0 -translate-y-4 max-h-0" enter-to-class="opacity-100 translate-y-0 max-h-[500px]"
+        leave-active-class="transition-all duration-200 ease-in" leave-from-class="opacity-100 max-h-[500px]"
+        leave-to-class="opacity-0 -translate-y-4 max-h-0">
+        <section v-if="showMap && (a.city || a.current_address)"
+          class="bg-white rounded-2xl border border-appleCore-100 overflow-hidden">
           <div class="flex items-center justify-between px-5 py-3 border-b border-appleCore-100 bg-appleCore-50/50">
             <div class="flex items-center gap-2">
               <div class="w-8 h-8 rounded-lg bg-apricot-100 flex items-center justify-center">
@@ -217,44 +232,22 @@ function batchStatusColor(status?: string): string {
               </div>
             </div>
 
-            <Button
-              icon="pi pi-times"
-              severity="secondary"
-              text
-              rounded
-              size="small"
-              @click="showMap = false"
-              v-tooltip.top="'Hide map'"
-            />
+            <Button icon="pi pi-times" severity="secondary" text rounded size="small" @click="showMap = false"
+              v-tooltip.top="'Hide map'" />
           </div>
 
-          <!-- Map itself -->
           <div class="h-[320px] w-full">
-            <AppAddressMap
-              label="Current Address"
-              :address="a.current_address"
-              :city="a.city"
-              :province="a.province"
-              :postal-code="a.postal_code"
-              country="Philippines"
-              height="100%"
-              :zoom="14"
-              class="h-full [&>div:first-child]:hidden [&>div:last-child]:h-full [&>div:last-child]:rounded-none [&>div:last-child]:ring-0"
-            />
+            <AppAddressMap label="Current Address" :address="a.current_address" :city="a.city" :province="a.province"
+              :postal-code="a.postal_code" country="Philippines" height="100%" :zoom="14"
+              class="h-full [&>div:first-child]:hidden [&>div:last-child]:h-full [&>div:last-child]:rounded-none [&>div:last-child]:ring-0" />
           </div>
         </section>
       </Transition>
 
-      <!-- ─── Show Map Button (when hidden) ───────────── -->
-      <button
-        v-if="!showMap && (a.city || a.current_address)"
-        type="button"
-        class="w-full py-3 px-4 rounded-xl border-2 border-dashed border-appleCore-200
+      <button v-if="!showMap && (a.city || a.current_address)" type="button" class="w-full py-3 px-4 rounded-xl border-2 border-dashed border-appleCore-200
                hover:border-apricot-300 hover:bg-apricot-50/30 transition-all
                flex items-center justify-center gap-2 text-sm font-medium text-blueberry-500
-               hover:text-apricot-600 group"
-        @click="showMap = true"
-      >
+               hover:text-apricot-600 group" @click="showMap = true">
         <i class="pi pi-map-marker group-hover:text-apricot-500" />
         <span>Show applicant location on map</span>
         <i class="pi pi-chevron-down text-xs" />
@@ -263,16 +256,12 @@ function batchStatusColor(status?: string): string {
       <!-- ─── Profile Header Card ──────────────────────── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
         <div class="flex items-start gap-5">
-          <!-- Avatar -->
-          <div
-            class="w-20 h-20 rounded-full bg-apricot-500 text-white
+          <div class="w-20 h-20 rounded-full bg-apricot-500 text-white
                    flex items-center justify-center flex-shrink-0
-                   font-serif font-bold text-2xl"
-          >
+                   font-serif font-bold text-2xl">
             {{ getInitials(a.first_name, a.last_name) }}
           </div>
 
-          <!-- Info -->
           <div class="flex-1 min-w-0">
             <div class="flex flex-wrap items-center gap-2 mb-1">
               <span class="font-mono text-xs text-apricot-600 font-semibold
@@ -302,18 +291,14 @@ function batchStatusColor(status?: string): string {
                 <i class="pi pi-globe text-xs" />
                 {{ a.nationality }}
               </span>
-              <span
-                v-if="a.city"
-                class="flex items-center gap-1.5 cursor-pointer hover:text-apricot-600"
-                @click="showMap = true"
-              >
+              <span v-if="a.city" class="flex items-center gap-1.5 cursor-pointer hover:text-apricot-600"
+                @click="showMap = true">
                 <i class="pi pi-map-marker text-xs text-apricot-500" />
                 {{ [a.city, a.province].filter(Boolean).join(', ') }}
               </span>
             </div>
           </div>
 
-          <!-- Quality Score -->
           <div class="text-right flex-shrink-0">
             <p class="text-xs text-blueberry-400 uppercase font-medium tracking-wider">
               Quality Score
@@ -322,24 +307,16 @@ function batchStatusColor(status?: string): string {
               {{ a.quality_score }}%
             </p>
             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs
-                   font-bold ring-1 ring-inset mt-1"
-              :class="gradeColor(a.quality_grade)"
-            >
+                   font-bold ring-1 ring-inset mt-1" :class="gradeColor(a.quality_grade)">
               Grade {{ a.quality_grade }}
             </span>
           </div>
         </div>
 
-        <!-- ─── Status Timestamps ──────────────────────── -->
-        <div
-          v-if="a.final_listed_at || a.rejected_at || a.rejection_reason"
-          class="mt-4 pt-4 border-t border-appleCore-100"
-        >
-          <div
-            v-if="a.status === 'final_list' && a.final_listed_at"
-            class="flex items-center gap-2 text-sm text-green-700
-                   bg-green-50 px-3 py-2 rounded-lg"
-          >
+        <div v-if="a.final_listed_at || a.rejected_at || a.rejection_reason"
+          class="mt-4 pt-4 border-t border-appleCore-100">
+          <div v-if="a.status === 'final_list' && a.final_listed_at" class="flex items-center gap-2 text-sm text-green-700
+                   bg-green-50 px-3 py-2 rounded-lg">
             <i class="pi pi-check-circle text-green-600" />
             <span>
               Moved to Final List on
@@ -350,10 +327,7 @@ function batchStatusColor(status?: string): string {
             </span>
           </div>
 
-          <div
-            v-if="a.status === 'rejected'"
-            class="flex flex-col gap-1 bg-red-50 px-3 py-2 rounded-lg"
-          >
+          <div v-if="a.status === 'rejected'" class="flex flex-col gap-1 bg-red-50 px-3 py-2 rounded-lg">
             <div class="flex items-center gap-2 text-sm text-red-700">
               <i class="pi pi-times-circle text-red-600" />
               <span>
@@ -370,7 +344,6 @@ function batchStatusColor(status?: string): string {
           </div>
         </div>
 
-        <!-- ─── Staff Info ─────────────────────────────── -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-appleCore-100">
           <div>
             <p class="text-xs text-blueberry-400 uppercase tracking-wider">Assigned Staff</p>
@@ -486,19 +459,16 @@ function batchStatusColor(status?: string): string {
         </dl>
       </section>
 
-      <!-- ─── Address Details (no map here anymore) ────── -->
+      <!-- ─── Address Details ──────────────────────────── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-base font-serif font-semibold text-blueberry-800 flex items-center gap-2">
             <i class="pi pi-map-marker text-apricot-500" />
             Address Details
           </h3>
-          <button
-            v-if="a.city || a.current_address"
-            type="button"
+          <button v-if="a.city || a.current_address" type="button"
             class="text-xs text-apricot-600 hover:text-apricot-700 hover:underline flex items-center gap-1"
-            @click="showMap = true"
-          >
+            @click="showMap = true">
             <i class="pi pi-map text-[10px]" />
             View on map
           </button>
@@ -574,22 +544,26 @@ function batchStatusColor(status?: string): string {
           <div class="mb-4">
             <p class="text-xs text-blueberry-400 uppercase tracking-wider mb-2">Current Habits</p>
             <div class="flex flex-wrap gap-2">
-              <span v-if="a.lifestyle.is_smoking" class="inline-flex items-center gap-1 px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-xs font-medium ring-1 ring-orange-200">
+              <span v-if="a.lifestyle.is_smoking"
+                class="inline-flex items-center gap-1 px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-xs font-medium ring-1 ring-orange-200">
                 🚬 Smoking
                 <span v-if="a.lifestyle.smoking_frequency" class="text-orange-500">
                   · {{ a.lifestyle.smoking_frequency }}
                 </span>
               </span>
-              <span v-if="a.lifestyle.is_drinking_alcohol" class="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium ring-1 ring-blue-200">
+              <span v-if="a.lifestyle.is_drinking_alcohol"
+                class="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium ring-1 ring-blue-200">
                 🍺 Drinking
                 <span v-if="a.lifestyle.drinking_frequency" class="text-blue-500">
                   · {{ a.lifestyle.drinking_frequency }}
                 </span>
               </span>
-              <span v-if="a.lifestyle.is_using_drugs" class="inline-flex items-center gap-1 px-3 py-1 bg-red-50 text-red-700 rounded-full text-xs font-medium ring-1 ring-red-200">
+              <span v-if="a.lifestyle.is_using_drugs"
+                class="inline-flex items-center gap-1 px-3 py-1 bg-red-50 text-red-700 rounded-full text-xs font-medium ring-1 ring-red-200">
                 💊 Drug Use
               </span>
-              <span v-if="!a.lifestyle.is_smoking && !a.lifestyle.is_drinking_alcohol && !a.lifestyle.is_using_drugs" class="text-blueberry-400 italic text-sm">
+              <span v-if="!a.lifestyle.is_smoking && !a.lifestyle.is_drinking_alcohol && !a.lifestyle.is_using_drugs"
+                class="text-blueberry-400 italic text-sm">
                 No current habits reported
               </span>
             </div>
@@ -598,10 +572,16 @@ function batchStatusColor(status?: string): string {
           <div class="mb-4">
             <p class="text-xs text-blueberry-400 uppercase tracking-wider mb-2">Past Habits</p>
             <div class="flex flex-wrap gap-2">
-              <span v-if="a.lifestyle.was_smoking" class="px-3 py-1 bg-appleCore-50 text-blueberry-700 rounded-full text-xs font-medium">Was smoking</span>
-              <span v-if="a.lifestyle.was_drinking_alcohol" class="px-3 py-1 bg-appleCore-50 text-blueberry-700 rounded-full text-xs font-medium">Was drinking</span>
-              <span v-if="a.lifestyle.was_using_drugs" class="px-3 py-1 bg-appleCore-50 text-blueberry-700 rounded-full text-xs font-medium">Was using drugs</span>
-              <span v-if="!a.lifestyle.was_smoking && !a.lifestyle.was_drinking_alcohol && !a.lifestyle.was_using_drugs" class="text-blueberry-400 italic text-sm">None</span>
+              <span v-if="a.lifestyle.was_smoking"
+                class="px-3 py-1 bg-appleCore-50 text-blueberry-700 rounded-full text-xs font-medium">Was smoking</span>
+              <span v-if="a.lifestyle.was_drinking_alcohol"
+                class="px-3 py-1 bg-appleCore-50 text-blueberry-700 rounded-full text-xs font-medium">Was
+                drinking</span>
+              <span v-if="a.lifestyle.was_using_drugs"
+                class="px-3 py-1 bg-appleCore-50 text-blueberry-700 rounded-full text-xs font-medium">Was using
+                drugs</span>
+              <span v-if="!a.lifestyle.was_smoking && !a.lifestyle.was_drinking_alcohol && !a.lifestyle.was_using_drugs"
+                class="text-blueberry-400 italic text-sm">None</span>
             </div>
           </div>
 
@@ -656,7 +636,8 @@ function batchStatusColor(status?: string): string {
         </h3>
 
         <div v-if="a.educations && a.educations.length > 0" class="space-y-3">
-          <div v-for="edu in a.educations" :key="edu.id" class="border border-appleCore-100 rounded-lg p-4 hover:bg-appleCore-50/30 transition-colors">
+          <div v-for="edu in a.educations" :key="edu.id"
+            class="border border-appleCore-100 rounded-lg p-4 hover:bg-appleCore-50/30 transition-colors">
             <p class="font-semibold text-blueberry-800">{{ edu.school_name }}</p>
             <p class="text-sm text-blueberry-600 mt-0.5">
               {{ capitalize(edu.education_level) }}
@@ -691,10 +672,12 @@ function batchStatusColor(status?: string): string {
         </h3>
 
         <div v-if="a.employments && a.employments.length > 0" class="space-y-3">
-          <div v-for="emp in a.employments" :key="emp.id" class="border border-appleCore-100 rounded-lg p-4 hover:bg-appleCore-50/30 transition-colors">
+          <div v-for="emp in a.employments" :key="emp.id"
+            class="border border-appleCore-100 rounded-lg p-4 hover:bg-appleCore-50/30 transition-colors">
             <div class="flex items-center gap-2">
               <p class="font-semibold text-blueberry-800">{{ emp.position }}</p>
-              <span v-if="emp.is_current" class="px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-xs font-medium ring-1 ring-green-200">
+              <span v-if="emp.is_current"
+                class="px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-xs font-medium ring-1 ring-green-200">
                 Current
               </span>
             </div>
@@ -740,7 +723,8 @@ function batchStatusColor(status?: string): string {
         </h3>
 
         <div v-if="a.tattoos && a.tattoos.length > 0" class="space-y-3">
-          <div v-for="tattoo in a.tattoos" :key="tattoo.id" class="border border-appleCore-100 rounded-lg p-4 hover:bg-appleCore-50/30 transition-colors">
+          <div v-for="tattoo in a.tattoos" :key="tattoo.id"
+            class="border border-appleCore-100 rounded-lg p-4 hover:bg-appleCore-50/30 transition-colors">
             <p class="font-semibold text-blueberry-800">{{ tattoo.location }}</p>
             <div class="flex flex-wrap items-center gap-2 mt-1 text-xs text-blueberry-500">
               <span v-if="tattoo.size" class="capitalize">
@@ -762,7 +746,8 @@ function batchStatusColor(status?: string): string {
       </section>
 
       <!-- ─── Batch Assignments ──────────────────────────── -->
-      <section v-if="a.applicant_batches && a.applicant_batches.length > 0" class="bg-white rounded-2xl border border-appleCore-100 p-6">
+      <section v-if="a.applicant_batches && a.applicant_batches.length > 0"
+        class="bg-white rounded-2xl border border-appleCore-100 p-6">
         <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
           <i class="pi pi-users text-apricot-500" />
           Batch Assignments
@@ -772,12 +757,14 @@ function batchStatusColor(status?: string): string {
         </h3>
 
         <div class="space-y-3">
-          <div v-for="ab in a.applicant_batches" :key="ab.id" class="border border-appleCore-100 rounded-lg p-4 hover:bg-appleCore-50/30 transition-colors">
+          <div v-for="ab in a.applicant_batches" :key="ab.id"
+            class="border border-appleCore-100 rounded-lg p-4 hover:bg-appleCore-50/30 transition-colors">
             <div class="flex items-center gap-2 flex-wrap mb-2">
               <span class="font-mono text-xs text-apricot-600 font-semibold bg-apricot-50 px-2 py-0.5 rounded">
                 Batch #{{ ab.batch?.batch_number ?? ab.batch_id }}
               </span>
-              <span class="px-2 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset" :class="batchStatusColor(ab.status)">
+              <span class="px-2 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset"
+                :class="batchStatusColor(ab.status)">
                 {{ capitalize(ab.status) }}
               </span>
             </div>
@@ -840,7 +827,8 @@ function batchStatusColor(status?: string): string {
         </div>
       </section>
 
-      <section v-else-if="a.status !== 'final_list'" class="bg-appleCore-50 rounded-2xl border border-dashed border-appleCore-200 p-6 text-center">
+      <section v-else-if="a.status !== 'final_list'"
+        class="bg-appleCore-50 rounded-2xl border border-dashed border-appleCore-200 p-6 text-center">
         <i class="pi pi-info-circle text-blueberry-400 text-2xl mb-2" />
         <p class="text-sm text-blueberry-500">
           This applicant has not been assigned to a batch yet.
@@ -849,6 +837,9 @@ function batchStatusColor(status?: string): string {
           </span>
         </p>
       </section>
+
+      <!-- 🚀 Deployment History -->
+      <DeploymentHistorySection :deployments="applicantDeployments" />
 
     </template>
   </div>

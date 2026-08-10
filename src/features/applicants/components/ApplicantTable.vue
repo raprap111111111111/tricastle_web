@@ -8,6 +8,7 @@ import Column from 'primevue/column'
 import Button from 'primevue/button'
 import Paginator, { type PageState } from 'primevue/paginator'
 import Menu from 'primevue/menu'
+import Popover from 'primevue/popover'
 import ApplicantStatusBadge from './ApplicantStatusBadge.vue'
 import ApplicantDeleteDialog from './ApplicantDeleteDialog.vue'
 import RejectApplicantDialog from './RejectApplicantDialog.vue'
@@ -20,15 +21,15 @@ const props = defineProps<{
   pagination: Pagination | null
   loading: boolean
   submitting: boolean
-  selectable?: boolean                        // 👈 NEW
-  selectedIds?: number[]                      // 👈 NEW
+  selectable?: boolean
+  selectedIds?: number[]
 }>()
 
 const emit = defineEmits<{
   (e: 'page-change', page: number): void
   (e: 'limit-change', limit: number): void
   (e: 'delete', id: number): void
-  (e: 'update:selectedIds', ids: number[]): void   // 👈 NEW
+  (e: 'update:selectedIds', ids: number[]): void
 }>()
 
 const router  = useRouter()
@@ -39,6 +40,76 @@ const store   = useApplicantStore()
 const deleteDialog       = ref(false)
 const rejectDialog       = ref(false)
 const selectedApplicant  = ref<Applicant | null>(null)
+
+// ─── 🚀 Deployment popover ─────────────────────────────
+const deploymentPopover = ref<InstanceType<typeof Popover> | null>(null)
+const hoveredApplicant  = ref<Applicant | null>(null)
+
+function showDeploymentPopover(event: Event, applicant: Applicant) {
+  hoveredApplicant.value = applicant
+  deploymentPopover.value?.show(event)
+}
+
+function hideDeploymentPopover() {
+  deploymentPopover.value?.hide()
+}
+
+// Get deployments from applicant's batches (sorted most recent first)
+function getApplicantDeployments(applicant: Applicant): any[] {
+  if (!applicant.applicant_batches) return []
+  return (applicant.applicant_batches as any[])
+    .filter((ab) => ab.deployment_country || ab.deployed_at)
+    .sort((a, b) => {
+      const da = new Date(a.deployed_at ?? 0).getTime()
+      const db = new Date(b.deployed_at ?? 0).getTime()
+      return db - da
+    })
+}
+
+// Latest deployment for badge display
+function getLatestDeployment(applicant: Applicant): any | null {
+  const deployments = getApplicantDeployments(applicant)
+  return deployments[0] ?? null
+}
+
+// Count deployments
+function deploymentCount(applicant: Applicant): number {
+  return getApplicantDeployments(applicant).length
+}
+
+// Country flag emoji
+function countryFlag(country?: string | null): string {
+  const flags: Record<string, string> = {
+    Japan: '🇯🇵',
+    Korea: '🇰🇷',
+    'South Korea': '🇰🇷',
+    Taiwan: '🇹🇼',
+    Singapore: '🇸🇬',
+    'Saudi Arabia': '🇸🇦',
+    UAE: '🇦🇪',
+    Qatar: '🇶🇦',
+    Kuwait: '🇰🇼',
+    Canada: '🇨🇦',
+    USA: '🇺🇸',
+    'United States': '🇺🇸',
+    Australia: '🇦🇺',
+    'Hong Kong': '🇭🇰',
+    Malaysia: '🇲🇾',
+    Philippines: '🇵🇭',
+  }
+  return flags[country ?? ''] ?? '🌍'
+}
+
+function formatDeploymentDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—'
+  try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return '—'
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  } catch {
+    return '—'
+  }
+}
 
 // ─── Selection support ─────────────────────────────
 const selectedRows = computed<Applicant[]>({
@@ -161,7 +232,7 @@ function goToEdit(id: number) {
 
 function onRowClick(event: DataTableRowClickEvent) {
   const target = event.originalEvent?.target as HTMLElement | null
-  if (target?.closest('button, a, .p-button, .p-menu, .p-checkbox')) return
+  if (target?.closest('button, a, .p-button, .p-menu, .p-checkbox, .p-popover')) return
   goToView((event.data as Applicant).id)
 }
 
@@ -326,10 +397,40 @@ function gradeColor(grade: string) {
         </template>
       </Column>
 
-      <Column field="gender" header="Gender" style="width: 100px">
+      <!-- 🚀 Deployment Column (replaces Gender) -->
+      <Column header="Deployment" style="width: 190px">
         <template #body="{ data }">
-          <span class="text-sm capitalize text-blueberry-600">
-            {{ data.gender ?? '—' }}
+          <div
+            v-if="getLatestDeployment(data)"
+            class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg
+                   bg-green-50 ring-1 ring-green-200 cursor-pointer
+                   hover:bg-green-100 hover:ring-green-300 transition-all group"
+            @mouseenter="showDeploymentPopover($event, data)"
+            @mouseleave="hideDeploymentPopover"
+            @click.stop
+          >
+            <span class="text-sm">{{ countryFlag(getLatestDeployment(data)?.deployment_country) }}</span>
+            <div class="flex flex-col items-start min-w-0">
+              <span class="text-xs font-semibold text-green-700 truncate max-w-[100px]">
+                {{ getLatestDeployment(data)?.deployment_country ?? '—' }}
+              </span>
+              <span class="text-[10px] text-green-600 truncate max-w-[100px]">
+                {{ getLatestDeployment(data)?.deployment_company ?? '' }}
+              </span>
+            </div>
+            <span
+              v-if="deploymentCount(data) > 1"
+              class="text-[9px] font-bold text-white bg-green-600 rounded-full
+                     w-4 h-4 flex items-center justify-center flex-shrink-0"
+              v-tooltip.top="`${deploymentCount(data)} total deployments`"
+            >
+              {{ deploymentCount(data) }}
+            </span>
+            <i class="pi pi-info-circle text-[9px] text-green-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+
+          <span v-else class="text-xs text-blueberry-300 italic">
+            Not deployed
           </span>
         </template>
       </Column>
@@ -508,5 +609,135 @@ function gradeColor(grade: string) {
       :loading="selectedApplicant ? isRowLoading(selectedApplicant.id) : false"
       @confirm="onRejectConfirmed"
     />
+
+    <!-- 🚀 Deployment History Popover -->
+    <Popover
+      ref="deploymentPopover"
+      :pt="{
+        root: { class: '!p-0 !border !border-appleCore-200 !rounded-xl !shadow-xl' },
+        content: { class: '!p-0' },
+      }"
+    >
+      <div v-if="hoveredApplicant" class="w-[380px] max-h-[400px] overflow-hidden flex flex-col">
+        <!-- Header -->
+        <div class="px-4 py-3 border-b border-appleCore-100 bg-gradient-to-r from-green-50 to-emerald-50">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-green-500 flex items-center justify-center flex-shrink-0">
+              <i class="pi pi-send text-white text-xs" />
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-blueberry-800">Deployment History</p>
+              <p class="text-[11px] text-blueberry-500 truncate">
+                {{ hoveredApplicant.first_name }} {{ hoveredApplicant.last_name }} —
+                <span class="font-mono text-apricot-600">{{ hoveredApplicant.applicant_code }}</span>
+              </p>
+            </div>
+            <span class="text-xs font-bold text-green-700 bg-white px-2 py-1 rounded-full ring-1 ring-green-200">
+              {{ deploymentCount(hoveredApplicant) }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="flex-1 overflow-y-auto p-4">
+          <div v-if="deploymentCount(hoveredApplicant) > 0" class="relative">
+            <!-- Vertical line -->
+            <div class="absolute left-[11px] top-2 bottom-2 w-0.5 bg-appleCore-100" />
+
+            <div class="space-y-3">
+              <div
+                v-for="deployment in getApplicantDeployments(hoveredApplicant)"
+                :key="deployment.id"
+                class="relative flex gap-3"
+              >
+                <!-- Dot -->
+                <div class="relative z-10 flex-shrink-0">
+                  <div
+                    class="w-6 h-6 rounded-full flex items-center justify-center ring-4"
+                    :class="deployment.cancelled_at
+                      ? 'bg-red-500 ring-red-100'
+                      : 'bg-green-500 ring-green-100'"
+                  >
+                    <i
+                      class="pi text-white text-[9px]"
+                      :class="deployment.cancelled_at ? 'pi-times' : 'pi-check'"
+                    />
+                  </div>
+                </div>
+
+                <!-- Card -->
+                <div class="flex-1 border border-appleCore-100 rounded-lg p-2.5 bg-white">
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-1.5">
+                        <span class="text-sm">{{ countryFlag(deployment.deployment_country) }}</span>
+                        <p class="text-xs font-semibold text-blueberry-800 truncate">
+                          {{ deployment.deployment_country ?? '—' }}
+                        </p>
+                      </div>
+                      <p class="text-[11px] text-blueberry-600 truncate mt-0.5">
+                        {{ deployment.deployment_company ?? '—' }}
+                        <span v-if="deployment.deployment_position" class="text-blueberry-400">
+                          · {{ deployment.deployment_position }}
+                        </span>
+                      </p>
+                    </div>
+                    <span
+                      class="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                      :class="deployment.cancelled_at
+                        ? 'bg-red-100 text-red-700'
+                        : 'bg-green-100 text-green-700'"
+                    >
+                      {{ deployment.cancelled_at ? 'CANCELLED' : 'DEPLOYED' }}
+                    </span>
+                  </div>
+
+                  <div class="flex items-center gap-3 mt-1.5 text-[10px] text-blueberry-500 flex-wrap">
+                    <span v-if="deployment.deployed_at" class="flex items-center gap-0.5">
+                      <i class="pi pi-calendar text-[8px]" />
+                      {{ formatDeploymentDate(deployment.deployed_at) }}
+                    </span>
+                    <span v-if="deployment.monthly_salary" class="flex items-center gap-0.5">
+                      <i class="pi pi-dollar text-[8px]" />
+                      {{ deployment.salary_currency ?? 'USD' }} {{ deployment.monthly_salary.toLocaleString() }}
+                    </span>
+                    <span v-if="deployment.contract_duration_months" class="flex items-center gap-0.5">
+                      <i class="pi pi-clock text-[8px]" />
+                      {{ deployment.contract_duration_months }}mo
+                    </span>
+                  </div>
+
+                  <p
+                    v-if="deployment.cancelled_at && deployment.cancellation_reason"
+                    class="mt-1.5 text-[10px] text-red-600 italic"
+                  >
+                    "{{ deployment.cancellation_reason }}"
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty state -->
+          <div v-else class="text-center py-6">
+            <i class="pi pi-inbox text-2xl text-blueberry-300 mb-2 block" />
+            <p class="text-xs text-blueberry-500">No deployments yet</p>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-4 py-2 border-t border-appleCore-100 bg-appleCore-50/50">
+          <button
+            type="button"
+            class="text-[11px] text-apricot-600 hover:text-apricot-700 font-medium
+                   flex items-center gap-1 mx-auto"
+            @click="hoveredApplicant && (goToView(hoveredApplicant.id), hideDeploymentPopover())"
+          >
+            <i class="pi pi-external-link text-[9px]" />
+            View full applicant profile
+          </button>
+        </div>
+      </div>
+    </Popover>
   </div>
 </template>

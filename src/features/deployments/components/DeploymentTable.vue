@@ -5,6 +5,7 @@ import DataTable, { type DataTableRowClickEvent } from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
 import Paginator, { type PageState } from 'primevue/paginator'
+import Menu from 'primevue/menu'
 import DeploymentStatusBadge from './DeploymentStatusBadge.vue'
 import type { Deployment, Pagination } from '../types'
 
@@ -21,6 +22,8 @@ const emit = defineEmits<{
   (e: 'edit', deployment: Deployment): void
   (e: 'cancel', deployment: Deployment): void
   (e: 'view', deployment: Deployment): void
+  (e: 'mark-returned', deployment: Deployment): void
+  (e: 'mark-completed', deployment: Deployment): void
 }>()
 
 const router = useRouter()
@@ -31,6 +34,51 @@ const loadingIds = ref<Set<number>>(new Set())
 function isRowLoading(id: number): boolean {
   return loadingIds.value.has(id)
 }
+
+// ─── Helper: is this deployment currently active? ─────
+function isActivelyDeployed(deployment: Deployment): boolean {
+  const d = deployment as any
+  return d.status === 'deployed'
+    && !d.cancelled_at
+    && !d.returned_at
+    && !d.completed_at
+}
+
+// ─── Status change menu ──────────────────────────────
+const menuRefs = ref<Record<number, InstanceType<typeof Menu> | null>>({})
+const activeDeployment = ref<Deployment | null>(null)
+
+function toggleStatusMenu(event: Event, deployment: Deployment) {
+  activeDeployment.value = deployment
+  menuRefs.value[deployment.id]?.toggle(event)
+}
+
+const statusMenuItems = computed(() => {
+  const d = activeDeployment.value
+  if (!d) return []
+
+  return [
+    {
+      label: 'Mark as Returned Home',
+      icon: 'pi pi-home',
+      class: '!text-orange-600',
+      command: () => emit('mark-returned', d),
+    },
+    {
+      label: 'Mark as Completed',
+      icon: 'pi pi-check-circle',
+      class: '!text-blue-600',
+      command: () => emit('mark-completed', d),
+    },
+    { separator: true },
+    {
+      label: 'Cancel Deployment',
+      icon: 'pi pi-times-circle',
+      class: '!text-red-600',
+      command: () => emit('cancel', d),
+    },
+  ]
+})
 
 // ─── Pagination ───────────────────────────────────────
 const currentLimit = computed(
@@ -98,20 +146,13 @@ function contractPeriod(d: Deployment): string {
 
 <template>
   <div class="flex flex-col">
-    <DataTable
-      :value="props.deployments"
-      :loading="props.loading"
-      class="!border-none"
-      size="small"
-      :row-hover="true"
-      @row-click="onRowClick"
-      :pt="{
+    <DataTable :value="props.deployments" :loading="props.loading" class="!border-none" size="small" :row-hover="true"
+      @row-click="onRowClick" :pt="{
         table: 'text-sm',
         header: '!bg-appleCore-50/50 !text-blueberry-600 !font-semibold !text-xs !uppercase !tracking-wider',
         headerRow: '!bg-appleCore-50/50 !border-b !border-appleCore-100',
         bodyRow: 'cursor-pointer hover:!bg-appleCore-50/40 !border-b !border-appleCore-100/60 transition-colors',
-      }"
-    >
+      }">
       <!-- Applicant Code -->
       <Column field="applicant.applicant_code" header="Code" style="width: 140px">
         <template #body="{ data }">
@@ -187,49 +228,53 @@ function contractPeriod(d: Deployment): string {
       <!-- Status -->
       <Column header="Status" style="width: 120px">
         <template #body="{ data }">
-          <DeploymentStatusBadge
-            :status="data.status"
-            :cancelled-at="data.cancelled_at"
-          />
+          <DeploymentStatusBadge :status="data.status" :cancelled-at="data.cancelled_at" />
         </template>
       </Column>
 
       <!-- Actions -->
-      <Column header="Actions" style="width: 150px">
+      <Column header="Actions" style="width: 100px">
         <template #body="{ data }">
           <div class="flex items-center gap-0.5" @click.stop>
-            <Button
-              icon="pi pi-eye"
-              text
-              rounded
-              size="small"
-              class="!text-blueberry-500 hover:!text-blue-600 hover:!bg-blue-50"
-              v-tooltip.top="'View Applicant'"
-              :disabled="isRowLoading(data.id)"
-              @click="data.applicant_id && goToApplicant(data.applicant_id)"
-            />
+            <!-- View -->
+            <Button icon="pi pi-eye" text rounded size="small"
+              class="!text-blueberry-500 hover:!text-blue-600 hover:!bg-blue-50" v-tooltip.top="'View Applicant'"
+              :disabled="isRowLoading(data.id)" @click="data.applicant_id && goToApplicant(data.applicant_id)" />
 
-            <Button
-              icon="pi pi-pencil"
-              text
-              rounded
-              size="small"
-              class="!text-blueberry-500 hover:!text-apricot-600 hover:!bg-apricot-50"
-              v-tooltip.top="'Edit Deployment'"
-              :disabled="isRowLoading(data.id)"
-              @click="emit('edit', data)"
-            />
+            <!-- Edit -->
+            <Button icon="pi pi-pencil" text rounded size="small"
+              class="!text-blueberry-500 hover:!text-apricot-600 hover:!bg-apricot-50" v-tooltip.top="'Edit Deployment'"
+              :disabled="isRowLoading(data.id)" @click="emit('edit', data)" />
+          </div>
+        </template>
+      </Column>
 
-            <Button
-              icon="pi pi-times-circle"
-              text
-              rounded
-              size="small"
-              class="!text-blueberry-500 hover:!text-red-500 hover:!bg-red-50"
-              v-tooltip.top="'Cancel Deployment'"
+      <!-- 🎯 Update Status Column -->
+      <Column header="Update Status" style="width: 140px">
+        <template #body="{ data }">
+          <div @click.stop>
+            <!-- Show dropdown only if actively deployed -->
+            <Button v-if="isActivelyDeployed(data)" size="small" outlined severity="secondary"
               :disabled="isRowLoading(data.id)"
-              @click="emit('cancel', data)"
-            />
+              class="!text-xs !py-1 !px-2.5 !gap-1.5 hover:!bg-appleCore-50 hover:!border-apricot-300 hover:!text-apricot-600 transition-all"
+              @click="toggleStatusMenu($event, data)">
+              <template #default>
+                <i class="pi pi-refresh text-[10px]" />
+                <span class="text-xs font-medium">Change</span>
+                <i class="pi pi-chevron-down text-[8px]" />
+              </template>
+            </Button>
+
+            <!-- Otherwise show final status label -->
+            <span v-else class="inline-flex items-center gap-1 text-[10px] text-blueberry-400 italic">
+              <i class="pi pi-lock text-[9px]" />
+              Locked
+            </span>
+
+            <Menu :ref="(el: any) => (menuRefs[data.id] = el)" :model="statusMenuItems" :popup="true"
+              :append-to="'body'" :pt="{
+                root: { class: '!min-w-[240px] !rounded-xl !shadow-lg !border !border-appleCore-200 !overflow-hidden' },
+              }" />
           </div>
         </template>
       </Column>
@@ -255,10 +300,8 @@ function contractPeriod(d: Deployment): string {
     </DataTable>
 
     <!-- Pagination -->
-    <div
-      v-if="props.pagination && props.pagination.total > 0"
-      class="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-appleCore-100 bg-appleCore-50/30"
-    >
+    <div v-if="props.pagination && props.pagination.total > 0"
+      class="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-appleCore-100 bg-appleCore-50/30">
       <div class="text-xs text-blueberry-500">
         Showing
         <span class="font-semibold text-blueberry-700">
@@ -273,15 +316,9 @@ function contractPeriod(d: Deployment): string {
         entries
       </div>
 
-      <Paginator
-        :rows="currentLimit"
-        :total-records="props.pagination.total"
-        :first="currentFirst"
-        :rows-per-page-options="[10, 25, 50, 100]"
-        template="PrevPageLink PageLinks NextPageLink RowsPerPageDropdown"
-        class="!bg-transparent !p-0"
-        @page="onPageChange"
-      />
+      <Paginator :rows="currentLimit" :total-records="props.pagination.total" :first="currentFirst"
+        :rows-per-page-options="[10, 25, 50, 100]" template="PrevPageLink PageLinks NextPageLink RowsPerPageDropdown"
+        class="!bg-transparent !p-0" @page="onPageChange" />
     </div>
   </div>
 </template>

@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Skeleton from 'primevue/skeleton'
 import { AppCard } from '@shared/ui'
 import { useDeploymentStore } from '../stores/deployment.store'
+import { useDeployments } from '../composables/useDeployments'
 import DeploymentStatusBadge from '../components/DeploymentStatusBadge.vue'
+import MarkReturnedDialog from '../components/MarkReturnedDialog.vue'
+import MarkCompletedDialog from '../components/MarkCompletedDialog.vue'
+import CancelDeploymentDialog from '../components/CancelDeploymentDialog.vue'
 
 const props = defineProps<{
   id: number
@@ -13,12 +17,28 @@ const props = defineProps<{
 
 const router = useRouter()
 const store = useDeploymentStore()
+const { handleMarkReturned, handleMarkCompleted, handleCancel } = useDeployments()
+
+// ─── Dialogs ──────────────────────────────────────────
+const returnedDialog  = ref(false)
+const completedDialog = ref(false)
+const cancelDialog    = ref(false)
 
 onMounted(() => {
   store.fetchDeployment(props.id)
 })
 
 const deployment = computed(() => store.deployment)
+
+// Helper — is this deployment currently active (deployed and not returned/completed/cancelled)?
+const isActivelyDeployed = computed(() => {
+  const d = deployment.value
+  if (!d) return false
+  return (d as any).status === 'deployed'
+    && !(d as any).cancelled_at
+    && !(d as any).returned_at
+    && !(d as any).completed_at
+})
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—'
@@ -41,6 +61,46 @@ function goBack() {
 function goToApplicant() {
   if (deployment.value?.applicant_id) {
     router.push({ name: 'applicants.show', params: { id: deployment.value.applicant_id } })
+  }
+}
+
+// ─── Action handlers ──────────────────────────────────
+async function onReturnedConfirm(reason: string) {
+  if (!deployment.value) return
+  const success = await handleMarkReturned(
+    deployment.value.id,
+    reason,
+    deployment.value.applicant?.full_name,
+  )
+  if (success) {
+    returnedDialog.value = false
+    await store.fetchDeployment(props.id)
+  }
+}
+
+async function onCompletedConfirm(notes: string | null) {
+  if (!deployment.value) return
+  const success = await handleMarkCompleted(
+    deployment.value.id,
+    notes,
+    deployment.value.applicant?.full_name,
+  )
+  if (success) {
+    completedDialog.value = false
+    await store.fetchDeployment(props.id)
+  }
+}
+
+async function onCancelConfirm(reason: string) {
+  if (!deployment.value) return
+  const result = await handleCancel(
+    deployment.value.id,
+    reason,
+    deployment.value.applicant?.full_name,
+  )
+  if (result) {
+    cancelDialog.value = false
+    await store.fetchDeployment(props.id)
   }
 }
 </script>
@@ -70,7 +130,7 @@ function goToApplicant() {
         <div class="flex items-start gap-3">
           <Button icon="pi pi-arrow-left" text rounded @click="goBack" />
           <div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 flex-wrap">
               <h1 class="text-3xl font-serif font-semibold text-blueberry-800 tracking-tight">
                 Deployment Details
               </h1>
@@ -85,14 +145,64 @@ function goToApplicant() {
           </div>
         </div>
 
-        <Button
-          label="View Applicant"
-          icon="pi pi-external-link"
-          severity="secondary"
-          outlined
-          @click="goToApplicant"
-        />
+        <div class="flex items-center gap-2">
+          <Button
+            label="View Applicant"
+            icon="pi pi-external-link"
+            severity="secondary"
+            outlined
+            @click="goToApplicant"
+          />
+        </div>
       </header>
+
+      <!-- 🚀 Action Bar (only when actively deployed) -->
+      <div
+        v-if="isActivelyDeployed"
+        class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4
+               bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50
+               border-2 border-indigo-200 rounded-xl shadow-sm"
+      >
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-indigo-500 flex items-center justify-center shadow-sm">
+            <i class="pi pi-cog text-white" />
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-indigo-900">
+              Update Deployment Status
+            </p>
+            <p class="text-xs text-indigo-700 mt-0.5">
+              Choose the action that reflects the current situation
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap">
+          <Button
+            label="Mark Returned"
+            icon="pi pi-home"
+            severity="warning"
+            outlined
+            size="small"
+            @click="returnedDialog = true"
+          />
+          <Button
+            label="Mark Completed"
+            icon="pi pi-check-circle"
+            size="small"
+            class="!bg-blue-600 hover:!bg-blue-700 !border-blue-600"
+            @click="completedDialog = true"
+          />
+          <Button
+            label="Cancel Deployment"
+            icon="pi pi-times-circle"
+            severity="danger"
+            outlined
+            size="small"
+            @click="cancelDialog = true"
+          />
+        </div>
+      </div>
 
       <!-- Info Grid -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -209,6 +319,44 @@ function goToApplicant() {
         </AppCard>
       </div>
 
+      <!-- 🏠 Returned home info -->
+      <AppCard v-if="(deployment as any).returned_at" padding="normal" shadow="soft">
+        <template #header>
+          <div class="flex items-center gap-2 mb-3">
+            <i class="pi pi-home text-orange-500" />
+            <h3 class="font-serif text-lg font-semibold text-blueberry-800">Returned Home</h3>
+          </div>
+        </template>
+
+        <div class="p-3 bg-orange-50 rounded-lg border border-orange-200">
+          <p class="text-xs font-medium text-orange-600 mb-1">
+            Returned on {{ formatDate((deployment as any).returned_at) }}
+          </p>
+          <p v-if="(deployment as any).return_reason" class="text-sm text-orange-800 whitespace-pre-wrap italic">
+            "{{ (deployment as any).return_reason }}"
+          </p>
+        </div>
+      </AppCard>
+
+      <!-- ✅ Completed info -->
+      <AppCard v-if="(deployment as any).completed_at" padding="normal" shadow="soft">
+        <template #header>
+          <div class="flex items-center gap-2 mb-3">
+            <i class="pi pi-check-circle text-blue-500" />
+            <h3 class="font-serif text-lg font-semibold text-blueberry-800">Contract Completed</h3>
+          </div>
+        </template>
+
+        <div class="p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <p class="text-xs font-medium text-blue-600 mb-1">
+            Completed on {{ formatDate((deployment as any).completed_at) }}
+          </p>
+          <p v-if="(deployment as any).completion_notes" class="text-sm text-blue-800 whitespace-pre-wrap">
+            {{ (deployment as any).completion_notes }}
+          </p>
+        </div>
+      </AppCard>
+
       <!-- Notes -->
       <AppCard v-if="deployment.deployment_notes || deployment.cancellation_reason" padding="normal" shadow="soft">
         <template #header>
@@ -228,6 +376,34 @@ function goToApplicant() {
           <p class="text-sm text-red-800 whitespace-pre-wrap">{{ deployment.cancellation_reason }}</p>
         </div>
       </AppCard>
+
+      <!-- ─── Dialogs ───────────────────────────────── -->
+      <MarkReturnedDialog
+        v-model:visible="returnedDialog"
+        :applicant-name="deployment.applicant?.full_name"
+        :applicant-code="deployment.applicant?.applicant_code"
+        :country="deployment.deployment_country ?? undefined"
+        :company="deployment.deployment_company ?? undefined"
+        :submitting="store.submitting"
+        @confirm="onReturnedConfirm"
+      />
+
+      <MarkCompletedDialog
+        v-model:visible="completedDialog"
+        :applicant-name="deployment.applicant?.full_name"
+        :applicant-code="deployment.applicant?.applicant_code"
+        :country="deployment.deployment_country ?? undefined"
+        :company="deployment.deployment_company ?? undefined"
+        :submitting="store.submitting"
+        @confirm="onCompletedConfirm"
+      />
+
+      <CancelDeploymentDialog
+        v-model:visible="cancelDialog"
+        :deployment="deployment"
+        :submitting="store.submitting"
+        @confirm="onCancelConfirm"
+      />
     </template>
   </div>
 </template>

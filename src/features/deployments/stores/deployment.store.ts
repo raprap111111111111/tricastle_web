@@ -21,7 +21,7 @@ export const useDeploymentStore = defineStore('deployment', () => {
   const deployment  = ref<Deployment | null>(null)
   const pagination  = ref<Pagination | null>(null)
 
-  const stats     = ref<DeploymentStats>({
+  const stats = ref<DeploymentStats>({
     total_deployed: 0,
     today: 0,
     this_week: 0,
@@ -81,7 +81,7 @@ export const useDeploymentStore = defineStore('deployment', () => {
     loading.value = true
     clearError()
     try {
-      const params = cleanParams(filters.value)
+      const params  = cleanParams(filters.value)
       const payload = await deploymentApi.list(params)
 
       deployments.value = payload?.records ?? []
@@ -141,8 +141,7 @@ export const useDeploymentStore = defineStore('deployment', () => {
     clearError()
     try {
       const updated = await deploymentApi.deploy(id, payload)
-      // If exists in list, replace; else add to top
-      const exists = deployments.value.find((d) => d.id === updated.id)
+      const exists  = deployments.value.find((d) => d.id === updated.id)
       if (exists) {
         replaceInList(updated)
       } else {
@@ -177,7 +176,6 @@ export const useDeploymentStore = defineStore('deployment', () => {
     clearError()
     try {
       const updated = await deploymentApi.cancel(id, payload)
-      // Cancelled → remove from list (since default view is only "deployed")
       removeFromList(id)
       return updated
     } catch (e: any) {
@@ -193,10 +191,46 @@ export const useDeploymentStore = defineStore('deployment', () => {
     clearError()
     try {
       const result = await deploymentApi.bulkDeploy(payload)
-      await fetchDeployments()   // Refresh list
+      await fetchDeployments()
       return result
     } catch (e: any) {
       error.value = e?.response?.data?.message ?? e?.message ?? 'Failed to bulk deploy'
+      throw e
+    } finally {
+      submitting.value = false
+    }
+  }
+
+  // 🏠 Mark returned home
+  async function markReturned(applicantBatchId: number, reason: string): Promise<any> {
+    submitting.value = true
+    clearError()
+    try {
+      const updated = await deploymentApi.markReturned(applicantBatchId, {
+        return_reason: reason,
+      })
+      removeFromList(applicantBatchId)
+      return updated
+    } catch (e: any) {
+      error.value = e?.response?.data?.message ?? e?.message ?? 'Failed to mark as returned'
+      throw e
+    } finally {
+      submitting.value = false
+    }
+  }
+
+  // ✅ Mark completed
+  async function markCompleted(applicantBatchId: number, notes?: string | null): Promise<any> {
+    submitting.value = true
+    clearError()
+    try {
+      const updated = await deploymentApi.markCompleted(applicantBatchId, {
+        completion_notes: notes ?? null,
+      })
+      removeFromList(applicantBatchId)
+      return updated
+    } catch (e: any) {
+      error.value = e?.response?.data?.message ?? e?.message ?? 'Failed to mark as completed'
       throw e
     } finally {
       submitting.value = false
@@ -261,6 +295,8 @@ export const useDeploymentStore = defineStore('deployment', () => {
     updateDeployment,
     cancelDeployment,
     bulkDeploy,
+    markReturned,
+    markCompleted,
 
     // Utilities
     setFilters,
