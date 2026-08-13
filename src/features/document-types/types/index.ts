@@ -1,6 +1,6 @@
 // src/features/document-types/types/index.ts
 
-export type DocumentTypeCategory = 'primary' | 'supporting'
+export type DocumentTypeCategory = 'primary' | 'supporting' | 'personal'  // ← added 'personal'
 export type OrderDir = 'asc' | 'desc'
 
 export type DocumentTypeOrderBy =
@@ -23,7 +23,7 @@ export interface DocumentType {
   is_required: boolean
   is_active: boolean
   validity_days: number | null
-  expiry_warning_days: number
+  expiry_warning_days: number | null  // ← changed to nullable (BIODATA has null)
   category: DocumentTypeCategory
   sort_order: number
   created_at: string
@@ -47,17 +47,17 @@ export interface DocumentTypeFilters {
 }
 
 export interface CreateDocumentTypePayload {
-  name:                string
-  code:                string
-  description?:        string | null
-  required_fields?:    string[] | null
-  validation_rules?:   Record<string, any> | null
-  is_required?:        boolean
-  is_active?:          boolean
-  validity_days?:      number | null
-  expiry_warning_days?: number
-  category:            DocumentTypeCategory
-  sort_order?:         number
+  name:                 string
+  code:                 string
+  description?:         string | null
+  required_fields?:     string[] | null
+  validation_rules?:    Record<string, any> | null
+  is_required?:         boolean
+  is_active?:           boolean
+  validity_days?:       number | null
+  expiry_warning_days?: number | null  // ← nullable (personal/biodata has no expiry)
+  category:             DocumentTypeCategory
+  sort_order?:          number
 }
 
 export type UpdateDocumentTypePayload = Partial<CreateDocumentTypePayload>

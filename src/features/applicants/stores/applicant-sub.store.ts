@@ -1,9 +1,12 @@
+// src/features/applicants/stores/applicant-sub.store.ts
+
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { lifestyleApi } from '../api/applicant-lifestyle.api'
-import { educationApi } from '../api/applicant-education.api'
+import { lifestyleApi }  from '../api/applicant-lifestyle.api'
+import { educationApi }  from '../api/applicant-education.api'
 import { employmentApi } from '../api/applicant-employment.api'
-import { tattooApi } from '../api/applicant-tattoo.api'
+import { tattooApi }     from '../api/applicant-tattoo.api'
+import { applicantApi }  from '../api/applicant.api'          // ← add this import
 import type {
   ApplicantLifestyle,
   ApplicantEducation,
@@ -19,17 +22,16 @@ import type {
 } from '../types'
 
 export const useApplicantSubStore = defineStore('applicant-sub', () => {
-  // ─── State ──────────────────────────────────────────────
+  // ─── State ────────────────────────────────────────────────────────────────
   const lifestyle   = ref<ApplicantLifestyle | null>(null)
   const educations  = ref<ApplicantEducation[]>([])
   const employments = ref<ApplicantEmployment[]>([])
   const tattoos     = ref<ApplicantTattoo[]>([])
+  const loading     = ref(false)
+  const submitting  = ref(false)
+  const error       = ref<string | null>(null)
 
-  const loading    = ref(false)
-  const submitting = ref(false)
-  const error      = ref<string | null>(null)
-
-  // ─── Lifestyle ──────────────────────────────────────────
+  // ─── Lifestyle ────────────────────────────────────────────────────────────
   async function fetchLifestyle(applicantId: number) {
     loading.value = true
     try {
@@ -55,7 +57,7 @@ export const useApplicantSubStore = defineStore('applicant-sub', () => {
     }
   }
 
-  // ─── Education ──────────────────────────────────────────
+  // ─── Education ────────────────────────────────────────────────────────────
   async function fetchEducations(applicantId: number) {
     loading.value = true
     try {
@@ -111,7 +113,7 @@ export const useApplicantSubStore = defineStore('applicant-sub', () => {
     }
   }
 
-  // ─── Employment ─────────────────────────────────────────
+  // ─── Employment ───────────────────────────────────────────────────────────
   async function fetchEmployments(applicantId: number) {
     loading.value = true
     try {
@@ -167,7 +169,7 @@ export const useApplicantSubStore = defineStore('applicant-sub', () => {
     }
   }
 
-  // ─── Tattoos ────────────────────────────────────────────
+  // ─── Tattoos ──────────────────────────────────────────────────────────────
   async function fetchTattoos(applicantId: number) {
     loading.value = true
     try {
@@ -223,7 +225,31 @@ export const useApplicantSubStore = defineStore('applicant-sub', () => {
     }
   }
 
-  // ─── Fetch All Sub Data ─────────────────────────────────
+  // ─── Biodata Upload ────────────────────────────────────────────────────────
+  // Non-fatal by design — caller catches and shows a warn toast.
+  // Uses existing POST /applicant-documents endpoint.
+  async function uploadBiodata(
+    applicantId:    number,
+    file:           File,
+    documentTypeId: number,
+    notes?:         string,
+  ) {
+    submitting.value = true
+    error.value      = null
+    try {
+      return await applicantApi.uploadBiodata(applicantId, file, documentTypeId, notes)
+    } catch (e: any) {
+      error.value =
+        e?.response?.data?.message ??
+        e?.message ??
+        'Failed to upload biodata'
+      throw e
+    } finally {
+      submitting.value = false
+    }
+  }
+
+  // ─── Fetch All ────────────────────────────────────────────────────────────
   async function fetchAllSubData(applicantId: number) {
     loading.value = true
     try {
@@ -239,14 +265,15 @@ export const useApplicantSubStore = defineStore('applicant-sub', () => {
   }
 
   function clearAll() {
-    lifestyle.value = null
-    educations.value = []
+    lifestyle.value   = null
+    educations.value  = []
     employments.value = []
-    tattoos.value = []
-    error.value = null
+    tattoos.value     = []
+    error.value       = null
   }
 
   return {
+    // State
     lifestyle,
     educations,
     employments,
@@ -254,20 +281,33 @@ export const useApplicantSubStore = defineStore('applicant-sub', () => {
     loading,
     submitting,
     error,
+
+    // Lifestyle
     fetchLifestyle,
     upsertLifestyle,
+
+    // Education
     fetchEducations,
     createEducation,
     updateEducation,
     deleteEducation,
+
+    // Employment
     fetchEmployments,
     createEmployment,
     updateEmployment,
     deleteEmployment,
+
+    // Tattoos
     fetchTattoos,
     createTattoo,
     updateTattoo,
     deleteTattoo,
+
+    // Biodata
+    uploadBiodata,
+
+    // Utils
     fetchAllSubData,
     clearAll,
   }

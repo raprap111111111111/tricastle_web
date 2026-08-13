@@ -15,7 +15,7 @@ import type {
 const BASE = '/applicants'
 
 export const applicantApi = {
-  // ─── CRUD ──────────────────────────────────────────────
+  // ─── CRUD ──────────────────────────────────────────────────────────────────
   async list(filters?: ApplicantFilters): Promise<PaginatedApplicants> {
     const res = await http.get<PaginatedApplicants>(BASE, { params: filters })
     return res.data
@@ -40,7 +40,7 @@ export const applicantApi = {
     await http.delete(`${BASE}/${id}`)
   },
 
-  // ─── Status Transitions ────────────────────────────────
+  // ─── Status Transitions ────────────────────────────────────────────────────
   async moveToFinalList(id: number): Promise<Applicant> {
     const res = await http.patch<Applicant>(`${BASE}/${id}/move-to-final-list`)
     return res.data
@@ -65,12 +65,34 @@ export const applicantApi = {
     return res.data
   },
 
-  // ─── Duplicate detection ───────────────────────────────
+  // ─── Duplicate Detection ───────────────────────────────────────────────────
   async checkDuplicates(payload: DuplicateCheckPayload): Promise<DuplicateCheckResult> {
     const res = await http.post<{ data: DuplicateCheckResult }>(
       `${BASE}/check-duplicates`,
       payload,
     )
+    return (res.data as any).data ?? res.data
+  },
+
+  // ─── Biodata Upload ────────────────────────────────────────────────────────
+  // Reuses POST /applicant-documents — no custom endpoint needed.
+  // The existing UploadApplicantDocumentRequest + UploadApplicantDocumentAction handle it.
+  async uploadBiodata(
+    applicantId:    number,
+    file:           File,
+    documentTypeId: number,
+    notes?:         string,
+  ): Promise<{ id: number; file_name: string; original_name: string }> {
+    const form = new FormData()
+    form.append('applicant_id',     String(applicantId))
+    form.append('document_type_id', String(documentTypeId))
+    form.append('file',             file)
+    form.append('priority',         'normal')
+    if (notes?.trim()) form.append('notes', notes.trim())
+
+    const res = await http.post('/applicant-documents', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
     return (res.data as any).data ?? res.data
   },
 }
