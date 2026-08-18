@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Skeleton from 'primevue/skeleton'
 import { useApplicantStore } from '../stores/applicant.store'
@@ -8,10 +9,20 @@ import ApplicantStatusBadge from '../components/ApplicantStatusBadge.vue'
 import AppAddressMap from '@shared/ui/map/AppAddressMap.vue'
 import DeploymentHistorySection from '@features/deployments/components/DeploymentHistorySection.vue'
 
+// ✅ NEW — barrel import (short and clean)
+import {
+  generateAIS,
+  generateBulkAIS,
+  mapApplicantToAIS,
+  type AISData,
+  type BulkProgress,
+} from '@shared/utils/ais'
+
 const props = defineProps<{ id: number }>()
 
 const router = useRouter()
 const store  = useApplicantStore()
+const toast  = useToast()
 
 // ─── Map visibility (persists across sessions) ────────────────────────────────
 const MAP_STORAGE_KEY = 'applicant_map_visible'
@@ -59,6 +70,74 @@ const applicantDeployments = computed(() => {
       batch:                    ab.batch,
     }))
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 📄 AIS PDF GENERATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+const generatingAIS = ref(false)
+
+/**
+ * Convert a remote image URL to base64 so jsPDF can embed it.
+ * Returns null on failure (e.g. CORS or 404) — AIS still generates without photo.
+ */
+async function urlToBase64(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url)
+    if (!response.ok) return null
+    const blob = await response.blob()
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result as string)
+      reader.onerror   = reject
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return null
+  }
+}
+
+async function handleGenerateAIS(): Promise<void> {
+  if (!a.value || generatingAIS.value) return
+
+  generatingAIS.value = true
+  try {
+    const aisData = mapApplicantToAIS(
+      a.value,
+      a.value.assigned_staff?.full_name,
+    )
+
+    // ✅ Embed photo if the applicant has one (adjust field name to your API)
+    const photoUrl =
+      (a.value as any).photo_url ??
+      (a.value as any).profile_photo_url ??
+      (a.value as any).avatar_url
+
+    if (photoUrl) {
+      const base64 = await urlToBase64(photoUrl)
+      if (base64) aisData.photo = base64
+    }
+
+    await generateAIS(aisData)
+
+    toast.add({
+      severity: 'success',
+      summary:  'AIS Generated',
+      detail:   `${a.value.applicant_code} information sheet downloaded`,
+      life:     3000,
+    })
+  } catch (err) {
+    console.error('[AIS] Generation failed:', err)
+    toast.add({
+      severity: 'error',
+      summary:  'AIS Failed',
+      detail:   'Could not generate the information sheet. Please try again.',
+      life:     4000,
+    })
+  } finally {
+    generatingAIS.value = false
+  }
+}
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 function formatDate(dateStr: string | null | undefined): string {
@@ -161,6 +240,19 @@ function batchStatusColor(status?: string): string {
           text
           @click="toggleMap"
         />
+
+        <!-- ✅ NEW — Generate AIS PDF -->
+        <Button
+          label="Generate AIS"
+          icon="pi pi-file-pdf"
+          severity="secondary"
+          outlined
+          :loading="generatingAIS"
+          class="!text-red-600 !border-red-300 hover:!bg-red-50"
+          v-tooltip.top="'Download Applicant Information Sheet (PDF)'"
+          @click="handleGenerateAIS"
+        />
+
         <Button
           label="Edit"
           icon="pi pi-pencil"
@@ -257,7 +349,6 @@ function batchStatusColor(status?: string): string {
                 {{ a.applicant_code }}
               </span>
               <ApplicantStatusBadge :status="a.status" />
-              <!-- Phase 1 — Japan ready badge -->
               <span
                 v-if="a.deployment?.japan_deployment_ready"
                 class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
@@ -294,7 +385,6 @@ function batchStatusColor(status?: string): string {
                 <i class="pi pi-map-marker text-xs text-apricot-500" />
                 {{ [a.city, a.province].filter(Boolean).join(', ') }}
               </span>
-              <!-- Phase 1 — trade badge in header -->
               <span v-if="a.trade_or_occupation" class="flex items-center gap-1.5">
                 <i class="pi pi-briefcase text-xs text-apricot-500" />
                 {{ a.trade_or_occupation }}
@@ -440,7 +530,6 @@ function batchStatusColor(status?: string): string {
           Japan Deployment Profile
         </h3>
 
-        <!-- Skill & Trade -->
         <div class="mb-5">
           <p class="text-[11px] font-bold text-blueberry-400 uppercase tracking-wider mb-3">Skill &amp; Trade</p>
           <dl class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
@@ -464,7 +553,6 @@ function batchStatusColor(status?: string): string {
           </dl>
         </div>
 
-        <!-- Language -->
         <div class="mb-5 pt-4 border-t border-appleCore-100">
           <p class="text-[11px] font-bold text-blueberry-400 uppercase tracking-wider mb-3">Language</p>
           <dl class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
@@ -498,7 +586,6 @@ function batchStatusColor(status?: string): string {
           </dl>
         </div>
 
-        <!-- Deployment Readiness -->
         <div class="mb-5 pt-4 border-t border-appleCore-100">
           <p class="text-[11px] font-bold text-blueberry-400 uppercase tracking-wider mb-3">Deployment Readiness</p>
 
@@ -553,7 +640,6 @@ function batchStatusColor(status?: string): string {
           </dl>
         </div>
 
-        <!-- Salary -->
         <div class="pt-4 border-t border-appleCore-100">
           <p class="text-[11px] font-bold text-blueberry-400 uppercase tracking-wider mb-3">Salary</p>
           <dl class="grid grid-cols-2 gap-x-6 gap-y-4">
@@ -588,7 +674,6 @@ function batchStatusColor(status?: string): string {
 
         <template v-if="a.family">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <!-- Father -->
             <div class="border border-appleCore-100 rounded-lg p-4">
               <p class="text-xs font-bold text-blueberry-500 uppercase tracking-wider mb-2">Father</p>
               <p class="text-sm font-semibold text-blueberry-800">{{ display(a.family.father.name) }}</p>
@@ -599,7 +684,6 @@ function batchStatusColor(status?: string): string {
               </p>
             </div>
 
-            <!-- Mother -->
             <div class="border border-appleCore-100 rounded-lg p-4">
               <p class="text-xs font-bold text-blueberry-500 uppercase tracking-wider mb-2">Mother</p>
               <p class="text-sm font-semibold text-blueberry-800">{{ display(a.family.mother.name) }}</p>
@@ -610,7 +694,6 @@ function batchStatusColor(status?: string): string {
               </p>
             </div>
 
-            <!-- Spouse (only when married or spouse name present) -->
             <div
               v-if="a.civil_status === 'married' || a.family.spouse.name"
               class="border border-appleCore-100 rounded-lg p-4"
@@ -625,7 +708,6 @@ function batchStatusColor(status?: string): string {
             </div>
           </div>
 
-          <!-- Emergency Contact -->
           <div v-if="a.family.emergency_contact.name" class="mt-2 pt-4 border-t border-appleCore-100">
             <p class="text-xs font-bold text-blueberry-500 uppercase tracking-wider mb-3">Emergency Contact</p>
             <div class="flex flex-wrap gap-4 p-4 bg-red-50 border border-red-100 rounded-lg">
