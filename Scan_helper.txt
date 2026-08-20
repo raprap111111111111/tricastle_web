@@ -24,3 +24,7 @@
 
 2. Run Scanner Helper:
    node scanner-helper.js
+
+run to run with npm run dev and helpers also at the same time 
+
+   npm install -D concurrently
