@@ -1,6 +1,6 @@
 // src/shared/utils/ais/generator.ts
 
-import jsPDF from 'jspdf'
+import { jsPDF } from 'jspdf'
 import JSZip from 'jszip'
 
 import type { AISData, BulkAISMode, BulkProgress } from './types'

@@ -1,6 +1,6 @@
 // src/shared/utils/ais/renderer/helpers.ts
 
-import type jsPDF from 'jspdf'
+import type { jsPDF } from 'jspdf'
 import type { AISLayout } from '../types'
 
 /**

@@ -11,7 +11,6 @@ import { useDocumentStore } from '../stores/document.store'
 import type { ApplicantFolderSummary } from '../types/folders'
 import { useDocumentRealtime } from '@shared/pubnub/useDocumentRealtime'
 
-
 // ⚠️ CRITICAL: this view uses batchId (NOT applicantId)
 const props = defineProps<{ batchId: number }>()
 
@@ -31,12 +30,11 @@ onMounted(load)
 onActivated(load)
 watch(() => props.batchId, load)
 
-// Listen only to THIS batch's documents
+// Listen only to THIS batch's documents (auto-refresh on scan/upload)
 useDocumentRealtime({
   onReload: load,
   batchId: props.batchId,
 })
-
 
 function onSearch() {
   clearTimeout(debounceTimer)
@@ -71,10 +69,18 @@ function openFolder(applicant: ApplicantFolderSummary) {
   })
 }
 
-// ✅ ADDED — Upload with batch preselected (user picks applicant)
+// ✅ Upload with batch preselected (user picks applicant)
 function goToUploadForBatch() {
   router.push({
     name:  'documents.create',
+    query: { batch_id: String(props.batchId) },
+  })
+}
+
+// ✅ NEW — Scan with batch preselected
+function goToScanForBatch() {
+  router.push({
+    name:  'documents.scan',
     query: { batch_id: String(props.batchId) },
   })
 }
@@ -108,7 +114,7 @@ const error   = computed(() => store.foldersError)
     </div>
 
     <!-- Header -->
-    <div class="flex items-start justify-between gap-6">
+    <div class="flex items-start justify-between gap-6 flex-wrap">
       <div>
         <h2 class="text-xl font-serif font-bold text-blueberry-800">
           Applicant Folders
@@ -117,19 +123,30 @@ const error   = computed(() => store.foldersError)
           </span>
         </h2>
         <p class="text-sm text-blueberry-400 mt-0.5">
-          Applicants in this batch who have uploaded documents
+          Applicants in this batch who have uploaded or scanned documents
         </p>
       </div>
 
-      <!-- ✅ Upload button — batch is preselected -->
-      <Button
-        icon="pi pi-upload"
-        label="Upload Document"
-        class="!bg-apricot-500 !border-apricot-500 !text-white
-               hover:!bg-apricot-600 hover:!border-apricot-600
-               !px-5 !py-2.5 !rounded-xl !font-semibold flex-shrink-0"
-        @click="goToUploadForBatch"
-      />
+      <!-- ✅ Action buttons — batch is preselected -->
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <Button
+          icon="pi pi-camera"
+          label="Scan Document"
+          outlined
+          class="!border-apricot-500 !text-apricot-600
+                 hover:!bg-apricot-50
+                 !px-5 !py-2.5 !rounded-xl !font-semibold"
+          @click="goToScanForBatch"
+        />
+        <Button
+          icon="pi pi-upload"
+          label="Upload Document"
+          class="!bg-apricot-500 !border-apricot-500 !text-white
+                 hover:!bg-apricot-600 hover:!border-apricot-600
+                 !px-5 !py-2.5 !rounded-xl !font-semibold"
+          @click="goToUploadForBatch"
+        />
+      </div>
     </div>
 
     <!-- Search -->
@@ -179,10 +196,54 @@ const error   = computed(() => store.foldersError)
       <Button label="Try again" text class="mt-4 !text-apricot-600" @click="load" />
     </div>
 
-    <!-- Empty -->
-    <div v-else-if="!folders.length" class="text-center py-20">
-      <i class="pi pi-folder-open text-5xl text-blueberry-200 mb-3 block" />
-      <p class="text-blueberry-400 font-medium">No applicant folders found in this batch</p>
+    <!-- ✅ IMPROVED Empty State — explains why + offers actions -->
+    <div v-else-if="!folders.length" class="text-center py-16 px-6">
+      <div class="inline-flex items-center justify-center w-16 h-16 rounded-full
+                  bg-apricot-50 mb-4">
+        <i class="pi pi-folder-open text-3xl text-apricot-400" />
+      </div>
+
+      <h3 class="text-lg font-serif font-bold text-blueberry-800 mb-2">
+        No documents in this batch yet
+      </h3>
+
+      <p class="text-sm text-blueberry-400 max-w-md mx-auto mb-6">
+        Scanned or uploaded documents will appear here once they're tagged to
+        this batch. Make sure to select this batch before scanning.
+      </p>
+
+      <div class="flex items-center justify-center gap-2 flex-wrap">
+        <Button
+          icon="pi pi-camera"
+          label="Scan a document"
+          outlined
+          class="!border-apricot-500 !text-apricot-600 hover:!bg-apricot-50
+                 !px-5 !py-2.5 !rounded-xl !font-semibold"
+          @click="goToScanForBatch"
+        />
+        <Button
+          icon="pi pi-upload"
+          label="Upload a document"
+          class="!bg-apricot-500 !border-apricot-500 !text-white
+                 hover:!bg-apricot-600 hover:!border-apricot-600
+                 !px-5 !py-2.5 !rounded-xl !font-semibold"
+          @click="goToUploadForBatch"
+        />
+      </div>
+
+      <!-- Diagnostic hint -->
+      <div class="mt-8 mx-auto max-w-lg text-left p-4 rounded-xl
+                  bg-appleCore-50/60 border border-appleCore-100">
+        <p class="text-xs font-bold uppercase tracking-wide text-blueberry-500 mb-1">
+          <i class="pi pi-info-circle mr-1" /> Not seeing your scans?
+        </p>
+        <p class="text-xs text-blueberry-500 leading-relaxed">
+          Scanned documents only appear here if they were saved with this
+          batch selected. If you scanned from an applicant's profile without
+          choosing a batch, the file exists in the applicant's folder but is
+          not linked to any batch yet.
+        </p>
+      </div>
     </div>
 
     <!-- Folder list -->

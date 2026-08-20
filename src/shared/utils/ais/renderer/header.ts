@@ -1,6 +1,6 @@
 // src/shared/utils/ais/renderer/header.ts
 
-import type jsPDF from 'jspdf'
+import type { jsPDF } from 'jspdf'
 import type { AISData, AISLayout } from '../types'
 import { loadLogoBase64, loadWordmarkBase64 } from '../assets'
 

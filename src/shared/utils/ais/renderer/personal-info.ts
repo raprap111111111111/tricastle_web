@@ -1,6 +1,6 @@
 // src/shared/utils/ais/renderer/personal-info.ts
 
-import type jsPDF from 'jspdf'
+import type { jsPDF } from 'jspdf'
 import type { AISData, AISLayout } from '../types'
 import { fmt, fmtBool, fmtDate } from '../formatters'
 import { drawSectionHeader, makeRowDrawer } from './helpers'

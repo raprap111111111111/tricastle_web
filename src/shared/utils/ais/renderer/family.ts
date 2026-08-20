@@ -1,6 +1,6 @@
 // src/shared/utils/ais/renderer/family.ts
 
-import type jsPDF from 'jspdf'
+import type { jsPDF } from 'jspdf'
 import type { AISData, AISLayout } from '../types'
 import { fmt } from '../formatters'
 import { drawSectionHeader } from './helpers'

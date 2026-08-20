@@ -39,7 +39,7 @@ const error = computed(() => store.folderError)
 const showVerifiedOnly = ref(false)
 const expandedGroups = ref<Set<number>>(new Set())
 
-  // Listen only to THIS applicant's documents
+// Listen only to THIS applicant's documents
 useDocumentRealtime({
   onReload: () => store.fetchFolder(numericApplicantId.value),
   applicantId: numericApplicantId.value,
@@ -59,11 +59,6 @@ function isExpanded(groupId: number): boolean {
 
 /**
  * Returns the filtered list of versions to display for a group.
- *
- * Priority order:
- * 1. Apply "Show verified only" filter (if ON)
- * 2. If not expanded → show only the top/latest version from the filtered list
- * 3. If expanded → show all filtered versions
  */
 function visibleVersions(group: DocumentGroup): FolderVersion[] {
   let list = [...group.versions]
@@ -139,7 +134,6 @@ function editDocument(v: FolderVersion) {
   router.push({ name: 'documents.edit', params: { id: v.id } })
 }
 
-// ✅ NEW: Navigate to the full version history list for a document
 function goToVersionHistory(v: FolderVersion) {
   router.push({
     name: 'document-versions.list',
@@ -147,7 +141,6 @@ function goToVersionHistory(v: FolderVersion) {
   })
 }
 
-// ✅ NEW: Navigate to a specific version detail
 function goToVersionDetail(v: FolderVersion) {
   router.push({
     name: 'document-versions.detail',
@@ -155,12 +148,14 @@ function goToVersionDetail(v: FolderVersion) {
   })
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ✅ UPLOAD ACTIONS — forwards batch + applicant context
+// ═══════════════════════════════════════════════════════════════════════════
 function uploadNewVersion(g: DocumentGroup) {
   const query: Record<string, any> = {
     applicant_id: numericApplicantId.value,
     document_type_id: g.document_type_id,
   }
-  // ✅ Forward the batch context if it's in the current URL
   if (route.query.from_batch) {
     query.batch_id = route.query.from_batch
   }
@@ -175,13 +170,55 @@ function uploadNew() {
   const query: Record<string, any> = {
     applicant_id: numericApplicantId.value,
   }
-  // ✅ Forward the batch context if it's in the current URL
   if (route.query.from_batch) {
     query.batch_id = route.query.from_batch
   }
 
   router.push({
     name: 'documents.create',
+    query,
+  })
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ✅ NEW — SCAN ACTIONS — forwards batch + applicant context
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Scan a brand-new document.
+ * Passes: batch_id (if known) + applicant_id
+ * User only picks: document type
+ */
+function scanNew() {
+  const query: Record<string, any> = {
+    applicant_id: numericApplicantId.value,
+  }
+  if (route.query.from_batch) {
+    query.batch_id = route.query.from_batch
+  }
+
+  router.push({
+    name: 'documents.scan',
+    query,
+  })
+}
+
+/**
+ * Scan a new version for a specific document group.
+ * Passes: batch_id (if known) + applicant_id + document_type_id
+ * User picks: nothing — just clicks Start scan
+ */
+function scanNewVersion(g: DocumentGroup) {
+  const query: Record<string, any> = {
+    applicant_id: numericApplicantId.value,
+    document_type_id: g.document_type_id,
+  }
+  if (route.query.from_batch) {
+    query.batch_id = route.query.from_batch
+  }
+
+  router.push({
+    name: 'documents.scan',
     query,
   })
 }
@@ -342,8 +379,21 @@ function statusLabel(status: string): string {
               </span>
             </div>
           </div>
-          <div class="flex gap-2 flex-shrink-0">
+
+          <!-- ✅ Action buttons — View + Scan + Upload -->
+          <div class="flex gap-2 flex-shrink-0 flex-wrap">
             <Button icon="pi pi-external-link" label="View Profile" text @click="goToApplicant" />
+
+            <Button
+              icon="pi pi-camera"
+              label="Scan"
+              outlined
+              class="!border-apricot-500 !text-apricot-600
+                     hover:!bg-apricot-50
+                     !px-4 !py-2 !rounded-xl !font-semibold"
+              @click="scanNew"
+            />
+
             <AppButton icon="pi pi-upload" label="Upload Document" variant="accent" @click="uploadNew" />
           </div>
         </div>
@@ -402,17 +452,28 @@ function statusLabel(status: string): string {
               <DocumentStatusBadge :status="group.latest_status" />
             </button>
 
-            <!-- ✅ NEW: Version History button (per group / current doc) -->
+            <!-- Version History button -->
             <Button v-if="group.versions.length > 0" icon="pi pi-history" label="History" text size="small"
               class="!text-blueberry-500 hover:!text-apricot-600" v-tooltip.top="'View full version history'" @click="goToVersionHistory(
                 group.versions.find(v => v.is_current) ?? group.versions[0]
               )" />
 
+            <!-- ✅ NEW: Scan new version -->
+            <Button
+              icon="pi pi-camera"
+              label="Scan"
+              text
+              size="small"
+              class="!text-apricot-600"
+              v-tooltip.top="'Scan a new version'"
+              @click="scanNewVersion(group)"
+            />
+
             <Button icon="pi pi-plus" label="New Version" text size="small" class="!text-apricot-600"
               @click="uploadNewVersion(group)" />
           </div>
 
-          <!-- ── Empty state (filter hides everything) ── -->
+          <!-- ── Empty state ── -->
           <div v-if="visibleVersions(group).length === 0" class="px-5 py-8 text-center">
             <i class="pi pi-inbox text-3xl text-blueberry-300 mb-2 block" />
             <p class="text-sm text-blueberry-500">
@@ -477,22 +538,18 @@ function statusLabel(status: string): string {
 
               <!-- ✅ Action buttons -->
               <div class="flex items-center gap-0.5" @click.stop>
-                <!-- View document -->
                 <Button icon="pi pi-eye" text rounded size="small"
                   class="!text-blueberry-500 hover:!text-blue-600 hover:!bg-blue-50" v-tooltip.top="'View document'"
                   @click.stop="goToDocument(v)" />
 
-                <!-- ✅ NEW: Version history for this specific doc -->
                 <Button icon="pi pi-history" text rounded size="small"
                   class="!text-blueberry-500 hover:!text-purple-600 hover:!bg-purple-50"
                   v-tooltip.top="'Version history'" @click.stop="goToVersionHistory(v)" />
 
-                <!-- Change status -->
                 <Button icon="pi pi-refresh" text rounded size="small"
                   class="!text-blueberry-500 hover:!text-emerald-600 hover:!bg-emerald-50"
                   v-tooltip.top="'Change status'" @click.stop="openStatusDialog(group, v)" />
 
-                <!-- Edit -->
                 <Button icon="pi pi-pencil" text rounded size="small"
                   class="!text-blueberry-500 hover:!text-apricot-600 hover:!bg-apricot-50" v-tooltip.top="'Edit'"
                   @click.stop="editDocument(v)" />
@@ -515,15 +572,9 @@ function statusLabel(status: string): string {
             </button>
           </div>
 
-          <!-- ═══════════════ ✅ VERSION HISTORY MINI-SECTION ══════════════ -->
-          <!--
-            Shows only when the group is expanded so it doesn't clutter
-            the collapsed view. Mirrors the "Version History" section
-            in DocumentView — clickable rows → document-versions.detail
-          -->
+          <!-- ═══════════════ VERSION HISTORY MINI-SECTION ══════════════ -->
           <div v-if="isExpanded(group.document_type_id) && group.versions.length > 1"
             class="border-t border-appleCore-100 bg-appleCore-50/30">
-            <!-- Section header -->
             <div class="flex items-center justify-between px-5 py-3">
               <h4 class="text-xs font-serif font-semibold text-blueberry-700
                          flex items-center gap-1.5">
@@ -534,14 +585,12 @@ function statusLabel(status: string): string {
                 </span>
               </h4>
 
-              <!-- View All → goes to full version list page -->
               <Button label="View All" icon="pi pi-external-link" text size="small"
                 class="!text-apricot-600 hover:!text-apricot-700 !text-xs" @click="goToVersionHistory(
                   group.versions.find(v => v.is_current) ?? group.versions[0]
                 )" />
             </div>
 
-            <!-- Clickable version rows (newest first) -->
             <div class="flex flex-col divide-y divide-appleCore-100/50 px-3 pb-3">
               <div v-for="ver in [...group.versions].sort((a, b) => b.version - a.version)" :key="ver.id" role="button"
                 tabindex="0" class="group/ver flex items-center gap-3 px-3 py-2.5 rounded-xl
@@ -550,14 +599,12 @@ function statusLabel(status: string): string {
                        focus:outline-none focus:ring-2 focus:ring-apricot-300" v-tooltip.top="'View version detail'"
                 @click="goToVersionDetail(ver)" @keydown.enter="goToVersionDetail(ver)"
                 @keydown.space.prevent="goToVersionDetail(ver)">
-                <!-- Icon -->
                 <div class="w-8 h-8 rounded-lg bg-apricot-50 text-apricot-600
                             flex items-center justify-center flex-shrink-0
                             group-hover/ver:bg-apricot-100 transition-colors">
                   <i class="pi pi-file text-xs" />
                 </div>
 
-                <!-- Info -->
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
                     <p class="text-xs font-semibold text-blueberry-800
@@ -568,7 +615,6 @@ function statusLabel(status: string): string {
                              text-[9px] font-semibold uppercase tracking-wide rounded">
                       Current
                     </span>
-                    <!-- Status chip for non-current versions -->
                     <span v-else class="text-[9px] font-bold uppercase tracking-wide
                              px-1.5 py-0.5 rounded flex-shrink-0" :class="{
                               'bg-green-50  text-green-700': ver.status === 'verified',
@@ -590,7 +636,6 @@ function statusLabel(status: string): string {
                   </p>
                 </div>
 
-                <!-- Arrow -->
                 <div class="flex items-center gap-1 flex-shrink-0 text-blueberry-300
                             group-hover/ver:text-apricot-500 transition-colors">
                   <i class="pi pi-external-link text-[11px]" />

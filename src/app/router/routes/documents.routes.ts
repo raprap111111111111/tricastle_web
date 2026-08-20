@@ -61,6 +61,20 @@ export const documentsRoutes: RouteRecordRaw[] = [
           permissions: [Perm.documentCreate],
         },
       },
+
+      // ✅ NEW — dedicated scan route
+      {
+        path: 'scan',
+        name: 'documents.scan',
+        component: () =>
+          import('@/features/documents/views/DocumentScanView.vue'),
+        meta: {
+          title: 'Scan Document',
+          requiresAuth: true,
+          permissions: [Perm.documentCreate],
+        },
+      },
+
       {
         path: ':id(\\d+)',
         name: 'documents.view',

@@ -1,6 +1,6 @@
 // src/shared/utils/ais/renderer/index.ts
 
-import type jsPDF from 'jspdf'
+import type { jsPDF } from 'jspdf'
 import type { AISData } from '../types'
 import { DEFAULT_LAYOUT } from '../types'
 import { renderHeader }            from './header'
