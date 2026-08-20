@@ -1,0 +1,26 @@
+========================================================================
+         TRICASTLE WEB - TERMINAL COMMANDS (MAC & WINDOWS)
+========================================================================
+
+------------------------------------------------------------------------
+🍎 FOR MAC USERS
+------------------------------------------------------------------------
+
+1. Install Dependencies (Run once in Mac Terminal):
+   npm install express
+   npm install cors
+
+2. Run Scanner Helper:
+   node scanner-helper.js
+
+
+------------------------------------------------------------------------
+🪟 FOR WINDOWS USERS
+------------------------------------------------------------------------
+
+1. Install Dependencies (Run once in Command Prompt / Git Bash):
+   npm install express
+   npm install cors
+
+2. Run Scanner Helper:
+   node scanner-helper.js

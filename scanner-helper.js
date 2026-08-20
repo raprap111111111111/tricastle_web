@@ -1,10 +1,9 @@
-// scanner-helper.js
-const express = require('express');
-const cors = require('cors');
-const { exec } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+import express from 'express';
+import cors from 'cors';
+import { exec } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 const app = express();
 const PORT = 5555;
@@ -12,19 +11,40 @@ const PORT = 5555;
 app.use(cors());
 app.use(express.json());
 
-// Auto-detect NAPS2 path on Windows
-const NAPS2_PATH = fs.existsSync('C:\\Program Files\\NAPS2\\naps2.console.exe')
-  ? '"C:\\Program Files\\NAPS2\\naps2.console.exe"'
-  : 'naps2.console';
+// Auto-detect NAPS2 path on macOS and Windows
+function getNaps2Path() {
+  const isWin = process.platform === 'win32';
+  const isMac = process.platform === 'darwin';
+
+  if (isWin) {
+    if (fs.existsSync('C:\\Program Files\\NAPS2\\naps2.console.exe')) {
+      return '"C:\\Program Files\\NAPS2\\naps2.console.exe"';
+    }
+    if (fs.existsSync('C:\\Program Files (x86)\\NAPS2\\naps2.console.exe')) {
+      return '"C:\\Program Files (x86)\\NAPS2\\naps2.console.exe"';
+    }
+  }
+
+  if (isMac) {
+    if (fs.existsSync('/Applications/NAPS2.app/Contents/MacOS/naps2.console')) {
+      return '"/Applications/NAPS2.app/Contents/MacOS/naps2.console"';
+    }
+  }
+
+  return 'naps2.console';
+}
+
+const NAPS2_PATH = getNaps2Path();
 
 // 1. Health check (Vue pings this)
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// 2. Get list of scanners connected to Windows
+// 2. Get list of scanners connected to machine
 app.get('/scanners', (req, res) => {
-  exec(`${NAPS2_PATH} --listdevices`, (error, stdout) => {
+  const cmd = `${NAPS2_PATH} --listdevices`;
+  exec(cmd, (error, stdout) => {
     if (error) {
       exec(`${NAPS2_PATH} -l`, (err2, stdout2) => {
         const scanners = parseScanners(stdout2 || '');
@@ -65,7 +85,7 @@ app.post('/scan', (req, res) => {
     cmd += ` --device "${device}"`;
   }
 
-  console.log('[Scanner Helper] Running scan:', cmd);
+  console.log('[Scanner Helper] Running scan command:', cmd);
 
   exec(cmd, { timeout: 120000 }, (error, stdout, stderr) => {
     if (error || !fs.existsSync(tempFile)) {
@@ -77,17 +97,17 @@ app.post('/scan', (req, res) => {
       const fileBuffer = fs.readFileSync(tempFile);
       const base64Data = `data:application/pdf;base64,${fileBuffer.toString('base64')}`;
 
-      // Clean up temporary file
+      // Clean up temp file
       fs.unlinkSync(tempFile);
 
-      console.log('[Scanner Helper] Scan successful, sending PDF to Vue...');
+      console.log('[Scanner Helper] Scan complete, sending PDF...');
       return res.json({
         success: true,
         data: base64Data,
         mimeType: 'application/pdf',
       });
     } catch (err) {
-      return res.status(500).json({ success: false, message: 'Failed to read scanned PDF file.' });
+      return res.status(500).json({ success: false, message: 'Failed to read scanned file.' });
     }
   });
 });
