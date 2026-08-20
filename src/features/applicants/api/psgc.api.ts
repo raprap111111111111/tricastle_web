@@ -1,3 +1,4 @@
+// src/features/applicants/api/psgc.api.ts
 import axios from 'axios'
 import type {
   PsgcRegion,
@@ -18,6 +19,18 @@ export const psgcApi = {
     return data.sort((a, b) => a.name.localeCompare(b.name))
   },
 
+  /**
+   * Get ALL provinces (used for filter dropdown)
+   * No region needed - returns all 81 provinces
+   */
+  async allProvinces(): Promise<PsgcProvince[]> {
+    const { data } = await psgc.get<PsgcProvince[]>('/provinces')
+    return data.sort((a, b) => a.name.localeCompare(b.name))
+  },
+
+  /**
+   * Get provinces filtered by region (for cascading region → province)
+   */
   async provinces(regionCode: string): Promise<PsgcProvince[]> {
     const { data } = await psgc.get<PsgcProvince[]>(
       `/regions/${regionCode}/provinces`,

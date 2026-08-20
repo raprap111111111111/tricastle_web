@@ -18,6 +18,14 @@ import { verificationRoutes } from './routes/verification.routes'
 import { documentVersionsRoutes } from './routes/document-versions.routes'
 import { documentExpiryAlertRoutes } from './routes/document-expiry-alert.routes'
 import { fileRepositoryRoutes } from './routes/file-repository.routes'
+import { permissionsRoutes } from './routes/permissions.routes'
+import { correctionRequestRoutes } from './routes/correction-request.routes'
+import { correctionApprovalRoutes } from './routes/correction-approval.routes'
+import { verificationMismatchRoutes } from './routes/verification-mismatch.routes'
+import { activityLogRoutes } from './routes/activity-log.routes'
+import { notificationsRoutes } from './routes/notifications.routes'
+import { deploymentRoutes } from './routes/deployment.routes'
+
 
 
 const router = createRouter({
@@ -40,6 +48,13 @@ const router = createRouter({
     ...documentVersionsRoutes,
     ...documentExpiryAlertRoutes,
     ...fileRepositoryRoutes,
+    ...permissionsRoutes,
+    ...correctionRequestRoutes,
+    ...correctionApprovalRoutes,
+    ...verificationMismatchRoutes,
+    ...activityLogRoutes,
+    ...notificationsRoutes,
+    ...deploymentRoutes,
 
 
     { path: '/:pathMatch(.*)*', name: 'NotFound', redirect: '/dashboard' },

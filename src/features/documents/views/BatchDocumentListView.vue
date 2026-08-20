@@ -1,16 +1,17 @@
 <!-- src/features/documents/views/BatchDocumentListView.vue -->
 <script setup lang="ts">
 import { onMounted, onActivated, computed, ref } from 'vue'
-import { useRouter } from 'vue-router'                      // ✅ ADDED
+import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Paginator, { type PageState } from 'primevue/paginator'
 import { AppCard, AppStatCard } from '@shared/ui'
 import { useDocumentStore } from '../stores/document.store'
 import BatchDocumentTable from '../components/BatchDocumentTable.vue'
+import { useDocumentRealtime } from '@shared/pubnub/useDocumentRealtime'
 
 const store  = useDocumentStore()
-const router = useRouter()                                   // ✅ ADDED
+const router = useRouter()
 
 const search = ref('')
 let debounceTimer: ReturnType<typeof setTimeout>
@@ -23,26 +24,15 @@ function load() {
 onMounted(load)
 onActivated(load)
 
+useDocumentRealtime({ onReload: load })
+
 function onSearch() {
   clearTimeout(debounceTimer)
   debounceTimer = setTimeout(load, 300)
 }
-
-function onSearchClick() {
-  clearTimeout(debounceTimer)
-  load()
-}
-
-function clearSearch() {
-  search.value = ''
-  onSearchClick()
-}
-
-function onRefresh() {
-  search.value = ''
-  clearTimeout(debounceTimer)
-  load()
-}
+function onSearchClick() { clearTimeout(debounceTimer); load() }
+function clearSearch()   { search.value = ''; onSearchClick() }
+function onRefresh()     { search.value = ''; clearTimeout(debounceTimer); load() }
 
 // ─── Stats ────────────────────────────────────────────────────────────────
 const totalBatches       = computed(() => store.batchesPagination.total || store.batches.length)
@@ -54,11 +44,9 @@ const batchesComplete    = computed(() => store.batches.filter((b) => !b.has_pen
 
 // ─── Pagination ──────────────────────────────────────────────────────────
 const pagination = computed(() => store.batchesPagination)
-
 const currentLimit = computed(
   () => pagination.value.per_page ?? pagination.value.limit ?? 15,
 )
-
 const currentFirst = computed(() => {
   if (pagination.value.current_page && currentLimit.value) {
     return (pagination.value.current_page - 1) * currentLimit.value
@@ -76,9 +64,14 @@ function onPageChange(event: PageState) {
   store.fetchBatches()
 }
 
-// ✅ ADDED — Global upload (user picks batch + applicant)
+// ─── Actions ─────────────────────────────────────────────────────────────
 function goToUpload() {
   router.push({ name: 'documents.create' })
+}
+
+// ✅ NEW — Global scan (user picks batch + applicant inside)
+function goToScan() {
+  router.push({ name: 'documents.scan' })
 }
 </script>
 
@@ -86,7 +79,7 @@ function goToUpload() {
   <div class="flex flex-col gap-8 p-8 max-w-[1400px] mx-auto">
 
     <!-- Header -->
-    <header class="flex items-start justify-between gap-6">
+    <header class="flex items-start justify-between gap-6 flex-wrap">
       <div class="flex flex-col gap-1">
         <h1 class="text-3xl font-serif font-semibold text-blueberry-800 tracking-tight">
           Document Batches
@@ -96,15 +89,26 @@ function goToUpload() {
         </p>
       </div>
 
-      <!-- ✅ Global upload button -->
-      <Button
-        icon="pi pi-upload"
-        label="Upload Document"
-        class="!bg-apricot-500 !border-apricot-500 !text-white
-               hover:!bg-apricot-600 hover:!border-apricot-600
-               !px-5 !py-2.5 !rounded-xl !font-semibold"
-        @click="goToUpload"
-      />
+      <!-- ✅ Action buttons — Scan + Upload -->
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <Button
+          icon="pi pi-camera"
+          label="Scan Document"
+          outlined
+          class="!border-apricot-500 !text-apricot-600
+                 hover:!bg-apricot-50
+                 !px-5 !py-2.5 !rounded-xl !font-semibold"
+          @click="goToScan"
+        />
+        <Button
+          icon="pi pi-upload"
+          label="Upload Document"
+          class="!bg-apricot-500 !border-apricot-500 !text-white
+                 hover:!bg-apricot-600 hover:!border-apricot-600
+                 !px-5 !py-2.5 !rounded-xl !font-semibold"
+          @click="goToUpload"
+        />
+      </div>
     </header>
 
     <!-- Info banner -->

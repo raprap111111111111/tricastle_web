@@ -8,6 +8,9 @@ import { AppButton, AppCard, AppStatCard } from '@shared/ui'
 import { useDocumentStore } from '../stores/document.store'
 import ApplicantFolderTable from '../components/ApplicantFolderTable.vue'
 import type { ApplicantFolderSummary } from '../types/folders'
+import { useDocumentRealtime } from '@shared/pubnub/useDocumentRealtime'
+
+
 
 const router = useRouter()
 const store = useDocumentStore()
@@ -30,6 +33,9 @@ const totalTypes = computed(() =>
 const pendingFolders = computed(() =>
   folders.value.filter((f) => f.has_pending).length,
 )
+
+// Listen to all documents
+useDocumentRealtime({ onReload: () => store.fetchFolders() })
 
 // ─── Search ────────────────────────────────────────────────────────────────
 const searchInput = ref('')

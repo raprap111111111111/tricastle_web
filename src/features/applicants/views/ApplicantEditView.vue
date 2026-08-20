@@ -35,7 +35,7 @@ const props = defineProps<{ id: number }>()
 const router   = useRouter()
 const toast    = useToast()
 const store    = useApplicantStore()
-const subStore = useApplicantSubStore()  // ← still used for updates only
+const subStore = useApplicantSubStore()
 
 const {
   steps,
@@ -55,6 +55,8 @@ const {
 const loaded = ref(false)
 
 // ─── Wizard State ─────────────────────────────────────────
+// No batch tab in Edit — batch is managed separately
+// from the applicant detail view after final_list status
 const personalData    = ref<PersonalFormValues | null>(null)
 const physicalData    = ref<PhysicalAddressFormValues | null>(null)
 const documentsData   = ref<DocumentsFormValues | null>(null)
@@ -63,15 +65,13 @@ const educationsData  = ref<EducationEntryValues[]>([])
 const employmentsData = ref<EmploymentEntryValues[]>([])
 const tattoosData     = ref<TattooEntryValues[]>([])
 
-// ─── Load Everything with ONE call ───────────────────────
+// ─── Load Applicant ───────────────────────────────────────
 onMounted(async () => {
   loaded.value = false
   store.clearApplicant()
 
   try {
-    // 🎯 ONE call — backend returns everything via whenLoaded()
     await store.fetchApplicant(props.id)
-
     const a = store.applicant
 
     if (!a) {
@@ -85,7 +85,7 @@ onMounted(async () => {
       return
     }
 
-    // ─── Populate Personal ─────────────────────────────
+    // ── Personal ────────────────────────────────────────
     personalData.value = {
       first_name:         a.first_name         ?? '',
       middle_name:        a.middle_name        ?? '',
@@ -102,7 +102,7 @@ onMounted(async () => {
     }
     setStepState('personal', 'valid')
 
-    // ─── Populate Physical & Address ───────────────────
+    // ── Physical & Address ──────────────────────────────
     physicalData.value = {
       height_cm:         a.height_cm         ?? null,
       weight_kg:         a.weight_kg         ?? null,
@@ -116,7 +116,7 @@ onMounted(async () => {
     }
     setStepState('physical', 'valid')
 
-    // ─── Populate Documents ────────────────────────────
+    // ── Documents ───────────────────────────────────────
     documentsData.value = {
       passport_number:   a.passport_number   ?? '',
       passport_expiry:   a.passport_expiry   ?? null,
@@ -127,7 +127,7 @@ onMounted(async () => {
     }
     setStepState('documents', 'valid')
 
-    // ─── Populate Lifestyle (from nested) ──────────────
+    // ── Lifestyle ───────────────────────────────────────
     if (a.lifestyle) {
       lifestyleData.value = {
         is_smoking:            a.lifestyle.is_smoking            ?? false,
@@ -147,19 +147,19 @@ onMounted(async () => {
       setStepState('lifestyle', 'valid')
     }
 
-    // ─── Populate Educations (from nested) ─────────────
+    // ── Educations ──────────────────────────────────────
     educationsData.value = (a.educations ?? []).map((ed) => ({
       id:               ed.id,
       education_level:  ed.education_level,
       education_status: ed.education_status,
       school_name:      ed.school_name,
-      course:           ed.course     ?? '',
-      year_started:     ed.year_started ?? null,
-      year_ended:       ed.year_ended ?? null,
-      honors:           ed.honors     ?? '',
+      course:           ed.course        ?? '',
+      year_started:     ed.year_started  ?? null,
+      year_ended:       ed.year_ended    ?? null,
+      honors:           ed.honors        ?? '',
     }))
 
-    // ─── Populate Employments (from nested) ────────────
+    // ── Employments ─────────────────────────────────────
     employmentsData.value = (a.employments ?? []).map((emp) => ({
       id:                 emp.id,
       company_name:       emp.company_name,
@@ -176,7 +176,7 @@ onMounted(async () => {
       reason_for_leaving: emp.reason_for_leaving ?? '',
     }))
 
-    // ─── Populate Tattoos (from nested) ────────────────
+    // ── Tattoos ─────────────────────────────────────────
     tattoosData.value = (a.tattoos ?? []).map((t) => ({
       id:          t.id,
       location:    t.location,
@@ -185,8 +185,8 @@ onMounted(async () => {
       photo_path:  t.photo_path  ?? '',
       is_visible:  t.is_visible,
     }))
+
   } catch (e: any) {
-    console.error('[EditView] Load error:', e)
     toast.add({
       severity: 'error',
       summary: 'Load Failed',
@@ -305,6 +305,8 @@ async function onFinalSubmit() {
   }
 
   try {
+    // ── Update main applicant fields only
+    // Status changes (final_list, rejected) are done from the detail view
     const payload: UpdateApplicantPayload = {
       ...personalData.value,
       ...physicalData.value,
@@ -313,6 +315,7 @@ async function onFinalSubmit() {
 
     await store.updateApplicant(props.id, payload)
 
+    // ── Lifestyle ──────────────────────────────────────
     if (lifestyleData.value) {
       await subStore.upsertLifestyle({
         applicant_id: props.id,
@@ -320,12 +323,14 @@ async function onFinalSubmit() {
       })
     }
 
-    // Use the nested data from store.applicant for sync
+    // ── Educations sync ────────────────────────────────
     const existingEduIds = (store.applicant?.educations ?? []).map((e) => e.id)
     const currentEduIds  = educationsData.value.filter((e) => e.id).map((e) => e.id!)
 
     for (const id of existingEduIds) {
-      if (!currentEduIds.includes(id)) await subStore.deleteEducation(id)
+      if (!currentEduIds.includes(id)) {
+        await subStore.deleteEducation(id)
+      }
     }
     for (const edu of educationsData.value) {
       if (edu.id) {
@@ -335,11 +340,14 @@ async function onFinalSubmit() {
       }
     }
 
+    // ── Employments sync ───────────────────────────────
     const existingEmpIds = (store.applicant?.employments ?? []).map((e) => e.id)
     const currentEmpIds  = employmentsData.value.filter((e) => e.id).map((e) => e.id!)
 
     for (const id of existingEmpIds) {
-      if (!currentEmpIds.includes(id)) await subStore.deleteEmployment(id)
+      if (!currentEmpIds.includes(id)) {
+        await subStore.deleteEmployment(id)
+      }
     }
     for (const emp of employmentsData.value) {
       if (emp.id) {
@@ -349,11 +357,14 @@ async function onFinalSubmit() {
       }
     }
 
+    // ── Tattoos sync ───────────────────────────────────
     const existingTatIds = (store.applicant?.tattoos ?? []).map((t) => t.id)
     const currentTatIds  = tattoosData.value.filter((t) => t.id).map((t) => t.id!)
 
     for (const id of existingTatIds) {
-      if (!currentTatIds.includes(id)) await subStore.deleteTattoo(id)
+      if (!currentTatIds.includes(id)) {
+        await subStore.deleteTattoo(id)
+      }
     }
     for (const tattoo of tattoosData.value) {
       if (tattoo.id) {
@@ -365,14 +376,29 @@ async function onFinalSubmit() {
 
     toast.add({
       severity: 'success',
-      summary: 'Success',
+      summary: 'Updated',
       detail: 'Applicant updated successfully',
       life: 3000,
     })
 
     await store.fetchApplicants()
-    router.push({ name: 'applicants.index' })
-  } catch {
+    router.push({ name: 'applicants.show', params: { id: props.id } })
+  } catch (e: any) {
+    if (e?.response?.status === 422) {
+      const errors = e.response.data.errors ?? {}
+      const firstError = Object.values(errors)[0] as string[] | undefined
+      toast.add({
+        severity: 'error',
+        summary: 'Validation Failed',
+        detail: firstError?.[0] ?? e.response.data.message ?? 'Please check your inputs.',
+        life: 5000,
+      })
+      if (errors.email) {
+        goToStep(steps.findIndex((s) => s.key === 'personal'))
+      }
+      return
+    }
+
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -385,13 +411,14 @@ async function onFinalSubmit() {
 
 <template>
   <div class="flex flex-col gap-6 p-6 max-w-5xl mx-auto">
-    <!-- Header -->
+
+    <!-- ─── Header ─────────────────────────────────────── -->
     <div class="flex items-center gap-3">
       <Button
         icon="pi pi-arrow-left"
         text
         rounded
-        @click="router.push({ name: 'applicants.index' })"
+        @click="router.push({ name: 'applicants.show', params: { id: props.id } })"
       />
       <div>
         <h1 class="text-2xl font-serif font-bold text-blueberry-800">Edit Applicant</h1>
@@ -402,13 +429,15 @@ async function onFinalSubmit() {
       </div>
     </div>
 
-    <!-- Loading -->
+    <!-- ─── Loading ───────────────────────────────────── -->
     <template v-if="!loaded">
       <Skeleton height="60px" border-radius="12px" />
       <Skeleton height="300px" border-radius="12px" />
     </template>
 
     <template v-else-if="personalData">
+
+      <!-- ─── Stepper ─────────────────────────────────── -->
       <WizardStepper
         :steps="steps"
         :current-index="currentStepIndex"
@@ -417,6 +446,7 @@ async function onFinalSubmit() {
         @go-to="goToStep"
       />
 
+      <!-- ─── Error Summary ──────────────────────────── -->
       <div
         v-if="hasErrors"
         class="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg"
@@ -431,7 +461,9 @@ async function onFinalSubmit() {
               v-for="step in invalidSteps"
               :key="step.key"
               type="button"
-              class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-red-700 rounded-md text-xs font-medium border border-red-200 hover:bg-red-100 transition-colors"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-red-700
+                     rounded-md text-xs font-medium border border-red-200
+                     hover:bg-red-100 transition-colors"
               @click="goToStep(steps.findIndex((s) => s.key === step.key))"
             >
               <i class="pi pi-arrow-right text-[10px]" />
@@ -441,6 +473,7 @@ async function onFinalSubmit() {
         </div>
       </div>
 
+      <!-- ─── Steps ───────────────────────────────────── -->
       <PersonalTab
         v-if="currentStep.key === 'personal'"
         :key="`personal-${props.id}`"
@@ -509,6 +542,7 @@ async function onFinalSubmit() {
         :educations="educationsData"
         :employments="employmentsData"
         :tattoos="tattoosData"
+        :steps="steps"
         :loading="store.submitting || subStore.submitting"
         :has-errors="hasErrors"
         :invalid-steps="invalidSteps"
@@ -517,6 +551,7 @@ async function onFinalSubmit() {
         @back="goBack"
         @go-to="goToStep"
       />
+
     </template>
   </div>
 </template>

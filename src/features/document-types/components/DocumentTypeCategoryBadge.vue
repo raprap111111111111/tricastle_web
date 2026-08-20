@@ -1,12 +1,13 @@
 <!-- src/features/document-types/components/DocumentTypeCategoryBadge.vue -->
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { DocumentTypeCategory } from '../types'
 
-const props = defineProps<{ category: DocumentTypeCategory }>()
+const props = defineProps<{
+  category: string
+}>()
 
 const config = computed(() => {
-  const map: Record<DocumentTypeCategory, { label: string; cls: string; icon: string }> = {
+  const map: Record<string, { label: string; cls: string; icon: string }> = {
     primary: {
       label: 'Primary',
       cls: 'bg-apricot-50 text-apricot-700 ring-apricot-200',
@@ -17,8 +18,18 @@ const config = computed(() => {
       cls: 'bg-blueberry-50 text-blueberry-700 ring-blueberry-200',
       icon: 'pi-bookmark',
     },
+    personal: {
+      label: 'Personal',
+      cls: 'bg-purple-50 text-purple-700 ring-purple-200',
+      icon: 'pi-user',
+    },
   }
-  return map[props.category]
+
+  return map[props.category] ?? {
+    label: props.category || 'Unknown',
+    cls: 'bg-gray-50 text-gray-700 ring-gray-200',
+    icon: 'pi-tag',
+  }
 })
 </script>
 

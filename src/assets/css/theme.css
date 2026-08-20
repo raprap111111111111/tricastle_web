@@ -1,24 +1,922 @@
-:root {
-  --color-blueberry:  #6B7A8F;
-  --color-apricot:    #F7882F;
-  --color-citrus:     #F7C331;
-  --color-apple-core: #DCC7AA;
+/* ═══════════════════════════════════════════════════════
+   🎄 CHRISTMAS THEME — Full RED override
+   ═══════════════════════════════════════════════════════ */
 
-  --color-primary:    #6B7A8F;
-  --color-accent:     #F7882F;
-  --color-secondary:  #F7C331;
-  --color-neutral:    #DCC7AA;
-
-  --color-success:    #16a34a;
-  --color-danger:     #dc2626;
-  --color-warning:    #F7C331;
-  --color-info:       #6B7A8F;
-
-  --surface-page:     #faf7f2;
-  --surface-card:     #ffffff;
-  --surface-border:   #e8d9bf;
+[data-theme="christmas"] {
+  --color-primary:    #DC2626;
+  --color-accent:     #059669;
 }
 
-body {
-  background-color: var(--surface-page);
+/* Deep red gradient background */
+[data-theme="christmas"] body {
+  background: linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 50%, #FECACA 100%) !important;
+}
+
+/* Main content area */
+[data-theme="christmas"] main {
+  background: transparent !important;
+}
+
+/* All apricot backgrounds → BOLD Christmas red */
+[data-theme="christmas"] .bg-apricot-500,
+[data-theme="christmas"] .\!bg-apricot-500 {
+  background-color: #DC2626 !important;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3) !important;
+}
+
+[data-theme="christmas"] .bg-apricot-600,
+[data-theme="christmas"] .\!bg-apricot-600 {
+  background-color: #B91C1C !important;
+}
+
+[data-theme="christmas"] .bg-apricot-50,
+[data-theme="christmas"] .\!bg-apricot-50 {
+  background-color: #FEE2E2 !important;
+}
+
+[data-theme="christmas"] .bg-apricot-100 {
+  background-color: #FECACA !important;
+}
+
+[data-theme="christmas"] .bg-apricot-500\/20 {
+  background-color: rgba(220, 38, 38, 0.2) !important;
+}
+
+[data-theme="christmas"] .bg-apricot-500\/40 {
+  background-color: rgba(220, 38, 38, 0.4) !important;
+}
+
+/* Hovers */
+[data-theme="christmas"] .hover\:bg-apricot-500:hover,
+[data-theme="christmas"] .hover\:\!bg-apricot-600:hover {
+  background-color: #B91C1C !important;
+}
+
+[data-theme="christmas"] .hover\:bg-apricot-50:hover {
+  background-color: #FEE2E2 !important;
+}
+
+[data-theme="christmas"] .hover\:bg-apricot-100:hover {
+  background-color: #FCA5A5 !important;
+}
+
+/* Text colors */
+[data-theme="christmas"] .text-apricot-500,
+[data-theme="christmas"] .text-apricot-600,
+[data-theme="christmas"] .\!text-apricot-600 {
+  color: #DC2626 !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="christmas"] .text-apricot-700 {
+  color: #991B1B !important;
+}
+
+/* Borders */
+[data-theme="christmas"] .border-apricot-200 {
+  border-color: #FCA5A5 !important;
+}
+
+[data-theme="christmas"] .border-apricot-300 {
+  border-color: #F87171 !important;
+}
+
+[data-theme="christmas"] .border-apricot-500,
+[data-theme="christmas"] .border-apricot-500\/50 {
+  border-color: #DC2626 !important;
+  border-width: 2px !important;
+}
+
+/* Rings */
+[data-theme="christmas"] .ring-apricot-200 {
+  --tw-ring-color: #FECACA !important;
+}
+
+[data-theme="christmas"] .ring-apricot-300 {
+  --tw-ring-color: #DC2626 !important;
+}
+
+/* Sidebar */
+[data-theme="christmas"] aside {
+  background: linear-gradient(180deg, #FFFFFF 0%, #FEF2F2 100%) !important;
+  border-right: 3px solid #DC2626 !important;
+}
+
+/* Sidebar active item — festive red gradient */
+[data-theme="christmas"] .bg-apricot-500\/20.border-apricot-500\/50 {
+  background: linear-gradient(90deg, rgba(220, 38, 38, 0.25) 0%, rgba(5, 150, 105, 0.1) 100%) !important;
+  border-color: #DC2626 !important;
+  border-left: 4px solid #DC2626 !important;
+}
+
+/* AppleCore backgrounds → soft pink */
+[data-theme="christmas"] .bg-appleCore-50,
+[data-theme="christmas"] .bg-appleCore-50\/50,
+[data-theme="christmas"] .bg-appleCore-50\/30,
+[data-theme="christmas"] .bg-appleCore-50\/40 {
+  background-color: rgba(254, 226, 226, 0.4) !important;
+}
+
+/* Gradients */
+[data-theme="christmas"] .from-apricot-50 {
+  --tw-gradient-from: #FEE2E2 !important;
+}
+
+[data-theme="christmas"] .to-citrus-50 {
+  --tw-gradient-to: #ECFDF5 !important;
+}
+
+[data-theme="christmas"] .from-apricot-100 {
+  --tw-gradient-from: #FECACA !important;
+}
+
+[data-theme="christmas"] .to-apricot-200 {
+  --tw-gradient-to: #FCA5A5 !important;
+}
+
+/* Header — Candy cane stripes at top */
+[data-theme="christmas"] header {
+  background: linear-gradient(90deg, #FFFFFF 0%, #FEF2F2 50%, #FFFFFF 100%) !important;
+  border-bottom: 3px solid transparent !important;
+  border-image: repeating-linear-gradient(
+    90deg,
+    #DC2626 0px,
+    #DC2626 15px,
+    #FFFFFF 15px,
+    #FFFFFF 30px
+  ) 1 !important;
+}
+
+/* Stat cards get festive glow */
+[data-theme="christmas"] .rounded-2xl {
+  transition: all 0.3s ease;
+}
+
+[data-theme="christmas"] .rounded-2xl:hover {
+  box-shadow: 0 8px 24px rgba(220, 38, 38, 0.15) !important;
+}
+
+/* Christmas green accents */
+[data-theme="christmas"] .bg-green-500,
+[data-theme="christmas"] .bg-green-600 {
+  background-color: #059669 !important;
+}
+
+/* Sidebar title text */
+[data-theme="christmas"] aside .text-blueberry-400 {
+  color: #DC2626 !important;
+  font-weight: 700 !important;
+}
+
+/* Buttons pop */
+[data-theme="christmas"] button.bg-apricot-500 {
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35) !important;
+  transform: translateY(0);
+  transition: all 0.2s ease;
+}
+
+[data-theme="christmas"] button.bg-apricot-500:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.45) !important;
+}
+
+/* Garland at top of page */
+[data-theme="christmas"] main::before {
+  content: '';
+  position: fixed;
+  top: 64px;
+  left: 0;
+  right: 0;
+  height: 12px;
+  background: repeating-linear-gradient(
+    90deg,
+    #DC2626 0px,
+    #DC2626 20px,
+    #059669 20px,
+    #059669 40px,
+    #FCD34D 40px,
+    #FCD34D 60px
+  );
+  z-index: 100;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Bells hanging from garland */
+[data-theme="christmas"] main::after {
+  content: '🔔     🎁     ⭐     🎁     🔔     🎁     ⭐     🎁     🔔';
+  position: fixed;
+  top: 72px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  letter-spacing: 40px;
+  font-size: 16px;
+  z-index: 101;
+  pointer-events: none;
+  animation: gentleSway 3s ease-in-out infinite;
+}
+
+/* Shared gentle sway animation */
+@keyframes gentleSway {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(10px); }
+}
+
+
+/* ═══════════════════════════════════════════════════════
+   🎃 HALLOWEEN THEME — Spooky orange & purple on dark
+   ═══════════════════════════════════════════════════════ */
+
+[data-theme="halloween"] {
+  --color-primary: #F97316;
+  --color-accent:  #A855F7;
+}
+
+/* Dark spooky gradient background */
+[data-theme="halloween"] body {
+  background: linear-gradient(135deg, #1A0B2E 0%, #2D1B4E 50%, #0F0620 100%) !important;
+  color: #F3F4F6 !important;
+}
+
+[data-theme="halloween"] main {
+  background: transparent !important;
+}
+
+/* Apricot → HALLOWEEN ORANGE */
+[data-theme="halloween"] .bg-apricot-500,
+[data-theme="halloween"] .\!bg-apricot-500 {
+  background-color: #F97316 !important;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.5) !important;
+}
+
+[data-theme="halloween"] .bg-apricot-600,
+[data-theme="halloween"] .\!bg-apricot-600 {
+  background-color: #EA580C !important;
+}
+
+[data-theme="halloween"] .bg-apricot-50,
+[data-theme="halloween"] .\!bg-apricot-50 {
+  background-color: #2D1B4E !important;
+}
+
+[data-theme="halloween"] .bg-apricot-100 {
+  background-color: #3B2566 !important;
+}
+
+[data-theme="halloween"] .bg-apricot-500\/20 {
+  background-color: rgba(249, 115, 22, 0.2) !important;
+}
+
+[data-theme="halloween"] .bg-apricot-500\/40 {
+  background-color: rgba(249, 115, 22, 0.4) !important;
+}
+
+/* Hovers */
+[data-theme="halloween"] .hover\:bg-apricot-500:hover,
+[data-theme="halloween"] .hover\:\!bg-apricot-600:hover {
+  background-color: #EA580C !important;
+}
+
+[data-theme="halloween"] .hover\:bg-apricot-50:hover {
+  background-color: #3B2566 !important;
+}
+
+[data-theme="halloween"] .hover\:bg-apricot-100:hover {
+  background-color: #4C1D95 !important;
+}
+
+/* Text colors */
+[data-theme="halloween"] .text-apricot-500,
+[data-theme="halloween"] .text-apricot-600,
+[data-theme="halloween"] .\!text-apricot-600 {
+  color: #FB923C !important;
+  font-weight: 700 !important;
+  text-shadow: 0 0 8px rgba(249, 115, 22, 0.4);
+}
+
+[data-theme="halloween"] .text-apricot-700 {
+  color: #FDBA74 !important;
+}
+
+/* Borders */
+[data-theme="halloween"] .border-apricot-200 {
+  border-color: #7C3AED !important;
+}
+
+[data-theme="halloween"] .border-apricot-300 {
+  border-color: #A855F7 !important;
+}
+
+[data-theme="halloween"] .border-apricot-500,
+[data-theme="halloween"] .border-apricot-500\/50 {
+  border-color: #F97316 !important;
+  border-width: 2px !important;
+}
+
+/* Rings */
+[data-theme="halloween"] .ring-apricot-200 {
+  --tw-ring-color: #7C3AED !important;
+}
+
+[data-theme="halloween"] .ring-apricot-300 {
+  --tw-ring-color: #F97316 !important;
+}
+
+/* Sidebar — dark purple with orange border */
+[data-theme="halloween"] aside {
+  background: linear-gradient(180deg, #1A0B2E 0%, #2D1B4E 100%) !important;
+  border-right: 3px solid #F97316 !important;
+  color: #F3F4F6 !important;
+}
+
+[data-theme="halloween"] aside * {
+  color: #F3F4F6 !important;
+}
+
+[data-theme="halloween"] aside .text-blueberry-400 {
+  color: #FB923C !important;
+  font-weight: 700 !important;
+  text-shadow: 0 0 10px rgba(249, 115, 22, 0.5);
+}
+
+/* Sidebar active item */
+[data-theme="halloween"] .bg-apricot-500\/20.border-apricot-500\/50 {
+  background: linear-gradient(90deg, rgba(249, 115, 22, 0.3) 0%, rgba(168, 85, 247, 0.2) 100%) !important;
+  border-color: #F97316 !important;
+  border-left: 4px solid #F97316 !important;
+  box-shadow: 0 0 12px rgba(249, 115, 22, 0.3);
+}
+
+/* AppleCore backgrounds → deep purple */
+[data-theme="halloween"] .bg-appleCore-50,
+[data-theme="halloween"] .bg-appleCore-50\/50,
+[data-theme="halloween"] .bg-appleCore-50\/30,
+[data-theme="halloween"] .bg-appleCore-50\/40 {
+  background-color: rgba(45, 27, 78, 0.6) !important;
+}
+
+/* Cards & surfaces — dark with orange glow on hover */
+[data-theme="halloween"] .bg-white {
+  background-color: #1F1235 !important;
+  color: #F3F4F6 !important;
+}
+
+[data-theme="halloween"] .rounded-2xl {
+  transition: all 0.3s ease;
+}
+
+[data-theme="halloween"] .rounded-2xl:hover {
+  box-shadow: 0 8px 24px rgba(249, 115, 22, 0.3),
+              0 0 20px rgba(168, 85, 247, 0.2) !important;
+}
+
+/* Gradients */
+[data-theme="halloween"] .from-apricot-50 {
+  --tw-gradient-from: #2D1B4E !important;
+}
+
+[data-theme="halloween"] .to-citrus-50 {
+  --tw-gradient-to: #1A0B2E !important;
+}
+
+[data-theme="halloween"] .from-apricot-100 {
+  --tw-gradient-from: #3B2566 !important;
+}
+
+[data-theme="halloween"] .to-apricot-200 {
+  --tw-gradient-to: #4C1D95 !important;
+}
+
+/* Header — spooky gradient with purple bottom border */
+[data-theme="halloween"] header {
+  background: linear-gradient(90deg, #1F1235 0%, #2D1B4E 50%, #1F1235 100%) !important;
+  border-bottom: 3px solid #A855F7 !important;
+  color: #F3F4F6 !important;
+  box-shadow: 0 2px 20px rgba(168, 85, 247, 0.3);
+}
+
+[data-theme="halloween"] header * {
+  color: #F3F4F6 !important;
+}
+
+/* Buttons pop with glow */
+[data-theme="halloween"] button.bg-apricot-500 {
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.5),
+              0 0 20px rgba(249, 115, 22, 0.3) !important;
+  transform: translateY(0);
+  transition: all 0.2s ease;
+}
+
+[data-theme="halloween"] button.bg-apricot-500:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(249, 115, 22, 0.6),
+              0 0 30px rgba(249, 115, 22, 0.4) !important;
+}
+
+/* Spider web decoration in corners */
+[data-theme="halloween"] main::before {
+  content: '🕸️';
+  position: fixed;
+  top: 70px;
+  left: 10px;
+  font-size: 60px;
+  opacity: 0.25;
+  z-index: 1;
+  pointer-events: none;
+  transform: rotate(-15deg);
+}
+
+[data-theme="halloween"] main::after {
+  content: '🕸️';
+  position: fixed;
+  top: 70px;
+  right: 10px;
+  font-size: 60px;
+  opacity: 0.25;
+  z-index: 1;
+  pointer-events: none;
+  transform: rotate(15deg) scaleX(-1);
+}
+
+/* Text overrides for readability on dark bg */
+[data-theme="halloween"] .text-blueberry-900,
+[data-theme="halloween"] .text-blueberry-800,
+[data-theme="halloween"] .text-blueberry-700 {
+  color: #F3F4F6 !important;
+}
+
+[data-theme="halloween"] .text-blueberry-500,
+[data-theme="halloween"] .text-blueberry-600 {
+  color: #C4B5FD !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════
+   💕 VALENTINE'S THEME — Romantic pink & rose
+   ═══════════════════════════════════════════════════════ */
+
+[data-theme="valentines"] {
+  --color-primary: #EC4899;
+  --color-accent:  #F43F5E;
+}
+
+/* Soft romantic pink gradient */
+[data-theme="valentines"] body {
+  background: linear-gradient(135deg, #FFF1F2 0%, #FCE7F3 50%, #FBCFE8 100%) !important;
+}
+
+[data-theme="valentines"] main {
+  background: transparent !important;
+}
+
+/* Apricot → VALENTINE PINK */
+[data-theme="valentines"] .bg-apricot-500,
+[data-theme="valentines"] .\!bg-apricot-500 {
+  background-color: #EC4899 !important;
+  box-shadow: 0 2px 8px rgba(236, 72, 153, 0.3) !important;
+}
+
+[data-theme="valentines"] .bg-apricot-600,
+[data-theme="valentines"] .\!bg-apricot-600 {
+  background-color: #DB2777 !important;
+}
+
+[data-theme="valentines"] .bg-apricot-50,
+[data-theme="valentines"] .\!bg-apricot-50 {
+  background-color: #FCE7F3 !important;
+}
+
+[data-theme="valentines"] .bg-apricot-100 {
+  background-color: #FBCFE8 !important;
+}
+
+[data-theme="valentines"] .bg-apricot-500\/20 {
+  background-color: rgba(236, 72, 153, 0.2) !important;
+}
+
+[data-theme="valentines"] .bg-apricot-500\/40 {
+  background-color: rgba(236, 72, 153, 0.4) !important;
+}
+
+/* Hovers */
+[data-theme="valentines"] .hover\:bg-apricot-500:hover,
+[data-theme="valentines"] .hover\:\!bg-apricot-600:hover {
+  background-color: #DB2777 !important;
+}
+
+[data-theme="valentines"] .hover\:bg-apricot-50:hover {
+  background-color: #FCE7F3 !important;
+}
+
+[data-theme="valentines"] .hover\:bg-apricot-100:hover {
+  background-color: #F9A8D4 !important;
+}
+
+/* Text colors */
+[data-theme="valentines"] .text-apricot-500,
+[data-theme="valentines"] .text-apricot-600,
+[data-theme="valentines"] .\!text-apricot-600 {
+  color: #EC4899 !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="valentines"] .text-apricot-700 {
+  color: #BE185D !important;
+}
+
+/* Borders */
+[data-theme="valentines"] .border-apricot-200 {
+  border-color: #F9A8D4 !important;
+}
+
+[data-theme="valentines"] .border-apricot-300 {
+  border-color: #F472B6 !important;
+}
+
+[data-theme="valentines"] .border-apricot-500,
+[data-theme="valentines"] .border-apricot-500\/50 {
+  border-color: #EC4899 !important;
+  border-width: 2px !important;
+}
+
+/* Rings */
+[data-theme="valentines"] .ring-apricot-200 {
+  --tw-ring-color: #FBCFE8 !important;
+}
+
+[data-theme="valentines"] .ring-apricot-300 {
+  --tw-ring-color: #EC4899 !important;
+}
+
+/* Sidebar — soft pink with rose border */
+[data-theme="valentines"] aside {
+  background: linear-gradient(180deg, #FFFFFF 0%, #FFF1F2 100%) !important;
+  border-right: 3px solid #EC4899 !important;
+}
+
+/* Sidebar active item — romantic pink gradient */
+[data-theme="valentines"] .bg-apricot-500\/20.border-apricot-500\/50 {
+  background: linear-gradient(90deg, rgba(236, 72, 153, 0.25) 0%, rgba(244, 63, 94, 0.15) 100%) !important;
+  border-color: #EC4899 !important;
+  border-left: 4px solid #EC4899 !important;
+}
+
+/* Sidebar title text */
+[data-theme="valentines"] aside .text-blueberry-400 {
+  color: #EC4899 !important;
+  font-weight: 700 !important;
+}
+
+/* AppleCore backgrounds → soft pink tint */
+[data-theme="valentines"] .bg-appleCore-50,
+[data-theme="valentines"] .bg-appleCore-50\/50,
+[data-theme="valentines"] .bg-appleCore-50\/30,
+[data-theme="valentines"] .bg-appleCore-50\/40 {
+  background-color: rgba(252, 231, 243, 0.4) !important;
+}
+
+/* Gradients */
+[data-theme="valentines"] .from-apricot-50 {
+  --tw-gradient-from: #FCE7F3 !important;
+}
+
+[data-theme="valentines"] .to-citrus-50 {
+  --tw-gradient-to: #FFF1F2 !important;
+}
+
+[data-theme="valentines"] .from-apricot-100 {
+  --tw-gradient-from: #FBCFE8 !important;
+}
+
+[data-theme="valentines"] .to-apricot-200 {
+  --tw-gradient-to: #F9A8D4 !important;
+}
+
+/* Header — soft pink with heart border */
+[data-theme="valentines"] header {
+  background: linear-gradient(90deg, #FFFFFF 0%, #FFF1F2 50%, #FFFFFF 100%) !important;
+  border-bottom: 3px solid #EC4899 !important;
+  box-shadow: 0 2px 12px rgba(236, 72, 153, 0.15);
+}
+
+/* Card glow on hover */
+[data-theme="valentines"] .rounded-2xl {
+  transition: all 0.3s ease;
+}
+
+[data-theme="valentines"] .rounded-2xl:hover {
+  box-shadow: 0 8px 24px rgba(236, 72, 153, 0.2) !important;
+}
+
+/* Buttons pop with pink glow */
+[data-theme="valentines"] button.bg-apricot-500 {
+  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.35) !important;
+  transform: translateY(0);
+  transition: all 0.2s ease;
+}
+
+[data-theme="valentines"] button.bg-apricot-500:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(236, 72, 153, 0.45) !important;
+}
+
+/* Heart garland at top */
+[data-theme="valentines"] main::before {
+  content: '💕  💖  💗  💘  💝  💕  💖  💗  💘  💝  💕  💖  💗';
+  position: fixed;
+  top: 68px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  letter-spacing: 20px;
+  font-size: 18px;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* ═══════════════════════════════════════════════════════
+   🌙 DARK MODE THEME — Clean professional dark
+   ═══════════════════════════════════════════════════════ */
+
+[data-theme="dark"] {
+  --color-primary: #F97316;
+  --color-accent:  #38BDF8;
+}
+
+/* Deep slate background */
+[data-theme="dark"] body {
+  background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%) !important;
+  color: #F1F5F9 !important;
+}
+
+[data-theme="dark"] main {
+  background: transparent !important;
+}
+
+/* Apricot backgrounds → keep orange brand */
+[data-theme="dark"] .bg-apricot-500,
+[data-theme="dark"] .\!bg-apricot-500 {
+  background-color: #F97316 !important;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.35) !important;
+}
+
+[data-theme="dark"] .bg-apricot-600,
+[data-theme="dark"] .\!bg-apricot-600 {
+  background-color: #EA580C !important;
+}
+
+[data-theme="dark"] .bg-apricot-50,
+[data-theme="dark"] .\!bg-apricot-50 {
+  background-color: #1E293B !important;
+}
+
+[data-theme="dark"] .bg-apricot-100 {
+  background-color: #334155 !important;
+}
+
+[data-theme="dark"] .bg-apricot-500\/20 {
+  background-color: rgba(249, 115, 22, 0.15) !important;
+}
+
+[data-theme="dark"] .bg-apricot-500\/40 {
+  background-color: rgba(249, 115, 22, 0.3) !important;
+}
+
+/* Hovers */
+[data-theme="dark"] .hover\:bg-apricot-500:hover,
+[data-theme="dark"] .hover\:\!bg-apricot-600:hover {
+  background-color: #EA580C !important;
+}
+
+[data-theme="dark"] .hover\:bg-apricot-50:hover {
+  background-color: #334155 !important;
+}
+
+[data-theme="dark"] .hover\:bg-apricot-100:hover {
+  background-color: #475569 !important;
+}
+
+/* Text — bright orange for accents */
+[data-theme="dark"] .text-apricot-500,
+[data-theme="dark"] .text-apricot-600,
+[data-theme="dark"] .\!text-apricot-600 {
+  color: #FB923C !important;
+  font-weight: 600 !important;
+}
+
+[data-theme="dark"] .text-apricot-700 {
+  color: #FDBA74 !important;
+}
+
+/* Borders — subtle slate */
+[data-theme="dark"] .border-apricot-200 {
+  border-color: #475569 !important;
+}
+
+[data-theme="dark"] .border-apricot-300 {
+  border-color: #64748B !important;
+}
+
+[data-theme="dark"] .border-apricot-500,
+[data-theme="dark"] .border-apricot-500\/50 {
+  border-color: #F97316 !important;
+  border-width: 2px !important;
+}
+
+/* Generic border colors */
+[data-theme="dark"] .border-gray-200,
+[data-theme="dark"] .border-gray-300,
+[data-theme="dark"] .border-slate-200,
+[data-theme="dark"] .border-slate-300 {
+  border-color: #334155 !important;
+}
+
+/* Rings */
+[data-theme="dark"] .ring-apricot-200 {
+  --tw-ring-color: #475569 !important;
+}
+
+[data-theme="dark"] .ring-apricot-300 {
+  --tw-ring-color: #F97316 !important;
+}
+
+/* Sidebar — dark slate with orange border */
+[data-theme="dark"] aside {
+  background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%) !important;
+  border-right: 1px solid #334155 !important;
+  color: #F1F5F9 !important;
+}
+
+[data-theme="dark"] aside * {
+  color: #F1F5F9 !important;
+}
+
+[data-theme="dark"] aside .text-blueberry-400 {
+  color: #94A3B8 !important;
+  font-weight: 600 !important;
+}
+
+/* Sidebar active item */
+[data-theme="dark"] .bg-apricot-500\/20.border-apricot-500\/50 {
+  background: linear-gradient(90deg, rgba(249, 115, 22, 0.2) 0%, rgba(56, 189, 248, 0.05) 100%) !important;
+  border-color: #F97316 !important;
+  border-left: 4px solid #F97316 !important;
+}
+
+/* AppleCore backgrounds → dark surface */
+[data-theme="dark"] .bg-appleCore-50,
+[data-theme="dark"] .bg-appleCore-50\/50,
+[data-theme="dark"] .bg-appleCore-50\/30,
+[data-theme="dark"] .bg-appleCore-50\/40 {
+  background-color: rgba(51, 65, 85, 0.4) !important;
+}
+
+/* White cards → dark slate surface */
+[data-theme="dark"] .bg-white {
+  background-color: #1E293B !important;
+  color: #F1F5F9 !important;
+}
+
+[data-theme="dark"] .bg-gray-50,
+[data-theme="dark"] .bg-slate-50 {
+  background-color: #0F172A !important;
+}
+
+[data-theme="dark"] .bg-gray-100,
+[data-theme="dark"] .bg-slate-100 {
+  background-color: #334155 !important;
+}
+
+/* Cards — subtle glow on hover */
+[data-theme="dark"] .rounded-2xl {
+  transition: all 0.3s ease;
+}
+
+[data-theme="dark"] .rounded-2xl:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4),
+              0 0 0 1px rgba(249, 115, 22, 0.2) !important;
+}
+
+/* Gradients */
+[data-theme="dark"] .from-apricot-50 {
+  --tw-gradient-from: #1E293B !important;
+}
+
+[data-theme="dark"] .to-citrus-50 {
+  --tw-gradient-to: #0F172A !important;
+}
+
+[data-theme="dark"] .from-apricot-100 {
+  --tw-gradient-from: #334155 !important;
+}
+
+[data-theme="dark"] .to-apricot-200 {
+  --tw-gradient-to: #475569 !important;
+}
+
+/* Header — dark with subtle border */
+[data-theme="dark"] header {
+  background: #1E293B !important;
+  border-bottom: 1px solid #334155 !important;
+  color: #F1F5F9 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] header * {
+  color: #F1F5F9 !important;
+}
+
+/* Buttons */
+[data-theme="dark"] button.bg-apricot-500 {
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3) !important;
+  transform: translateY(0);
+  transition: all 0.2s ease;
+}
+
+[data-theme="dark"] button.bg-apricot-500:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(249, 115, 22, 0.4) !important;
+}
+
+/* Text overrides — readable on dark */
+[data-theme="dark"] .text-blueberry-900,
+[data-theme="dark"] .text-blueberry-800,
+[data-theme="dark"] .text-blueberry-700 {
+  color: #F1F5F9 !important;
+}
+
+[data-theme="dark"] .text-blueberry-500,
+[data-theme="dark"] .text-blueberry-600 {
+  color: #94A3B8 !important;
+}
+
+[data-theme="dark"] .text-blueberry-400 {
+  color: #64748B !important;
+}
+
+[data-theme="dark"] .text-gray-900,
+[data-theme="dark"] .text-gray-800,
+[data-theme="dark"] .text-slate-900,
+[data-theme="dark"] .text-slate-800 {
+  color: #F1F5F9 !important;
+}
+
+[data-theme="dark"] .text-gray-600,
+[data-theme="dark"] .text-gray-500,
+[data-theme="dark"] .text-slate-600,
+[data-theme="dark"] .text-slate-500 {
+  color: #94A3B8 !important;
+}
+
+/* Input fields */
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  background-color: #0F172A !important;
+  color: #F1F5F9 !important;
+  border-color: #334155 !important;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: #64748B !important;
+}
+
+[data-theme="dark"] input:focus,
+[data-theme="dark"] textarea:focus,
+[data-theme="dark"] select:focus {
+  border-color: #F97316 !important;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15) !important;
+}
+
+/* Tables */
+[data-theme="dark"] table {
+  color: #F1F5F9 !important;
+}
+
+[data-theme="dark"] thead {
+  background-color: #334155 !important;
+}
+
+[data-theme="dark"] tbody tr {
+  border-color: #334155 !important;
+}
+
+[data-theme="dark"] tbody tr:hover {
+  background-color: rgba(51, 65, 85, 0.5) !important;
+}
+
+/* Dividers */
+[data-theme="dark"] hr,
+[data-theme="dark"] .divide-y > * {
+  border-color: #334155 !important;
+}
+
+/* Modals / dropdowns */
+[data-theme="dark"] .shadow-lg,
+[data-theme="dark"] .shadow-xl,
+[data-theme="dark"] .shadow-2xl {
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6) !important;
 }

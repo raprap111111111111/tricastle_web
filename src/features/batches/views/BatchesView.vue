@@ -7,19 +7,21 @@ import { useBatchStore } from '../stores/batch.store'
 import BatchTable from '../components/BatchTable.vue'
 import BatchFilters from '../components/BatchFilters.vue'
 import type { BatchFilters as IFilters } from '../types'
+import { useBatchRealtime } from '@shared/pubnub/useBatchRealtime'
 
 const router = useRouter()
 const store  = useBatchStore()
 const { handleDelete, handleActivate, handleDeactivate } = useBatches()
 
-onMounted(async () => {
+async function load() {
   await store.fetchBatches()
   await store.fetchActiveBatch()
-})
-onActivated(async () => {
-  await store.fetchBatches()
-  await store.fetchActiveBatch()
-})
+}
+
+onMounted(load)
+onActivated(load)
+
+useBatchRealtime({ onReload: load })   // ← ADD THIS
 
 const totalCount     = computed(() => store.pagination?.total ?? 0)
 const ongoingCount   = computed(() => store.batches.filter(b => b.status === 'ongoing').length)

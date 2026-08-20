@@ -12,23 +12,24 @@ import WizardStepper from '../components/WizardStepper.vue'
 import PersonalTab from '../components/tabs/PersonalTab.vue'
 import PhysicalAddressTab from '../components/tabs/PhysicalAddressTab.vue'
 import DocumentsTab from '../components/tabs/DocumentsTab.vue'
+import DeploymentTab from '../components/tabs/DeploymentTab.vue'
 import LifestyleTab from '../components/tabs/LifestyleTab.vue'
 import EducationTab from '../components/tabs/EducationTab.vue'
 import EmploymentTab from '../components/tabs/EmploymentTab.vue'
 import TattooTab from '../components/tabs/TattooTab.vue'
-import BatchAssignmentTab from '../components/tabs/BatchAssignmentTab.vue'
 import ReviewTab from '../components/tabs/ReviewTab.vue'
 import DuplicateWarningDialog from '../components/DuplicateWarningDialog.vue'
+import { DOCUMENT_TYPE_IDS } from '../constants/document-types'
 
 import type {
   PersonalFormValues,
   PhysicalAddressFormValues,
   DocumentsFormValues,
+  DeploymentFormValues,
   LifestyleFormValues,
   EducationEntryValues,
   EmploymentEntryValues,
   TattooEntryValues,
-  BatchAssignmentValues,
 } from '../schemas/applicant.schema'
 import type { CreateApplicantPayload, DuplicateItem } from '../types'
 
@@ -52,21 +53,22 @@ const {
   goToStep,
 } = useApplicantWizard()
 
-// ─── Wizard State ─────────────────────────────────────────
+// ─── Wizard State ──────────────────────────────────────────────────────────────
 const personalData    = ref<PersonalFormValues | null>(null)
 const physicalData    = ref<PhysicalAddressFormValues | null>(null)
 const documentsData   = ref<DocumentsFormValues | null>(null)
+const deploymentData  = ref<DeploymentFormValues | null>(null)
 const lifestyleData   = ref<LifestyleFormValues | null>(null)
 const educationsData  = ref<EducationEntryValues[]>([])
 const employmentsData = ref<EmploymentEntryValues[]>([])
 const tattoosData     = ref<TattooEntryValues[]>([])
-const batchData       = ref<BatchAssignmentValues | null>(null)
 
-// ─── Duplicate Dialog State ───────────────────────────────
-const duplicateDialog     = ref(false)
-const foundDuplicates     = ref<DuplicateItem[]>([])
+// ─── Duplicate Dialog ─────────────────────────────────────────────────────────
+const duplicateDialog = ref(false)
+const foundDuplicates = ref<DuplicateItem[]>([])
 
-// ─── Validation Handlers ──────────────────────────────────
+// ─── Validate Handlers ────────────────────────────────────────────────────────
+
 function onPersonalValidate(values: PersonalFormValues | null) {
   if (values) {
     personalData.value = values
@@ -94,6 +96,12 @@ function onDocumentsValidate(values: DocumentsFormValues | null) {
   }
 }
 
+// Deployment is fully optional — always valid
+function onDeploymentValidate(values: DeploymentFormValues | null) {
+  deploymentData.value = values
+  setStepState('deployment', 'valid')
+}
+
 function onLifestyleValidate(values: LifestyleFormValues | null) {
   if (values) {
     lifestyleData.value = values
@@ -103,12 +111,8 @@ function onLifestyleValidate(values: LifestyleFormValues | null) {
   }
 }
 
-function onBatchValidate(values: BatchAssignmentValues | null) {
-  batchData.value = values
-  setStepState('batch', 'valid')
-}
+// ─── Next Handlers ────────────────────────────────────────────────────────────
 
-// ─── Step Next Handlers ───────────────────────────────────
 function onPersonalNext(values: PersonalFormValues) {
   personalData.value = values
   setStepState('personal', 'valid')
@@ -124,6 +128,12 @@ function onPhysicalNext(values: PhysicalAddressFormValues) {
 function onDocumentsNext(values: DocumentsFormValues) {
   documentsData.value = values
   setStepState('documents', 'valid')
+  goNext()
+}
+
+function onDeploymentNext(values: DeploymentFormValues) {
+  deploymentData.value = values
+  setStepState('deployment', 'valid')
   goNext()
 }
 
@@ -151,13 +161,7 @@ function onTattooNext(values: { tattoos: TattooEntryValues[] }) {
   goNext()
 }
 
-function onBatchNext(values: BatchAssignmentValues) {
-  batchData.value = values
-  setStepState('batch', 'valid')
-  goNext()
-}
-
-// ─── Pre-check duplicates when moving forward ─────────────
+// ─── Duplicate Pre-check ──────────────────────────────────────────────────────
 async function preCheckDuplicates(): Promise<boolean> {
   if (!personalData.value) return true
 
@@ -168,7 +172,6 @@ async function preCheckDuplicates(): Promise<boolean> {
     last_name:       personalData.value.last_name,
     date_of_birth:   personalData.value.date_of_birth ?? undefined,
     passport_number: documentsData.value?.passport_number ?? undefined,
-    batch_id:        batchData.value?.batch_id ?? undefined,
   })
 
   if (result.has_blockers) {
@@ -177,15 +180,14 @@ async function preCheckDuplicates(): Promise<boolean> {
     return false
   }
 
-  // Show warnings but allow continue
   if (result.has_duplicates) {
     const warnings = result.duplicates.filter((d) => d.severity === 'warn')
     if (warnings.length > 0) {
       toast.add({
         severity: 'warn',
-        summary: 'Possible Duplicate',
-        detail: warnings[0].message,
-        life: 6000,
+        summary:  'Possible Duplicate',
+        detail:   warnings[0].message,
+        life:     6000,
       })
     }
   }
@@ -193,15 +195,15 @@ async function preCheckDuplicates(): Promise<boolean> {
   return true
 }
 
-// ─── Final Submit ─────────────────────────────────────────
+// ─── Final Submit ─────────────────────────────────────────────────────────────
 async function onFinalSubmit() {
   if (hasErrors.value) {
     const stepLabels = invalidSteps.value.map((s) => s.label).join(', ')
     toast.add({
       severity: 'error',
-      summary: 'Validation Errors',
-      detail: `Please fix errors in: ${stepLabels}`,
-      life: 5000,
+      summary:  'Validation Errors',
+      detail:   `Please fix errors in: ${stepLabels}`,
+      life:     5000,
     })
     if (firstInvalidStepIndex.value !== null) {
       goToStep(firstInvalidStepIndex.value)
@@ -212,34 +214,33 @@ async function onFinalSubmit() {
   if (!personalData.value) {
     toast.add({
       severity: 'warn',
-      summary: 'Incomplete',
-      detail: 'Please fill personal info',
-      life: 3000,
+      summary:  'Incomplete',
+      detail:   'Please fill personal info',
+      life:     3000,
     })
     goToStep(0)
     return
   }
 
-  // ─── Pre-check for duplicates ───────────────────────────
   const canProceed = await preCheckDuplicates()
   if (!canProceed) return
 
   try {
+    // ── Build main payload ─────────────────────────────────────────────────────
+    // biodata_file and biodata_notes are UI-only — strip them from the payload.
+    // They are uploaded separately after the applicant is created.
+    const { biodata_file, biodata_notes, ...docFields } = documentsData.value ?? {}
+
     const payload: CreateApplicantPayload = {
       ...personalData.value,
-      ...physicalData.value,
-      ...documentsData.value,
-      ...(batchData.value?.batch_id
-        ? {
-            batch_id:     batchData.value.batch_id,
-            batch_status: batchData.value.batch_status ?? 'applied',
-          }
-        : {}),
+      ...(physicalData.value ?? {}),
+      ...docFields,
+      ...(deploymentData.value ?? {}),
     }
 
     const created = await store.createApplicant(payload)
 
-    // ─── Sub-resources ─────────────────────────────────
+    // ── Sub-resources ──────────────────────────────────────────────────────────
     if (lifestyleData.value) {
       await subStore.upsertLifestyle({
         applicant_id: created.id,
@@ -259,59 +260,89 @@ async function onFinalSubmit() {
       await subStore.createTattoo({ applicant_id: created.id, ...tattoo })
     }
 
+    // ── Biodata upload ─────────────────────────────────────────────────────────
+    // Non-fatal — applicant is created regardless of upload result.
+    if (biodata_file instanceof File) {
+      try {
+        await subStore.uploadBiodata(
+          created.id,
+          biodata_file,
+          DOCUMENT_TYPE_IDS.BIODATA,
+          biodata_notes ?? undefined,
+        )
+      } catch {
+        toast.add({
+          severity: 'warn',
+          summary:  'Biodata Upload Failed',
+          detail:   'Applicant was created but the biodata could not be uploaded. Retry from their profile.',
+          life:     7000,
+        })
+      }
+    }
+
+    // ── Success ────────────────────────────────────────────────────────────────
     toast.add({
       severity: 'success',
-      summary: 'Success',
-      detail: `Applicant ${created.applicant_code} created successfully`,
-      life: 3000,
+      summary:  'Applicant Created',
+      detail:   `${created.applicant_code} created — status: Pending`,
+      life:     3000,
     })
 
     await store.fetchApplicants()
     router.push({ name: 'applicants.index' })
+
   } catch (e: any) {
-    // ─── Handle duplicate error from backend ───────────
-    if (e?.response?.status === 422 && e?.response?.data?.duplicates?.length) {
+    if (e?.response?.status === 409 && e?.response?.data?.duplicates?.length) {
       foundDuplicates.value = e.response.data.duplicates
       duplicateDialog.value = true
       return
     }
 
-    // ─── Validation error ──────────────────────────────
     if (e?.response?.status === 422) {
-      const errors = e.response.data.errors ?? {}
+      const errors     = e.response.data.errors ?? {}
       const firstError = Object.values(errors)[0] as string[] | undefined
+
       toast.add({
         severity: 'error',
-        summary: 'Validation Failed',
-        detail: firstError?.[0] ?? e.response.data.message ?? 'Please check your inputs.',
-        life: 5000,
+        summary:  'Validation Failed',
+        detail:   firstError?.[0] ?? e.response.data.message ?? 'Please check your inputs.',
+        life:     5000,
       })
 
-      if (errors.email) {
+      if (errors.email || errors.first_name || errors.last_name) {
         goToStep(steps.findIndex((s) => s.key === 'personal'))
+      } else if (
+        errors.skill_category         ||
+        errors.trade_or_occupation    ||
+        errors.jlpt_level             ||
+        errors.willing_to_be_deployed ||
+        errors.expected_salary        ||
+        errors.father_name            ||
+        errors.emergency_contact_phone
+      ) {
+        goToStep(steps.findIndex((s) => s.key === 'deployment'))
       }
       return
     }
 
-    // ─── Other errors ──────────────────────────────────
     toast.add({
       severity: 'error',
-      summary: 'Error',
-      detail: e?.response?.data?.message ?? store.error ?? subStore.error ?? 'Something went wrong',
-      life: 4000,
+      summary:  'Error',
+      detail:   e?.response?.data?.message ?? store.error ?? subStore.error ?? 'Something went wrong',
+      life:     4000,
     })
   }
 }
 
 function onDuplicateDialogClose() {
-  // Navigate back to personal step so user can adjust
   goToStep(steps.findIndex((s) => s.key === 'personal'))
 }
 </script>
 
 <template>
   <div class="flex flex-col gap-6 p-6 max-w-5xl mx-auto">
-    <!-- Header -->
+
+    <!-- ─── Header ─────────────────────────────────────────────────────────── -->
     <div class="flex items-center gap-3">
       <Button
         icon="pi pi-arrow-left"
@@ -320,12 +351,21 @@ function onDuplicateDialogClose() {
         @click="router.push({ name: 'applicants.index' })"
       />
       <div>
-        <h1 class="text-2xl font-serif font-bold text-blueberry-800">Create Applicant</h1>
+        <h1 class="text-2xl font-serif font-bold text-blueberry-800">
+          Create Applicant
+        </h1>
         <p class="text-sm text-blueberry-500">{{ currentStep.description }}</p>
       </div>
     </div>
 
-    <!-- Stepper -->
+    <!-- ─── Info Banner ────────────────────────────────────────────────────── -->
+    <div class="flex items-center gap-2 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+      <i class="pi pi-info-circle text-blue-500" />
+      Applicant will start as <strong class="mx-1">Pending</strong>.
+      Batch assignment is available after moving to <strong class="ml-1">Final List</strong>.
+    </div>
+
+    <!-- ─── Stepper ─────────────────────────────────────────────────────────── -->
     <WizardStepper
       :steps="steps"
       :current-index="currentStepIndex"
@@ -334,7 +374,7 @@ function onDuplicateDialogClose() {
       @go-to="goToStep"
     />
 
-    <!-- Error Summary -->
+    <!-- ─── Error Summary ───────────────────────────────────────────────────── -->
     <div
       v-if="hasErrors"
       class="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg"
@@ -349,7 +389,9 @@ function onDuplicateDialogClose() {
             v-for="step in invalidSteps"
             :key="step.key"
             type="button"
-            class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-red-700 rounded-md text-xs font-medium border border-red-200 hover:bg-red-100 transition-colors"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-red-700
+                   rounded-md text-xs font-medium border border-red-200
+                   hover:bg-red-100 transition-colors"
             @click="goToStep(steps.findIndex((s) => s.key === step.key))"
           >
             <i class="pi pi-arrow-right text-[10px]" />
@@ -359,7 +401,8 @@ function onDuplicateDialogClose() {
       </div>
     </div>
 
-    <!-- Steps -->
+    <!-- ─── Step Tabs ────────────────────────────────────────────────────────── -->
+
     <PersonalTab
       v-if="currentStep.key === 'personal'"
       :initial-values="personalData ?? undefined"
@@ -375,11 +418,28 @@ function onDuplicateDialogClose() {
       @back="goBack"
     />
 
+    <!--
+      DocumentsTab — @next and @validate are wired to DOCUMENTS handlers.
+      biodata_file and biodata_notes live inside DocumentsFormValues
+      but are stripped before the main createApplicant payload is built.
+    -->
     <DocumentsTab
       v-else-if="currentStep.key === 'documents'"
       :initial-values="documentsData ?? undefined"
       @next="onDocumentsNext"
       @validate="onDocumentsValidate"
+      @back="goBack"
+    />
+
+    <!--
+      DeploymentTab — @next and @validate are wired to DEPLOYMENT handlers.
+      All fields optional — user can skip through with no input.
+    -->
+    <DeploymentTab
+      v-else-if="currentStep.key === 'deployment'"
+      :initial-values="deploymentData ?? undefined"
+      @next="onDeploymentNext"
+      @validate="onDeploymentValidate"
       @back="goBack"
     />
 
@@ -412,24 +472,16 @@ function onDuplicateDialogClose() {
       @back="goBack"
     />
 
-    <BatchAssignmentTab
-      v-else-if="currentStep.key === 'batch'"
-      :initial-values="batchData"
-      @next="onBatchNext"
-      @validate="onBatchValidate"
-      @back="goBack"
-    />
-
     <ReviewTab
       v-else-if="currentStep.key === 'review'"
       :personal="personalData"
       :physical="physicalData"
       :documents="documentsData"
+      :deployment="deploymentData"
       :lifestyle="lifestyleData"
       :educations="educationsData"
       :employments="employmentsData"
       :tattoos="tattoosData"
-      :batch="batchData"
       :steps="steps"
       :loading="store.submitting || subStore.submitting"
       :has-errors="hasErrors"
@@ -440,7 +492,7 @@ function onDuplicateDialogClose() {
       @go-to="goToStep"
     />
 
-    <!-- ─── Duplicate Warning Dialog ────────────────────── -->
+    <!-- ─── Duplicate Warning Dialog ─────────────────────────────────────────── -->
     <DuplicateWarningDialog
       v-model:visible="duplicateDialog"
       :duplicates="foundDuplicates"

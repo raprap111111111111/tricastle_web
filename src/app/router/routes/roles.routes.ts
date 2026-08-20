@@ -10,7 +10,7 @@ export const rolesRoutes: RouteRecordRaw[] = [
       {
         path: '',
         name: 'Roles',
-        component: () => import('@features/roles/views/RolesView.vue'),
+        component: () => import('@features/roles/views/RoleListView.vue'),
         meta: { title: 'Roles & Permissions', requiresAuth: true, permissions: [Perm.roleViewAny] },
       },
     ],

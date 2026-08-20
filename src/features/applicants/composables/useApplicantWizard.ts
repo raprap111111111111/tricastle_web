@@ -1,3 +1,5 @@
+// src/features/applicants/composables/useApplicantWizard.ts
+
 import { ref, computed } from 'vue'
 
 export interface WizardStep {
@@ -5,26 +7,73 @@ export interface WizardStep {
   label: string
   icon: string
   description: string
+  optional?: boolean
 }
 
 export type StepValidationState = 'untouched' | 'valid' | 'invalid'
 
 const STEPS: WizardStep[] = [
-  { key: 'personal',   label: 'Personal',           icon: 'pi pi-user',         description: 'Basic personal information' },
-  { key: 'physical',   label: 'Physical & Address', icon: 'pi pi-heart',        description: 'Physical details and address' },
-  { key: 'documents',  label: 'Documents',          icon: 'pi pi-id-card',      description: 'Passport and government IDs' },
-  { key: 'lifestyle',  label: 'Lifestyle',          icon: 'pi pi-shield',       description: 'Habits and medical info' },
-  { key: 'education',  label: 'Education',          icon: 'pi pi-book',         description: 'Educational background' },
-  { key: 'employment', label: 'Employment',         icon: 'pi pi-briefcase',    description: 'Work experience' },
-  { key: 'tattoos',    label: 'Tattoos',            icon: 'pi pi-palette',      description: 'Tattoo records' },
-  { key: 'batch',      label: 'Batch',              icon: 'pi pi-users',        description: 'Assign to a deployment batch (optional)' },
-  { key: 'review',     label: 'Review',             icon: 'pi pi-check-circle', description: 'Review and submit' },
+  {
+    key:         'personal',
+    label:       'Personal',
+    icon:        'pi pi-user',
+    description: 'Basic personal information',
+  },
+  {
+    key:         'physical',
+    label:       'Physical & Address',
+    icon:        'pi pi-heart',
+    description: 'Physical details and address',
+  },
+  {
+    key:         'documents',
+    label:       'Documents',
+    icon:        'pi pi-id-card',
+    description: 'Passport and government IDs',
+  },
+  {
+    key:         'deployment',
+    label:       'Deployment',
+    icon:        'pi pi-send',
+    description: 'Japan deployment profile, family & emergency contact',
+    optional:    true,   // all fields optional — user can skip
+  },
+  {
+    key:         'lifestyle',
+    label:       'Lifestyle',
+    icon:        'pi pi-shield',
+    description: 'Habits and medical info',
+  },
+  {
+    key:         'education',
+    label:       'Education',
+    icon:        'pi pi-book',
+    description: 'Educational background',
+  },
+  {
+    key:         'employment',
+    label:       'Employment',
+    icon:        'pi pi-briefcase',
+    description: 'Work experience',
+  },
+  {
+    key:         'tattoos',
+    label:       'Tattoos',
+    icon:        'pi pi-palette',
+    description: 'Tattoo records',
+  },
+  {
+    key:         'review',
+    label:       'Review',
+    icon:        'pi pi-check-circle',
+    description: 'Review and submit',
+  },
 ]
 
 export function useApplicantWizard() {
   const currentStepIndex = ref(0)
-  const steps = STEPS
-  const totalSteps = STEPS.length
+  const steps            = STEPS
+  const totalSteps       = STEPS.length
 
   const stepStates = ref<Record<string, StepValidationState>>(
     Object.fromEntries(STEPS.map((s) => [s.key, 'untouched'])),
@@ -38,6 +87,7 @@ export function useApplicantWizard() {
     () => Math.round(((currentStepIndex.value + 1) / totalSteps) * 100),
   )
 
+  // Only non-optional steps count as errors
   const invalidSteps = computed(() =>
     STEPS.filter((s) => stepStates.value[s.key] === 'invalid'),
   )

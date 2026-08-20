@@ -1,5 +1,5 @@
-// src/app/router/routes/documents.routes.ts
 import type { RouteRecordRaw } from 'vue-router'
+import { Perm } from '@shared/constants/permissions'
 import MainLayout from '@/app/layouts/MainLayout.vue'
 
 export const documentsRoutes: RouteRecordRaw[] = [
@@ -8,62 +8,84 @@ export const documentsRoutes: RouteRecordRaw[] = [
     component: MainLayout,
     meta: { requiresAuth: true },
     children: [
-
-      // ─── Root → redirect to Level 1 ────────────────────────────
       {
         path: '',
         name: 'documents.index',
         redirect: { name: 'documents.batches' },
       },
-
-      // ─── Level 1 — Batches ─────────────────────────────────────
       {
         path: 'batches',
         name: 'documents.batches',
         component: () =>
           import('@/features/documents/views/BatchDocumentListView.vue'),
-        meta: { title: 'Document Batches' },
+        meta: {
+          title: 'Document Batches',
+          requiresAuth: true,
+          permissions: [Perm.documentViewAny],
+        },
       },
-
-      // ─── Level 2 — Folders (plural) inside a batch ────────────
       {
         path: 'batches/:batchId(\\d+)/folders',
         name: 'documents.folders',
         component: () =>
           import('@/features/documents/views/DocumentFoldersView.vue'),
         props: (route) => ({ batchId: Number(route.params.batchId) }),
-        meta: { title: 'Applicant Folders' },
+        meta: {
+          title: 'Applicant Folders',
+          requiresAuth: true,
+          permissions: [Perm.documentViewAny],
+        },
       },
-
-      // ─── Level 3 — Folder (singular) for one applicant ────────
-      // ⚠️ FIX: your file is DocumentsView.vue with drill-down OR
-      //    you need to rename Level-3 file — pick ONE of these two options
       {
         path: 'folders/:applicantId(\\d+)',
         name: 'documents.folder',
         component: () =>
-          import('@/features/documents/views/DocumentFolderView.vue'),  // ← MUST EXIST
-        props: (route) => ({ applicantId: Number(route.params.applicantId) }),
-        meta: { title: 'Applicant Documents' },
+          import('@/features/documents/views/DocumentFolderView.vue'),
+        props: (route) => ({
+          applicantId: Number(route.params.applicantId),
+        }),
+        meta: {
+          title: 'Applicant Documents',
+          requiresAuth: true,
+          permissions: [Perm.documentViewAny],
+        },
       },
-
-      // ─── Create ────────────────────────────────────────────────
       {
         path: 'create',
         name: 'documents.create',
         component: () =>
           import('@/features/documents/views/DocumentCreateView.vue'),
-        meta: { title: 'Upload Document' },
+        meta: {
+          title: 'Upload Document',
+          requiresAuth: true,
+          permissions: [Perm.documentCreate],
+        },
       },
 
-      // ─── Single document ───────────────────────────────────────
+      // ✅ NEW — dedicated scan route
+      {
+        path: 'scan',
+        name: 'documents.scan',
+        component: () =>
+          import('@/features/documents/views/DocumentScanView.vue'),
+        meta: {
+          title: 'Scan Document',
+          requiresAuth: true,
+          permissions: [Perm.documentCreate],
+        },
+      },
+
       {
         path: ':id(\\d+)',
         name: 'documents.view',
         component: () =>
           import('@/features/documents/views/DocumentView.vue'),
         props: (route) => ({ id: Number(route.params.id) }),
-        meta: { title: 'Document Details' },
+        meta: {
+          title: 'Document Details',
+          requiresAuth: true,
+          permissions: [Perm.documentView],
+        },
       },
       {
         path: ':id(\\d+)/edit',
@@ -71,7 +93,11 @@ export const documentsRoutes: RouteRecordRaw[] = [
         component: () =>
           import('@/features/documents/views/DocumentEditView.vue'),
         props: (route) => ({ id: Number(route.params.id) }),
-        meta: { title: 'Edit Document' },
+        meta: {
+          title: 'Edit Document',
+          requiresAuth: true,
+          permissions: [Perm.documentUpdate],
+        },
       },
     ],
   },

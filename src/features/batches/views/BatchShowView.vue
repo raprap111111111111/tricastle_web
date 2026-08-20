@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Skeleton from 'primevue/skeleton'
 import BatchStatusBadge from '../components/BatchStatusBadge.vue'
+import ExcelExportButton from '@shared/ui/export/ExcelExportButton.vue'
 import { useBatchStore } from '../stores/batch.store'
 
 const props = defineProps<{ id: number }>()
@@ -17,6 +18,14 @@ onMounted(async () => {
 })
 
 const b = computed(() => store.batch)
+
+// ✅ No cast needed — applicant_batches is now on the Batch type
+const batchApplicants = computed(() => {
+  if (!b.value?.applicant_batches) return []
+  return b.value.applicant_batches
+    .map((ab) => ab.applicant)
+    .filter(Boolean)
+})
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—'
@@ -48,14 +57,26 @@ function formatDate(dateStr: string | null | undefined): string {
           </p>
         </div>
       </div>
-      <Button
-        v-if="b"
-        label="Edit"
-        icon="pi pi-pencil"
-        severity="secondary"
-        outlined
-        @click="router.push({ name: 'batches.edit', params: { id: b.id } })"
-      />
+
+      <div v-if="b" class="flex items-center gap-2">
+        <!-- Export button — only shown when batch has applicants -->
+        <ExcelExportButton
+          v-if="batchApplicants.length > 0"
+          mode="batch"
+          :applicants="batchApplicants"
+          :batch-id="b.id"
+          :batch-name="`${b.name} (#${b.batch_number})`"
+          label="Export Excel"
+        />
+
+        <Button
+          label="Edit"
+          icon="pi pi-pencil"
+          severity="secondary"
+          outlined
+          @click="router.push({ name: 'batches.edit', params: { id: b.id } })"
+        />
+      </div>
     </div>
 
     <!-- Loading -->
@@ -84,10 +105,23 @@ function formatDate(dateStr: string | null | undefined): string {
                 Batch #{{ b.batch_number }}
               </span>
               <BatchStatusBadge :status="b.status" />
+
+              <!-- Applicant count badge -->
+              <span
+                v-if="batchApplicants.length > 0"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
+                       font-medium bg-blue-50 text-blue-700 ring-1 ring-blue-200"
+              >
+                <i class="pi pi-users text-[10px]" />
+                {{ batchApplicants.length }}
+                applicant{{ batchApplicants.length !== 1 ? 's' : '' }}
+              </span>
             </div>
+
             <h2 class="text-2xl font-serif font-semibold text-blueberry-800">
               {{ b.name }}
             </h2>
+
             <div class="flex flex-wrap gap-4 mt-2 text-sm text-blueberry-500">
               <span v-if="b.country" class="flex items-center gap-1.5">
                 <i class="pi pi-globe text-xs" />
