@@ -26,13 +26,12 @@
     "types": ["vite/client", "node"],
 
     /* ── Path aliases ──────────────────────────── */
-    "baseUrl": ".",
     "paths": {
-      "@/*":         ["src/*"],
-      "@app/*":      ["src/app/*"],
-      "@shared/*":   ["src/shared/*"],
-      "@features/*": ["src/features/*"],
-      "@assets/*":   ["src/assets/*"]
+      "@/*":         ["./src/*"],
+      "@app/*":      ["./src/app/*"],
+      "@shared/*":   ["./src/shared/*"],
+      "@features/*": ["./src/features/*"],
+      "@assets/*":   ["./src/assets/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "src/**/*.d.ts"]

@@ -26,8 +26,4 @@ dist-ssr
 # Environment variables
 .env
 .env*.local
-<<<<<<< HEAD
-.env.local
-=======
 .env.local".env" 
->>>>>>> ce94e292ef967795efa3e99a909f212f3c82fd08
