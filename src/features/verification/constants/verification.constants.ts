@@ -32,12 +32,26 @@ export const SEVERITY_LABELS: Record<MismatchSeverity, string> = {
   critical: 'Critical',
 }
 
+export const SEVERITY_SEVERITY: Record<string, string> = {
+  low: 'info',
+  moderate: 'warn',
+  critical: 'danger',
+}
+
 export const MISMATCH_STATUS_LABELS: Record<MismatchStatus, string> = {
   open: 'Open',
   correction_requested: 'Correction Requested',
   corrected: 'Corrected',
   waived: 'Waived',
   escalated: 'Escalated',
+}
+
+export const MISMATCH_STATUS_SEVERITY: Record<string, string> = {
+  open: 'warn',
+  correction_requested: 'info',
+  corrected: 'success',
+  waived: 'secondary',
+  escalated: 'danger',
 }
 
 export const MISMATCH_TYPE_LABELS: Record<MismatchType, string> = {
