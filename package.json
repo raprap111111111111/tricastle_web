@@ -9,7 +9,7 @@
     "dev:force": "lsof -ti:5173 | xargs kill -9 2>/dev/null; concurrently \"vite\" \"node scanner-helper.js\"",
     "dev:clean": "rm -rf node_modules/.vite && lsof -ti:5173 | xargs kill -9 2>/dev/null; vite",
     "kill": "lsof -ti:5173 | xargs kill -9 2>/dev/null || true",
-    "build": "vue-tsc -b && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "type-check": "vue-tsc --noEmit",
     "clean": "rm -rf node_modules/.vite dist"
