@@ -1,3 +1,4 @@
+<!-- src/features/applicants/components/ApplicantTable.vue -->
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
@@ -6,15 +7,16 @@ import { useConfirm } from 'primevue/useconfirm'
 import DataTable, { type DataTableRowClickEvent } from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
-import Paginator, { type PageState } from 'primevue/paginator'
 import Menu from 'primevue/menu'
 import Popover from 'primevue/popover'
 import ApplicantStatusBadge from './ApplicantStatusBadge.vue'
 import ApplicantDeleteDialog from './ApplicantDeleteDialog.vue'
 import RejectApplicantDialog from './RejectApplicantDialog.vue'
 import DeployButton from '@features/deployments/components/DeployButton.vue'
+import AppPagination from '@shared/ui/table/AppPagination.vue'
 import { useApplicantStore } from '../stores/applicant.store'
 import type { Applicant, Pagination } from '../types'
+import { getApplicantPhoto, getDefaultAvatar } from '@shared/utils/applicant-photo'
 
 const props = defineProps<{
   applicants: Applicant[]
@@ -37,9 +39,49 @@ const toast   = useToast()
 const confirm = useConfirm()
 const store   = useApplicantStore()
 
-const deleteDialog       = ref(false)
-const rejectDialog       = ref(false)
-const selectedApplicant  = ref<Applicant | null>(null)
+const deleteDialog      = ref(false)
+const rejectDialog      = ref(false)
+const selectedApplicant = ref<Applicant | null>(null)
+
+// ─── 🖼️ Photo Hover Preview State ──────────────────────
+const hoveredPhotoId = ref<number | null>(null)
+const previewPhotoApplicant = ref<Applicant | null>(null)
+const previewPos = ref({ x: 0, y: 0 })
+let photoHideTimer: ReturnType<typeof setTimeout> | null = null
+
+function getFullName(a: Applicant) {
+  return [a.first_name, a.middle_name, a.last_name, a.suffix].filter(Boolean).join(' ')
+}
+
+function onNameEnter(event: MouseEvent, applicant: Applicant) {
+  if (photoHideTimer) clearTimeout(photoHideTimer)
+
+  const target = event.currentTarget as HTMLElement
+  const rect = target.getBoundingClientRect()
+
+  previewPhotoApplicant.value = applicant
+  hoveredPhotoId.value = applicant.id
+  previewPos.value = {
+    x: rect.left,
+    y: rect.bottom + 8,
+  }
+}
+
+function onNameLeave() {
+  photoHideTimer = setTimeout(() => {
+    hoveredPhotoId.value = null
+    previewPhotoApplicant.value = null
+  }, 150)
+}
+
+function onPreviewEnter() {
+  if (photoHideTimer) clearTimeout(photoHideTimer)
+}
+
+function onPreviewLeave() {
+  hoveredPhotoId.value = null
+  previewPhotoApplicant.value = null
+}
 
 // ─── 🚀 Deployment popover ─────────────────────────────
 const deploymentPopover = ref<InstanceType<typeof Popover> | null>(null)
@@ -54,7 +96,6 @@ function hideDeploymentPopover() {
   deploymentPopover.value?.hide()
 }
 
-// Get deployments from applicant's batches (sorted most recent first)
 function getApplicantDeployments(applicant: Applicant): any[] {
   if (!applicant.applicant_batches) return []
   return (applicant.applicant_batches as any[])
@@ -66,18 +107,15 @@ function getApplicantDeployments(applicant: Applicant): any[] {
     })
 }
 
-// Latest deployment for badge display
 function getLatestDeployment(applicant: Applicant): any | null {
   const deployments = getApplicantDeployments(applicant)
   return deployments[0] ?? null
 }
 
-// Count deployments
 function deploymentCount(applicant: Applicant): number {
   return getApplicantDeployments(applicant).length
 }
 
-// Country flag emoji
 function countryFlag(country?: string | null): string {
   const flags: Record<string, string> = {
     Japan: '🇯🇵',
@@ -189,18 +227,6 @@ const menuItems = computed(() => {
   return items
 })
 
-// ─── Pagination ──────────────────────────────────────
-const currentLimit = computed(
-  () => props.pagination?.per_page ?? props.pagination?.limit ?? 10,
-)
-
-const currentFirst = computed(() => {
-  if (props.pagination?.current_page && currentLimit.value) {
-    return (props.pagination.current_page - 1) * currentLimit.value
-  }
-  return props.pagination?.offset ?? 0
-})
-
 // ─── Handlers ────────────────────────────────────────
 function confirmDelete(applicant: Applicant) {
   selectedApplicant.value = applicant
@@ -212,14 +238,6 @@ function onDeleteConfirmed() {
     emit('delete', selectedApplicant.value.id)
     deleteDialog.value = false
   }
-}
-
-function onPageChange(event: PageState) {
-  if (event.rows !== currentLimit.value) {
-    emit('limit-change', event.rows)
-    return
-  }
-  emit('page-change', event.page + 1)
 }
 
 function goToView(id: number) {
@@ -251,7 +269,6 @@ function onDeployed(applicantId: number) {
   })
 }
 
-// ─── Status Actions ──────────────────────────────────
 function handleMoveToFinalList(applicant: Applicant) {
   confirm.require({
     header: 'Move to Final List',
@@ -324,7 +341,6 @@ async function onRejectConfirmed(reason: string) {
   }
 }
 
-// ─── Formatters ──────────────────────────────────────
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—'
   try {
@@ -349,7 +365,7 @@ function gradeColor(grade: string) {
 </script>
 
 <template>
-  <div class="flex flex-col">
+  <div class="flex flex-col relative">
     <DataTable
       :value="props.applicants"
       :loading="props.loading"
@@ -367,7 +383,6 @@ function gradeColor(grade: string) {
         bodyRow: 'cursor-pointer hover:!bg-appleCore-50/40 !border-b !border-appleCore-100/60 transition-colors',
       }"
     >
-      <!-- 🎯 Selection checkbox column -->
       <Column
         v-if="selectable"
         selection-mode="multiple"
@@ -383,21 +398,30 @@ function gradeColor(grade: string) {
         </template>
       </Column>
 
+      <!-- Applicant Column with Avatar + Hover -->
       <Column header="Applicant" sortable sort-field="last_name">
         <template #body="{ data }">
-          <div class="flex flex-col items-start text-left">
-            <span class="font-medium text-blueberry-800">
-              {{ data.first_name }}
-              {{ data.middle_name ? data.middle_name + ' ' : '' }}
-              {{ data.last_name }}
-              {{ data.suffix ?? '' }}
-            </span>
-            <span class="text-xs text-blueberry-400 mt-0.5">{{ data.email }}</span>
+          <div
+            class="relative inline-flex items-center gap-3 cursor-pointer py-1"
+            @mouseenter="onNameEnter($event, data)"
+            @mouseleave="onNameLeave"
+          >
+            <img
+              :src="getApplicantPhoto(data)"
+              :alt="getFullName(data)"
+              class="w-9 h-9 rounded-full object-cover border border-appleCore-200 bg-appleCore-50 flex-shrink-0 shadow-2xs"
+              @error="($event.target as HTMLImageElement).src = getDefaultAvatar(getFullName(data))"
+            />
+            <div class="flex flex-col items-start text-left min-w-0">
+              <span class="font-medium text-blueberry-800 hover:text-apricot-600 transition-colors truncate">
+                {{ getFullName(data) }}
+              </span>
+              <span class="text-xs text-blueberry-400 mt-0.5 truncate">{{ data.email }}</span>
+            </div>
           </div>
         </template>
       </Column>
 
-      <!-- 🚀 Deployment Column (replaces Gender) -->
       <Column header="Deployment" style="width: 190px">
         <template #body="{ data }">
           <div
@@ -508,7 +532,6 @@ function gradeColor(grade: string) {
               @click="handleMoveToFinalList(data)"
             />
 
-            <!-- 🚀 DEPLOY BUTTON -->
             <DeployButton
               v-if="data.status === 'final_list' && data.applicant_batches?.[0]?.id"
               :applicant-batch-id="data.applicant_batches[0].id"
@@ -567,34 +590,13 @@ function gradeColor(grade: string) {
       </template>
     </DataTable>
 
-    <div
+    <!-- 🎯 UNIFIED CUSTOM PAGINATION BAR -->
+    <AppPagination
       v-if="props.pagination && props.pagination.total > 0"
-      class="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-appleCore-100 bg-appleCore-50/30"
-    >
-      <div class="text-xs text-blueberry-500">
-        Showing
-        <span class="font-semibold text-blueberry-700">
-          {{ props.pagination.from ?? currentFirst + 1 }}
-        </span>
-        to
-        <span class="font-semibold text-blueberry-700">
-          {{ props.pagination.to ?? Math.min(currentFirst + currentLimit, props.pagination.total) }}
-        </span>
-        of
-        <span class="font-semibold text-blueberry-700">{{ props.pagination.total }}</span>
-        entries
-      </div>
-
-      <Paginator
-        :rows="currentLimit"
-        :total-records="props.pagination.total"
-        :first="currentFirst"
-        :rows-per-page-options="[10, 25, 50, 100]"
-        template="PrevPageLink PageLinks NextPageLink RowsPerPageDropdown"
-        class="!bg-transparent !p-0"
-        @page="onPageChange"
-      />
-    </div>
+      :pagination="props.pagination"
+      @page-change="(page) => emit('page-change', page)"
+      @limit-change="(limit) => emit('limit-change', limit)"
+    />
 
     <ApplicantDeleteDialog
       v-model:visible="deleteDialog"
@@ -610,7 +612,7 @@ function gradeColor(grade: string) {
       @confirm="onRejectConfirmed"
     />
 
-    <!-- 🚀 Deployment History Popover -->
+    <!-- Deployment History Popover -->
     <Popover
       ref="deploymentPopover"
       :pt="{
@@ -619,7 +621,6 @@ function gradeColor(grade: string) {
       }"
     >
       <div v-if="hoveredApplicant" class="w-[380px] max-h-[400px] overflow-hidden flex flex-col">
-        <!-- Header -->
         <div class="px-4 py-3 border-b border-appleCore-100 bg-gradient-to-r from-green-50 to-emerald-50">
           <div class="flex items-center gap-2">
             <div class="w-8 h-8 rounded-lg bg-green-500 flex items-center justify-center flex-shrink-0">
@@ -638,34 +639,24 @@ function gradeColor(grade: string) {
           </div>
         </div>
 
-        <!-- Timeline -->
         <div class="flex-1 overflow-y-auto p-4">
           <div v-if="deploymentCount(hoveredApplicant) > 0" class="relative">
-            <!-- Vertical line -->
             <div class="absolute left-[11px] top-2 bottom-2 w-0.5 bg-appleCore-100" />
-
             <div class="space-y-3">
               <div
                 v-for="deployment in getApplicantDeployments(hoveredApplicant)"
                 :key="deployment.id"
                 class="relative flex gap-3"
               >
-                <!-- Dot -->
                 <div class="relative z-10 flex-shrink-0">
                   <div
                     class="w-6 h-6 rounded-full flex items-center justify-center ring-4"
-                    :class="deployment.cancelled_at
-                      ? 'bg-red-500 ring-red-100'
-                      : 'bg-green-500 ring-green-100'"
+                    :class="deployment.cancelled_at ? 'bg-red-500 ring-red-100' : 'bg-green-500 ring-green-100'"
                   >
-                    <i
-                      class="pi text-white text-[9px]"
-                      :class="deployment.cancelled_at ? 'pi-times' : 'pi-check'"
-                    />
+                    <i class="pi text-white text-[9px]" :class="deployment.cancelled_at ? 'pi-times' : 'pi-check'" />
                   </div>
                 </div>
 
-                <!-- Card -->
                 <div class="flex-1 border border-appleCore-100 rounded-lg p-2.5 bg-white">
                   <div class="flex items-start justify-between gap-2">
                     <div class="flex-1 min-w-0">
@@ -684,9 +675,7 @@ function gradeColor(grade: string) {
                     </div>
                     <span
                       class="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
-                      :class="deployment.cancelled_at
-                        ? 'bg-red-100 text-red-700'
-                        : 'bg-green-100 text-green-700'"
+                      :class="deployment.cancelled_at ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'"
                     >
                       {{ deployment.cancelled_at ? 'CANCELLED' : 'DEPLOYED' }}
                     </span>
@@ -707,10 +696,7 @@ function gradeColor(grade: string) {
                     </span>
                   </div>
 
-                  <p
-                    v-if="deployment.cancelled_at && deployment.cancellation_reason"
-                    class="mt-1.5 text-[10px] text-red-600 italic"
-                  >
+                  <p v-if="deployment.cancelled_at && deployment.cancellation_reason" class="mt-1.5 text-[10px] text-red-600 italic">
                     "{{ deployment.cancellation_reason }}"
                   </p>
                 </div>
@@ -718,19 +704,16 @@ function gradeColor(grade: string) {
             </div>
           </div>
 
-          <!-- Empty state -->
           <div v-else class="text-center py-6">
             <i class="pi pi-inbox text-2xl text-blueberry-300 mb-2 block" />
             <p class="text-xs text-blueberry-500">No deployments yet</p>
           </div>
         </div>
 
-        <!-- Footer -->
         <div class="px-4 py-2 border-t border-appleCore-100 bg-appleCore-50/50">
           <button
             type="button"
-            class="text-[11px] text-apricot-600 hover:text-apricot-700 font-medium
-                   flex items-center gap-1 mx-auto"
+            class="text-[11px] text-apricot-600 hover:text-apricot-700 font-medium flex items-center gap-1 mx-auto"
             @click="hoveredApplicant && (goToView(hoveredApplicant.id), hideDeploymentPopover())"
           >
             <i class="pi pi-external-link text-[9px]" />
@@ -739,5 +722,61 @@ function gradeColor(grade: string) {
         </div>
       </div>
     </Popover>
+
+    <!-- Photo Hover Card Preview -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="opacity-0 scale-95 translate-y-1"
+        enter-to-class="opacity-100 scale-100 translate-y-0"
+        leave-active-class="transition duration-150 ease-in"
+        leave-from-class="opacity-100 scale-100"
+        leave-to-class="opacity-0 scale-95"
+      >
+        <div
+          v-if="previewPhotoApplicant && hoveredPhotoId === previewPhotoApplicant.id"
+          class="fixed z-[9999] w-60 rounded-2xl border border-appleCore-100 bg-white shadow-2xl shadow-blueberry-950/15 overflow-hidden pointer-events-auto"
+          :style="{
+            left: `${previewPos.x}px`,
+            top: `${previewPos.y}px`,
+          }"
+          @mouseenter="onPreviewEnter"
+          @mouseleave="onPreviewLeave"
+        >
+          <div class="relative h-44 bg-appleCore-50 border-b border-appleCore-100">
+            <img
+              :src="getApplicantPhoto(previewPhotoApplicant)"
+              :alt="getFullName(previewPhotoApplicant)"
+              class="w-full h-full object-cover"
+              @error="($event.target as HTMLImageElement).src = getDefaultAvatar(getFullName(previewPhotoApplicant))"
+            />
+            <div class="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/60 to-transparent" />
+            <span class="absolute bottom-2 left-3 text-xs font-bold text-white shadow-xs">
+              {{ previewPhotoApplicant.applicant_code }}
+            </span>
+          </div>
+
+          <div class="p-3 space-y-2">
+            <div>
+              <p class="text-sm font-bold text-blueberry-800 leading-tight">
+                {{ getFullName(previewPhotoApplicant) }}
+              </p>
+              <p class="text-xs text-blueberry-400 mt-0.5">
+                {{ previewPhotoApplicant.applied_position || 'No position specified' }}
+              </p>
+            </div>
+
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <span class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-appleCore-100 text-blueberry-700">
+                {{ String(previewPhotoApplicant.status).replace(/_/g, ' ') }}
+              </span>
+              <span v-if="(previewPhotoApplicant as any).age" class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-apricot-50 text-apricot-700 border border-apricot-200">
+                {{ (previewPhotoApplicant as any).age }} yrs old
+              </span>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>

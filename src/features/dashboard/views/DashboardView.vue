@@ -1,6 +1,8 @@
+<!-- src/features/dashboard/DashboardView.vue -->
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useToast } from 'primevue/usetoast'
+import Dialog from 'primevue/dialog'
 import { AppPageHeader, AppButton, AppCard } from '@shared/ui'
 import { useDashboard } from '../composables/useDashboard'
 import { useDashboardRealtime } from '@shared/pubnub/useDashboardRealtime'
@@ -14,8 +16,10 @@ import DashboardBatchProgress from '../components/DashboardBatchProgress.vue'
 import DashboardPipeline from '../components/DashboardPipeline.vue'
 import DashboardQuickStats from '../components/DashboardQuickStats.vue'
 import DashboardAttentionCard from '../components/DashboardAttentionCard.vue'
+import DashboardBirthdays from '../components/DashboardBirthdays.vue'
 
 const toast = useToast()
+const showBirthdaysModal = ref(false)
 
 const { store, refresh } = useDashboard({
   autoRefresh: true,
@@ -31,6 +35,13 @@ const lastUpdatedLabel = computed(() => {
   if (seconds < 60) return 'just now'
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
   return date.toLocaleTimeString()
+})
+
+// Count how many birthdays are TODAY
+const todayBirthdaysCount = computed(() => {
+  const applicantCount = store.birthdays?.applicants?.filter((a) => a.is_today).length ?? 0
+  const staffCount = store.birthdays?.staff?.filter((s) => s.is_today).length ?? 0
+  return applicantCount + staffCount
 })
 
 const trendRanges: TrendRange[] = ['7d', '14d', '30d']
@@ -65,6 +76,23 @@ async function handleRefresh() {
       title="Dashboard"
       description="Welcome back to Tricastle Bacolod"
     >
+      <!-- Birthdays Action Button -->
+      <div class="relative inline-flex">
+        <AppButton
+          icon="pi pi-gift"
+          label="Birthdays"
+          variant="neutral"
+          outlined
+          @click="showBirthdaysModal = true"
+        />
+        <span
+          v-if="todayBirthdaysCount > 0"
+          class="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-apricot-500 text-[10px] font-bold text-white shadow ring-2 ring-white animate-bounce"
+        >
+          {{ todayBirthdaysCount }}
+        </span>
+      </div>
+
       <AppButton
         icon="pi pi-refresh"
         label="Refresh"
@@ -100,7 +128,7 @@ async function handleRefresh() {
           <div class="flex items-start justify-between mb-4">
             <div>
               <h3 class="text-base font-serif font-semibold text-blueberry-800">
-                Applicant & Document Trends
+                Applicant &amp; Document Trends
               </h3>
               <p class="text-xs text-blueberry-500 mt-0.5">
                 Last {{ store.trendRange.toUpperCase() }} activity
@@ -146,7 +174,7 @@ async function handleRefresh() {
       </AppCard>
     </div>
 
-    <!-- ─── Pipeline & Batches Row ─────────────── -->
+    <!-- ─── Pipeline & Batches Row (Clean 2-column Grid) ─────── -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <!-- Pipeline -->
       <AppCard padding="normal" shadow="soft">
@@ -239,5 +267,40 @@ async function handleRefresh() {
         </div>
       </AppCard>
     </div>
+
+    <!-- ─── Birthdays Dialog Modal ─────────────────────────────── -->
+    <Dialog
+      v-model:visible="showBirthdaysModal"
+      modal
+      :style="{ width: '48rem' }"
+      :breakpoints="{ '960px': '95vw', '640px': '100vw' }"
+      :pt="{
+        root: { class: 'rounded-2xl overflow-hidden' },
+        header: { class: 'pb-2 pt-4 px-5 border-b border-appleCore-100' },
+        content: { class: 'pt-4 px-5 pb-5' }
+      }"
+      dismissable-mask
+    >
+      <template #header>
+        <div class="flex items-center gap-3">
+          <span class="w-10 h-10 rounded-xl bg-apricot-50 border border-apricot-100 flex items-center justify-center">
+            <i class="pi pi-gift text-lg text-apricot-500" />
+          </span>
+          <div>
+            <h2 class="text-lg font-serif font-bold text-blueberry-800 leading-tight">
+              Birthdays
+            </h2>
+            <p class="text-xs text-blueberry-400 font-normal mt-0.5">
+              Today, tomorrow & upcoming
+            </p>
+          </div>
+        </div>
+      </template>
+
+      <DashboardBirthdays
+        :data="store.birthdays"
+        :loading="store.loadingBirthdays"
+      />
+    </Dialog>
   </div>
 </template>

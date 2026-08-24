@@ -1,5 +1,4 @@
 <!-- src/features/applicants/views/FinalListView.vue -->
-
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -18,11 +17,10 @@ import { useDeploymentStore } from '@features/deployments/stores/deployment.stor
 import type { DeployApplicantPayload } from '@features/deployments/types'
 
 // 📚 Composables
-import { useFinalListFilters }    from '../composables/useFinalListFilters'
-import { useFinalListPagination } from '../composables/useFinalListPagination'
-import { useFinalListStats }      from '../composables/useFinalListStats'
-import { useExcelExportDialog }   from '../composables/useExcelExportDialog'
-import { useBulkAISDialog }       from '../composables/useBulkAISDialog'
+import { useFinalListFilters }  from '../composables/useFinalListFilters'
+import { useFinalListStats }    from '../composables/useFinalListStats'
+import { useExcelExportDialog } from '../composables/useExcelExportDialog'
+import { useBulkAISDialog }     from '../composables/useBulkAISDialog'
 
 // 🧩 Child components
 import FinalListHeader         from '../components/final-list/FinalListHeader.vue'
@@ -49,15 +47,32 @@ const filters = useFinalListFilters()
 // ─── Selection state ────────────────────────────────────────────────────────
 const selectedIds = ref<number[]>([])
 
-// ─── Data loading ───────────────────────────────────────────────────────────
-async function loadFinalList(): Promise<void> {
-  store.resetFilters()
+// ─── SERVER-SIDE DATA FETCHING ──────────────────────────────────────────────
+async function fetchFinalList(): Promise<void> {
+  const adv = filters.appliedAdvanced.value
+
   store.setFilters({
-    status:           'final_list',
-    exclude_statuses: '',
-    limit:            1000,
-    offset:           0,
+    status:                    'final_list',
+    exclude_statuses:          '',
+    search:                    filters.searchQuery.value.trim(),
+    batch_id:                  filters.selectedBatchId.value ?? undefined,
+    gender:                    adv.gender,
+    civil_status:              adv.civil_status,
+    nationality:               adv.nationality,
+    quality_grade:             adv.quality_grade,
+    city:                      adv.city,
+    province:                  adv.province,
+    address:                   adv.address,
+    skill_category:            adv.skill_category,
+    jlpt_level:                adv.jlpt_level,
+    willing_to_be_deployed:    adv.willing_to_be_deployed ? (adv.willing_to_be_deployed === 'true') : '',
+    japan_deployment_ready:    adv.japan_deployment_ready ? (adv.japan_deployment_ready === 'true') : '',
+    previous_japan_experience: adv.previous_japan_experience ? (adv.previous_japan_experience === 'true') : '',
+    ssw_eligible:              adv.ssw_eligible ? (adv.ssw_eligible === 'true') : '',
+    limit:                     store.filters.limit ?? 10,
+    page:                      store.filters.page ?? 1,
   } as any)
+
   await store.fetchApplicants()
 }
 
@@ -68,11 +83,21 @@ async function loadAllBatches(): Promise<void> {
 
 onMounted(async () => {
   await Promise.all([
-    loadFinalList(),
+    fetchFinalList(),
     filters.fetchAllProvinces(),
     loadAllBatches(),
   ])
 })
+
+// Re-fetch from MySQL whenever search or filters change
+watch(
+  [filters.searchQuery, filters.selectedBatchId, filters.appliedAdvanced],
+  () => {
+    selectedIds.value = []
+    fetchFinalList()
+  },
+  { deep: true },
+)
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BATCH OPTIONS
@@ -108,107 +133,10 @@ const batchOptions = computed(() => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CLIENT-SIDE FILTERING
+// STATS & FILTERS
 // ═══════════════════════════════════════════════════════════════════════════
 
-const filteredApplicants = computed(() => {
-  let list = store.applicants
-
-  if (filters.selectedBatchId.value) {
-    list = list.filter((a) =>
-      a.applicant_batches?.some((ab) => ab.batch_id === filters.selectedBatchId.value),
-    )
-  }
-
-  if (filters.searchQuery.value.trim()) {
-    const q = filters.searchQuery.value.toLowerCase()
-    list = list.filter((a) => {
-      const fullName = `${a.first_name} ${a.middle_name ?? ''} ${a.last_name}`.toLowerCase()
-      return (
-        fullName.includes(q) ||
-        a.email?.toLowerCase().includes(q) ||
-        a.applicant_code?.toLowerCase().includes(q) ||
-        a.trade_or_occupation?.toLowerCase().includes(q)
-      )
-    })
-  }
-
-  const adv = filters.appliedAdvanced.value
-
-  if (adv.gender)        list = list.filter((a) => a.gender?.toLowerCase() === adv.gender)
-  if (adv.civil_status)  list = list.filter((a) => a.civil_status?.toLowerCase() === adv.civil_status)
-  if (adv.nationality)   list = list.filter((a) => a.nationality === adv.nationality)
-  if (adv.quality_grade) list = list.filter((a) => a.quality_grade === adv.quality_grade)
-
-  if (adv.province) {
-    const target = adv.province.toLowerCase()
-    list = list.filter((a) =>
-      a.province === adv.province ||
-      (a.current_address   ?? '').toLowerCase().includes(target) ||
-      (a.permanent_address ?? '').toLowerCase().includes(target),
-    )
-  }
-
-  if (adv.city) {
-    const target = adv.city.toLowerCase()
-    list = list.filter((a) =>
-      a.city === adv.city ||
-      (a.current_address   ?? '').toLowerCase().includes(target) ||
-      (a.permanent_address ?? '').toLowerCase().includes(target),
-    )
-  }
-
-  if (adv.address) {
-    const keyword = adv.address.toLowerCase()
-    list = list.filter((a) =>
-      (a.current_address   ?? '').toLowerCase().includes(keyword) ||
-      (a.permanent_address ?? '').toLowerCase().includes(keyword),
-    )
-  }
-
-  if (adv.skill_category) list = list.filter((a) => a.skill_category === adv.skill_category)
-  if (adv.jlpt_level)     list = list.filter((a) => a.language?.jlpt_level === adv.jlpt_level)
-
-  if (adv.willing_to_be_deployed) {
-    const want = adv.willing_to_be_deployed === 'true'
-    list = list.filter((a) => Boolean(a.deployment?.willing_to_be_deployed) === want)
-  }
-  if (adv.japan_deployment_ready) {
-    const want = adv.japan_deployment_ready === 'true'
-    list = list.filter((a) => Boolean(a.deployment?.japan_deployment_ready) === want)
-  }
-  if (adv.previous_japan_experience) {
-    const want = adv.previous_japan_experience === 'true'
-    list = list.filter((a) => Boolean(a.deployment?.previous_japan_experience) === want)
-  }
-  if (adv.ssw_eligible) {
-    const want = adv.ssw_eligible === 'true'
-    list = list.filter((a) => Boolean(a.deployment?.ssw_eligible) === want)
-  }
-
-  return list
-})
-
-// ═══════════════════════════════════════════════════════════════════════════
-// PAGINATION + STATS
-// ═══════════════════════════════════════════════════════════════════════════
-
-const pagination = useFinalListPagination(filteredApplicants)
-const stats      = useFinalListStats(computed(() => store.applicants))
-
-// Reset page + selection when filters change
-watch(
-  [filters.searchQuery, filters.selectedBatchId, filters.appliedAdvanced],
-  () => {
-    pagination.reset()
-    selectedIds.value = []
-  },
-  { deep: true },
-)
-
-// ═══════════════════════════════════════════════════════════════════════════
-// ACTIVE FILTER CHIPS
-// ═══════════════════════════════════════════════════════════════════════════
+const stats = useFinalListStats(computed(() => store.applicants))
 
 const activeFilters = computed(() => {
   const list: { key: string; label: string; value: string }[] = []
@@ -267,11 +195,21 @@ function removeFilter(key: string): void {
 
 function resetFilters(): void {
   filters.resetAll()
-  pagination.reset()
   selectedIds.value = []
+  fetchFinalList()
 }
 
 function goBack(): void { router.push({ name: 'applicants.index' }) }
+
+function onPageChange(page: number) {
+  store.setPage(page)
+  fetchFinalList()
+}
+
+function onLimitChange(limit: number) {
+  store.setLimit(limit)
+  fetchFinalList()
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BULK DEPLOY
@@ -301,13 +239,8 @@ async function onBulkDeploySubmit(payload: DeployApplicantPayload): Promise<void
   })
   if (success) {
     bulkDeployDialog.value = false
-    const deployedIds = selectedIds.value.filter((id) => {
-      const applicant = store.applicants.find((a) => a.id === id)
-      return applicant?.applicant_batches?.[0]?.id !== undefined
-    })
-    store.applicants = store.applicants.filter((a) => !deployedIds.includes(a.id))
     selectedIds.value = []
-    await loadFinalList()
+    await fetchFinalList()
   }
 }
 
@@ -317,7 +250,7 @@ async function onBulkDeploySubmit(payload: DeployApplicantPayload): Promise<void
 
 const excel = useExcelExportDialog(
   computed(() => store.applicants),
-  filteredApplicants,
+  computed(() => store.applicants),
   availableBatches,
   filters.selectedBatchId,
   filters.appliedAdvanced,
@@ -325,7 +258,7 @@ const excel = useExcelExportDialog(
 
 const bulkAIS = useBulkAISDialog(
   computed(() => store.applicants),
-  filteredApplicants,
+  computed(() => store.applicants),
   selectedIds,
   filters.selectedBatchId,
 )
@@ -339,7 +272,7 @@ const bulkAIS = useBulkAISDialog(
       :loading="store.loading"
       :has-applicants="store.applicants.length > 0"
       @back="goBack"
-      @refresh="loadFinalList"
+      @refresh="fetchFinalList"
       @export="excel.openExportDialog"
       @bulk-a-i-s="bulkAIS.openBulkAISDialog"
     />
@@ -362,7 +295,7 @@ const bulkAIS = useBulkAISDialog(
       :active-filters="activeFilters"
       @update:search-query="filters.searchQuery.value = $event"
       @update:selected-batch-id="filters.selectedBatchId.value = $event"
-      @search="filters.onSearch"
+      @search="fetchFinalList"
       @open-advanced="filters.showAdvanced.value = true"
       @reset-all="resetFilters"
       @remove-filter="removeFilter"
@@ -378,32 +311,32 @@ const bulkAIS = useBulkAISDialog(
       @deploy="openBulkDeploy"
     />
 
-    <!-- ─── Table (or loading skeleton) ───────────────────────────────────── -->
+    <!-- ─── Table (Server-Side Paginated) ─────────────────────────────────── -->
     <template v-if="store.loading && store.applicants.length === 0">
       <Skeleton height="400px" border-radius="16px" />
     </template>
 
     <AppCard v-else :padding="'none'" :shadow="'soft'">
       <ApplicantTable
-        :applicants="pagination.paginatedApplicants.value"
-        :pagination="pagination.paginationInfo.value"
+        :applicants="store.applicants"
+        :pagination="store.pagination"
         :loading="store.loading"
         :submitting="false"
         :selectable="true"
         v-model:selectedIds="selectedIds"
-        @page-change="pagination.onPageChange"
-        @limit-change="pagination.onLimitChange"
+        @page-change="onPageChange"
+        @limit-change="onLimitChange"
         @delete="() => {}"
       />
     </AppCard>
 
     <!-- ─── Empty state ───────────────────────────────────────────────────── -->
     <div
-      v-if="filteredApplicants.length === 0 && !store.loading && filters.hasFilters.value"
+      v-if="store.applicants.length === 0 && !store.loading && filters.hasFilters.value"
       class="text-center py-8 bg-white border border-dashed border-appleCore-200 rounded-xl"
     >
       <i class="pi pi-filter-slash text-3xl text-blueberry-300 mb-2" />
-      <p class="text-sm text-blueberry-500 mb-2">No applicants match your filters</p>
+      <p class="text-sm text-blueberry-500 mb-2">No applicants match your search criteria</p>
       <Button label="Clear Filters" icon="pi pi-times" text @click="resetFilters" />
     </div>
 
@@ -411,7 +344,6 @@ const bulkAIS = useBulkAISDialog(
          DIALOGS
     ═══════════════════════════════════════════════════════════════════════ -->
 
-    <!-- 🎯 Advanced Filters -->
     <AdvancedFiltersDialog
       v-model:visible="filters.showAdvanced.value"
       v-model:gender="filters.gender.value"
@@ -446,7 +378,6 @@ const bulkAIS = useBulkAISDialog(
       @clear="filters.clearAdvanced"
     />
 
-    <!-- 📊 Excel Export -->
     <ExcelExportDialog
       v-model:visible="excel.showExportDialog.value"
       v-model:export-scope="excel.exportScope.value"
@@ -454,7 +385,7 @@ const bulkAIS = useBulkAISDialog(
       v-model:export-location="excel.exportLocation.value"
       v-model:export-status="excel.exportStatus.value"
       :exporting="excel.exporting.value"
-      :filtered-count="filteredApplicants.length"
+      :filtered-count="store.applicants.length"
       :export-count="excel.exportApplicants.value.length"
       :available-batches="availableBatches"
       :available-locations="excel.availableLocations.value"
@@ -470,7 +401,6 @@ const bulkAIS = useBulkAISDialog(
       @download="excel.handleDownload"
     />
 
-    <!-- 📄 Bulk AIS -->
     <BulkAISDialog
       v-model:visible="bulkAIS.showBulkAISDialog.value"
       v-model:source="bulkAIS.bulkAISSource.value"
@@ -479,14 +409,13 @@ const bulkAIS = useBulkAISDialog(
       :generating="bulkAIS.bulkAISGenerating.value"
       :progress="bulkAIS.bulkAISProgress.value"
       :selected-count="selectedIds.length"
-      :filtered-count="filteredApplicants.length"
+      :filtered-count="store.applicants.length"
       :applicants-count="bulkAIS.bulkAISApplicants.value.length"
       :available-batches="availableBatches"
       @generate="bulkAIS.handleBulkAISGenerate"
       @close="bulkAIS.closeBulkAISDialog"
     />
 
-    <!-- 🚀 Bulk Deploy -->
     <BulkDeployDialog
       v-model:visible="bulkDeployDialog"
       :applicant-batch-ids="selectedApplicantBatchIds"

@@ -1,11 +1,12 @@
+<!-- src/features/deployments/components/DeploymentTable.vue -->
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import DataTable, { type DataTableRowClickEvent } from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
-import Paginator, { type PageState } from 'primevue/paginator'
 import Menu from 'primevue/menu'
+import AppPagination from '@shared/ui/table/AppPagination.vue'
 import DeploymentStatusBadge from './DeploymentStatusBadge.vue'
 import type { Deployment, Pagination } from '../types'
 
@@ -80,26 +81,6 @@ const statusMenuItems = computed(() => {
   ]
 })
 
-// ─── Pagination ───────────────────────────────────────
-const currentLimit = computed(
-  () => props.pagination?.per_page ?? props.pagination?.limit ?? 10,
-)
-
-const currentFirst = computed(() => {
-  if (props.pagination?.current_page && currentLimit.value) {
-    return (props.pagination.current_page - 1) * currentLimit.value
-  }
-  return props.pagination?.offset ?? 0
-})
-
-function onPageChange(event: PageState) {
-  if (event.rows !== currentLimit.value) {
-    emit('limit-change', event.rows)
-    return
-  }
-  emit('page-change', event.page + 1)
-}
-
 // ─── Row actions ──────────────────────────────────────
 function goToApplicant(applicantId: number) {
   router.push({ name: 'applicants.show', params: { id: applicantId } })
@@ -145,14 +126,21 @@ function contractPeriod(d: Deployment): string {
 </script>
 
 <template>
-  <div class="flex flex-col">
-    <DataTable :value="props.deployments" :loading="props.loading" class="!border-none" size="small" :row-hover="true"
-      @row-click="onRowClick" :pt="{
+  <div class="flex flex-col relative">
+    <DataTable
+      :value="props.deployments"
+      :loading="props.loading"
+      class="!border-none"
+      size="small"
+      :row-hover="true"
+      @row-click="onRowClick"
+      :pt="{
         table: 'text-sm',
         header: '!bg-appleCore-50/50 !text-blueberry-600 !font-semibold !text-xs !uppercase !tracking-wider',
         headerRow: '!bg-appleCore-50/50 !border-b !border-appleCore-100',
         bodyRow: 'cursor-pointer hover:!bg-appleCore-50/40 !border-b !border-appleCore-100/60 transition-colors',
-      }">
+      }"
+    >
       <!-- Applicant Code -->
       <Column field="applicant.applicant_code" header="Code" style="width: 140px">
         <template #body="{ data }">
@@ -237,27 +225,46 @@ function contractPeriod(d: Deployment): string {
         <template #body="{ data }">
           <div class="flex items-center gap-0.5" @click.stop>
             <!-- View -->
-            <Button icon="pi pi-eye" text rounded size="small"
-              class="!text-blueberry-500 hover:!text-blue-600 hover:!bg-blue-50" v-tooltip.top="'View Applicant'"
-              :disabled="isRowLoading(data.id)" @click="data.applicant_id && goToApplicant(data.applicant_id)" />
+            <Button
+              icon="pi pi-eye"
+              text
+              rounded
+              size="small"
+              class="!text-blueberry-500 hover:!text-blue-600 hover:!bg-blue-50"
+              v-tooltip.top="'View Applicant'"
+              :disabled="isRowLoading(data.id)"
+              @click="data.applicant_id && goToApplicant(data.applicant_id)"
+            />
 
             <!-- Edit -->
-            <Button icon="pi pi-pencil" text rounded size="small"
-              class="!text-blueberry-500 hover:!text-apricot-600 hover:!bg-apricot-50" v-tooltip.top="'Edit Deployment'"
-              :disabled="isRowLoading(data.id)" @click="emit('edit', data)" />
+            <Button
+              icon="pi pi-pencil"
+              text
+              rounded
+              size="small"
+              class="!text-blueberry-500 hover:!text-apricot-600 hover:!bg-apricot-50"
+              v-tooltip.top="'Edit Deployment'"
+              :disabled="isRowLoading(data.id)"
+              @click="emit('edit', data)"
+            />
           </div>
         </template>
       </Column>
 
-      <!-- 🎯 Update Status Column -->
+      <!-- Update Status Column -->
       <Column header="Update Status" style="width: 140px">
         <template #body="{ data }">
           <div @click.stop>
             <!-- Show dropdown only if actively deployed -->
-            <Button v-if="isActivelyDeployed(data)" size="small" outlined severity="secondary"
+            <Button
+              v-if="isActivelyDeployed(data)"
+              size="small"
+              outlined
+              severity="secondary"
               :disabled="isRowLoading(data.id)"
               class="!text-xs !py-1 !px-2.5 !gap-1.5 hover:!bg-appleCore-50 hover:!border-apricot-300 hover:!text-apricot-600 transition-all"
-              @click="toggleStatusMenu($event, data)">
+              @click="toggleStatusMenu($event, data)"
+            >
               <template #default>
                 <i class="pi pi-refresh text-[10px]" />
                 <span class="text-xs font-medium">Change</span>
@@ -271,10 +278,15 @@ function contractPeriod(d: Deployment): string {
               Locked
             </span>
 
-            <Menu :ref="(el: any) => (menuRefs[data.id] = el)" :model="statusMenuItems" :popup="true"
-              :append-to="'body'" :pt="{
+            <Menu
+              :ref="(el: any) => (menuRefs[data.id] = el)"
+              :model="statusMenuItems"
+              :popup="true"
+              :append-to="'body'"
+              :pt="{
                 root: { class: '!min-w-[240px] !rounded-xl !shadow-lg !border !border-appleCore-200 !overflow-hidden' },
-              }" />
+              }"
+            />
           </div>
         </template>
       </Column>
@@ -299,26 +311,12 @@ function contractPeriod(d: Deployment): string {
       </template>
     </DataTable>
 
-    <!-- Pagination -->
-    <div v-if="props.pagination && props.pagination.total > 0"
-      class="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-appleCore-100 bg-appleCore-50/30">
-      <div class="text-xs text-blueberry-500">
-        Showing
-        <span class="font-semibold text-blueberry-700">
-          {{ props.pagination.from ?? currentFirst + 1 }}
-        </span>
-        to
-        <span class="font-semibold text-blueberry-700">
-          {{ props.pagination.to ?? Math.min(currentFirst + currentLimit, props.pagination.total) }}
-        </span>
-        of
-        <span class="font-semibold text-blueberry-700">{{ props.pagination.total }}</span>
-        entries
-      </div>
-
-      <Paginator :rows="currentLimit" :total-records="props.pagination.total" :first="currentFirst"
-        :rows-per-page-options="[10, 25, 50, 100]" template="PrevPageLink PageLinks NextPageLink RowsPerPageDropdown"
-        class="!bg-transparent !p-0" @page="onPageChange" />
-    </div>
+    <!-- 🎯 UNIFIED CUSTOM PAGINATION BAR -->
+    <AppPagination
+      v-if="props.pagination && props.pagination.total > 0"
+      :pagination="props.pagination"
+      @page-change="(page) => emit('page-change', page)"
+      @limit-change="(limit) => emit('limit-change', limit)"
+    />
   </div>
 </template>

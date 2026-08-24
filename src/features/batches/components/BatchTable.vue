@@ -1,10 +1,11 @@
+<!-- src/features/batches/components/BatchTable.vue -->
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import DataTable, { type DataTableRowClickEvent } from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
-import Paginator, { type PageState } from 'primevue/paginator'
+import AppPagination from '@shared/ui/table/AppPagination.vue'
 import BatchStatusBadge from './BatchStatusBadge.vue'
 import BatchDeleteDialog from './BatchDeleteDialog.vue'
 import type { Batch, Pagination } from '../types'
@@ -20,24 +21,13 @@ const emit = defineEmits<{
   (e: 'page-change', page: number): void
   (e: 'limit-change', limit: number): void
   (e: 'delete', id: number): void
-  (e: 'activate', id: number): void       // ← NEW
-  (e: 'deactivate', id: number): void     // ← NEW
+  (e: 'activate', id: number): void
+  (e: 'deactivate', id: number): void
 }>()
 
 const router = useRouter()
 const deleteDialog = ref(false)
 const selectedBatch = ref<Batch | null>(null)
-
-const currentLimit = computed(
-  () => props.pagination?.per_page ?? props.pagination?.limit ?? 10,
-)
-
-const currentFirst = computed(() => {
-  if (props.pagination?.current_page && currentLimit.value) {
-    return (props.pagination.current_page - 1) * currentLimit.value
-  }
-  return props.pagination?.offset ?? 0
-})
 
 function confirmDelete(batch: Batch) {
   selectedBatch.value = batch
@@ -49,14 +39,6 @@ function onDeleteConfirmed() {
     emit('delete', selectedBatch.value.id)
     deleteDialog.value = false
   }
-}
-
-function onPageChange(event: PageState) {
-  if (event.rows !== currentLimit.value) {
-    emit('limit-change', event.rows)
-    return
-  }
-  emit('page-change', event.page + 1)
 }
 
 function goToView(id: number) {
@@ -82,7 +64,7 @@ function formatDate(dateStr: string | null | undefined): string {
 </script>
 
 <template>
-  <div class="flex flex-col">
+  <div class="flex flex-col relative">
     <DataTable
       :value="props.batches"
       :loading="props.loading"
@@ -249,35 +231,13 @@ function formatDate(dateStr: string | null | undefined): string {
       </template>
     </DataTable>
 
-    <!-- Pagination -->
-    <div
+    <!-- 🎯 UNIFIED CUSTOM PAGINATION BAR -->
+    <AppPagination
       v-if="props.pagination && props.pagination.total > 0"
-      class="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-appleCore-100 bg-appleCore-50/30"
-    >
-      <div class="text-xs text-blueberry-500">
-        Showing
-        <span class="font-semibold text-blueberry-700">
-          {{ props.pagination.from ?? currentFirst + 1 }}
-        </span>
-        to
-        <span class="font-semibold text-blueberry-700">
-          {{ props.pagination.to ?? Math.min(currentFirst + currentLimit, props.pagination.total) }}
-        </span>
-        of
-        <span class="font-semibold text-blueberry-700">{{ props.pagination.total }}</span>
-        entries
-      </div>
-
-      <Paginator
-        :rows="currentLimit"
-        :total-records="props.pagination.total"
-        :first="currentFirst"
-        :rows-per-page-options="[10, 25, 50, 100]"
-        template="PrevPageLink PageLinks NextPageLink RowsPerPageDropdown"
-        class="!bg-transparent !p-0"
-        @page="onPageChange"
-      />
-    </div>
+      :pagination="props.pagination"
+      @page-change="(page) => emit('page-change', page)"
+      @limit-change="(limit) => emit('limit-change', limit)"
+    />
 
     <BatchDeleteDialog
       v-model:visible="deleteDialog"

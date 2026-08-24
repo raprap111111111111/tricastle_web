@@ -1,4 +1,5 @@
-import http from '@shared/api/http'  // adjust import to match your setup
+// src/features/dashboard/api/dashboard.api.ts
+import http from '@shared/api/http'
 import type { DashboardStatsFilters, TrendRange } from '../types'
 
 const BASE = '/dashboard'
@@ -34,5 +35,10 @@ export const DashboardApi = {
 
   attention() {
     return http.get(`${BASE}/attention`)
+  },
+
+  // NEW: Fetch upcoming birthdays
+  birthdays() {
+    return http.get(`${BASE}/birthdays`)
   },
 }

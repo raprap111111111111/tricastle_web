@@ -1,3 +1,5 @@
+// src/features/applicants/stores/applicant.store.ts
+
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { applicantApi } from '../api/applicant.api'
@@ -15,10 +17,10 @@ import type {
 
 export const useApplicantStore = defineStore('applicants', () => {
   const applicants = ref<Applicant[]>([])
-  const applicant  = ref<Applicant | null>(null)
-  const loading    = ref(false)
+  const applicant = ref<Applicant | null>(null)
+  const loading = ref(false)
   const submitting = ref(false)
-  const error      = ref<string | null>(null)
+  const error = ref<string | null>(null)
   const duplicates = ref<DuplicateItem[]>([])
   const pagination = ref<Pagination | null>(null)
 
@@ -64,14 +66,18 @@ export const useApplicantStore = defineStore('applicants', () => {
       const payload: any = await applicantApi.list(params)
 
       applicants.value = payload?.records ?? []
+
+      // 🎯 Fixed: Map 'from' and 'to' so AppPagination displays correct entry counts
       pagination.value = {
         current_page: payload?.current_page ?? 1,
-        last_page:    payload?.last_page ?? 1,
-        per_page:     payload?.per_page ?? payload?.limit ?? 10,
-        total:        payload?.total ?? 0,
-        offset:       payload?.offset ?? 0,
-        limit:        payload?.limit ?? 10,
-        has_more:     payload?.has_more ?? false,
+        last_page: payload?.last_page ?? 1,
+        per_page: payload?.per_page ?? payload?.limit ?? 10,
+        total: payload?.total ?? 0,
+        offset: payload?.offset ?? 0,
+        limit: payload?.limit ?? 10,
+        has_more: payload?.has_more ?? false,
+        from: payload?.from ?? null,
+        to: payload?.to ?? null,
       }
     } catch (e: any) {
       error.value = e?.message ?? 'Failed to load applicants'
@@ -220,7 +226,12 @@ export const useApplicantStore = defineStore('applicants', () => {
       return await applicantApi.checkDuplicates(payload)
     } catch (e: any) {
       error.value = e?.message ?? 'Failed to check duplicates'
-      return { has_duplicates: false, has_blockers: false, duplicates: [] }
+      return {
+        has_duplicates: false,
+        has_blockers: false,
+        has_warnings: false,
+        duplicates: [],
+      }
     }
   }
 
@@ -231,18 +242,21 @@ export const useApplicantStore = defineStore('applicants', () => {
 
   function setPage(page: number) {
     const limit = filters.value.limit ?? 10
+    filters.value.page = page
     filters.value.offset = (page - 1) * limit
   }
 
   function setLimit(limit: number) {
     filters.value.limit = limit
     filters.value.offset = 0
+    filters.value.page = 1
   }
 
   function resetFilters() {
     filters.value = {
       offset: 0,
       limit: 10,
+      page: 1,
       search: '',
       status: '',
       exclude_statuses: '',

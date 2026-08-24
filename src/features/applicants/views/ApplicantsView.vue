@@ -26,10 +26,10 @@ import {
   type ExcelColumn,
 } from '@shared/utils/excel-export'
 
-const route  = useRoute()
+const route = useRoute()
 const router = useRouter()
-const toast  = useToast()
-const store  = useApplicantStore()
+const toast = useToast()
+const store = useApplicantStore()
 const { handleDelete } = useApplicants()
 
 // ─── Load applicants excluding final_list and rejected ─────
@@ -67,18 +67,18 @@ watch(
 usePubNub([PubNubChannels.APPLICANTS], (msg) => {
   console.log('📩 PubNub message received:', msg)
   switch (msg.event) {
-    case 'applicant.status_changed': handleStatusChange(msg.payload);   break
-    case 'applicant.created':        handleNewApplicant(msg.payload);   break
-    case 'applicant.deleted':        handleDeletedApplicant(msg.payload); break
+    case 'applicant.status_changed': handleStatusChange(msg.payload); break
+    case 'applicant.created': handleNewApplicant(msg.payload); break
+    case 'applicant.deleted': handleDeletedApplicant(msg.payload); break
   }
 })
 
 function handleStatusChange(payload: any) {
   toast.add({
     severity: 'info',
-    summary:  '📌 Applicant Updated',
-    detail:   `${payload.name} → ${String(payload.new_status).replace(/_/g, ' ')}`,
-    life:     4000,
+    summary: '📌 Applicant Updated',
+    detail: `${payload.name} → ${String(payload.new_status).replace(/_/g, ' ')}`,
+    life: 4000,
   })
   loadInProgress()
 }
@@ -86,9 +86,9 @@ function handleStatusChange(payload: any) {
 function handleNewApplicant(payload: any) {
   toast.add({
     severity: 'success',
-    summary:  '👤 New Applicant',
-    detail:   `${payload.name} was just added by another staff`,
-    life:     4000,
+    summary: '👤 New Applicant',
+    detail: `${payload.name} was just added by another staff`,
+    life: 4000,
   })
   loadInProgress()
 }
@@ -96,17 +96,17 @@ function handleNewApplicant(payload: any) {
 function handleDeletedApplicant(payload: any) {
   toast.add({
     severity: 'warn',
-    summary:  '🗑️ Applicant Removed',
-    detail:   `${payload.name} was deleted`,
-    life:     3000,
+    summary: '🗑️ Applicant Removed',
+    detail: `${payload.name} was deleted`,
+    life: 3000,
   })
   loadInProgress()
 }
 
 // ─── Stats ────────────────────────────────────────────
-const totalCount    = computed(() => store.pagination?.total ?? 0)
-const pendingCount  = computed(() => store.applicants.filter((a) => a.status === 'pending').length)
-const reviewCount   = computed(() => store.applicants.filter((a) => a.status === 'under_review').length)
+const totalCount = computed(() => store.pagination?.total ?? 0)
+const pendingCount = computed(() => store.applicants.filter((a) => a.status === 'pending').length)
+const reviewCount = computed(() => store.applicants.filter((a) => a.status === 'under_review').length)
 const verifiedCount = computed(() => store.applicants.filter((a) => a.status === 'verified').length)
 
 // ─── Filter / Pagination handlers ─────────────────────
@@ -115,22 +115,22 @@ function onFilter(filters: Partial<IFilters>) {
   store.fetchApplicants()
 }
 
-function onReset()                     { loadInProgress() }
-function onPageChange(page: number)    { store.setPage(page);   store.fetchApplicants() }
-function onLimitChange(limit: number)  { store.setLimit(limit); store.fetchApplicants() }
-async function onDelete(id: number)    { await handleDelete(id) }
+function onReset() { loadInProgress() }
+function onPageChange(page: number) { store.setPage(page); store.fetchApplicants() }
+function onLimitChange(limit: number) { store.setLimit(limit); store.fetchApplicants() }
+async function onDelete(id: number) { await handleDelete(id) }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 📊 EXCEL EXPORT
 // ═══════════════════════════════════════════════════════════════════════════
 
 const showExportDialog = ref(false)
-const exporting        = ref(false)
+const exporting = ref(false)
 
 type ExportScope = 'current' | 'location' | 'status'
-const exportScope    = ref<ExportScope>('current')
+const exportScope = ref<ExportScope>('current')
 const exportLocation = ref<string>('')
-const exportStatus   = ref<string>('')
+const exportStatus = ref<string>('')
 
 // ─── Column Picker State ──────────────────────────────
 const selectedColumnKeys = ref<string[]>([...DEFAULT_COLUMN_KEYS])
@@ -139,7 +139,7 @@ const columnGroups = computed(() => {
   const groups: Record<string, ExcelColumn[]> = {}
   ALL_COLUMNS.forEach((col) => {
     const g = col.group ?? 'Other'
-    ;(groups[g] = groups[g] ?? []).push(col)
+      ; (groups[g] = groups[g] ?? []).push(col)
   })
   return Object.entries(groups).map(([name, columns]) => ({ name, columns }))
 })
@@ -153,7 +153,7 @@ function toggleColumn(key: string): void {
 function toggleGroup(groupName: string): void {
   const group = columnGroups.value.find((g) => g.name === groupName)
   if (!group) return
-  const groupKeys  = group.columns.map((c) => c.key)
+  const groupKeys = group.columns.map((c) => c.key)
   const allChecked = groupKeys.every((k) => selectedColumnKeys.value.includes(k))
   if (allChecked) {
     selectedColumnKeys.value = selectedColumnKeys.value.filter((k) => !groupKeys.includes(k))
@@ -173,7 +173,7 @@ function isGroupPartial(groupName: string): boolean {
   const group = columnGroups.value.find((g) => g.name === groupName)
   if (!group) return false
   const some = group.columns.some((c) => selectedColumnKeys.value.includes(c.key))
-  const all  = group.columns.every((c) => selectedColumnKeys.value.includes(c.key))
+  const all = group.columns.every((c) => selectedColumnKeys.value.includes(c.key))
   return some && !all
 }
 
@@ -194,7 +194,7 @@ const availableLocations = computed(() => {
   const set = new Set<string>()
   store.applicants.forEach((a) => {
     if (a.province) set.add(a.province)
-    if (a.city)     set.add(a.city)
+    if (a.city) set.add(a.city)
   })
   return Array.from(set).sort()
 })
@@ -219,8 +219,8 @@ const exportApplicants = computed(() => {
         const loc = exportLocation.value.toLowerCase()
         return (
           (a.province ?? '').toLowerCase() === loc ||
-          (a.city     ?? '').toLowerCase() === loc ||
-          (a.current_address  ?? '').toLowerCase().includes(loc) ||
+          (a.city ?? '').toLowerCase() === loc ||
+          (a.current_address ?? '').toLowerCase().includes(loc) ||
           (a.permanent_address ?? '').toLowerCase().includes(loc)
         )
       })
@@ -235,11 +235,11 @@ const exportApplicants = computed(() => {
 })
 
 function openExportDialog() {
-  exportScope.value        = 'current'
-  exportLocation.value     = ''
-  exportStatus.value       = ''
+  exportScope.value = 'current'
+  exportLocation.value = ''
+  exportStatus.value = ''
   selectedColumnKeys.value = [...DEFAULT_COLUMN_KEYS]
-  showExportDialog.value   = true
+  showExportDialog.value = true
 }
 
 function closeExportDialog() {
@@ -282,18 +282,18 @@ async function handleDownload(): Promise<void> {
 
     toast.add({
       severity: 'success',
-      summary:  'Exported',
-      detail:   `${exportApplicants.value.length} applicant${exportApplicants.value.length !== 1 ? 's' : ''} × ${selectedColumnKeys.value.length} columns exported`,
-      life:     3000,
+      summary: 'Exported',
+      detail: `${exportApplicants.value.length} applicant${exportApplicants.value.length !== 1 ? 's' : ''} × ${selectedColumnKeys.value.length} columns exported`,
+      life: 3000,
     })
     closeExportDialog()
   } catch (err) {
     console.error('[Export]', err)
     toast.add({
       severity: 'error',
-      summary:  'Export Failed',
-      detail:   'Something went wrong.',
-      life:     4000,
+      summary: 'Export Failed',
+      detail: 'Something went wrong.',
+      life: 4000,
     })
   } finally {
     exporting.value = false
@@ -312,10 +312,8 @@ async function handleDownload(): Promise<void> {
             Applicants
           </h1>
           <!-- Live indicator -->
-          <span
-            class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-green-50
-                   text-green-700 rounded-full text-xs font-medium ring-1 ring-green-200"
-          >
+          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-green-50
+                   text-green-700 rounded-full text-xs font-medium ring-1 ring-green-200">
             <span class="relative flex h-2 w-2">
               <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
               <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
@@ -327,43 +325,24 @@ async function handleDownload(): Promise<void> {
           Applicants currently in the review process
         </p>
       </div>
-
       <!-- 🎯 Action Buttons Group -->
-      <div class="flex items-center gap-2 flex-wrap">
-        <!-- ✅ NEW — Export Excel -->
-        <AppButton
-          label="Export Excel"
-          icon="pi pi-file-excel"
-          variant="secondary"
-          :disabled="store.applicants.length === 0"
-          @click="openExportDialog"
-        />
+      <div class="flex items-center gap-2.5 flex-wrap">
+        <!-- Export Excel (Standard neutral outline) -->
+        <AppButton label="Export Excel" icon="pi pi-file-excel" variant="neutral" outlined
+          :disabled="store.applicants.length === 0" @click="openExportDialog" />
 
-        <!-- Quick shortcut: View Final List -->
-        <AppButton
-          label="Final List"
-          icon="pi pi-folder-open"
-          variant="secondary"
-          class="!text-green-700 !border-green-200 hover:!bg-green-50"
-          @click="router.push('/applicants/final-list')"
-        />
+        <!-- Quick shortcut: View Final List (Green outline) -->
+        <AppButton label="Final List" icon="pi pi-folder-open" variant="neutral" outlined
+          class="!text-emerald-700 !border-emerald-200 hover:!bg-emerald-50"
+          @click="router.push('/applicants/final-list')" />
 
-        <!-- Quick shortcut: View Rejected -->
-        <AppButton
-          label="Rejected"
-          icon="pi pi-times-circle"
-          variant="secondary"
-          class="!text-red-600 !border-red-200 hover:!bg-red-50"
-          @click="router.push('/applicants/rejected')"
-        />
+        <!-- Quick shortcut: View Rejected (Red outline) -->
+        <AppButton label="Rejected" icon="pi pi-times-circle" variant="neutral" outlined
+          class="!text-red-600 !border-red-200 hover:!bg-red-50" @click="router.push('/applicants/rejected')" />
 
-        <!-- Primary CTA: New Applicant -->
-        <AppButton
-          label="New Applicant"
-          icon="pi pi-plus"
-          variant="accent"
-          @click="router.push({ name: 'applicants.create' })"
-        />
+        <!-- Primary CTA: New Applicant (Keep solid for primary action) -->
+        <AppButton label="New Applicant" icon="pi pi-plus" variant="accent"
+          @click="router.push({ name: 'applicants.create' })" />
       </div>
     </header>
 
@@ -379,10 +358,10 @@ async function handleDownload(): Promise<void> {
 
     <!-- ─── Stats Cards ───────────────────────────── -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <AppStatCard label="In Progress"  :value="totalCount"    icon="pi pi-users"     variant="blueberry" />
-      <AppStatCard label="Pending"      :value="pendingCount"  icon="pi pi-hourglass" variant="apricot" />
-      <AppStatCard label="Under Review" :value="reviewCount"   icon="pi pi-clock"     variant="citrus" />
-      <AppStatCard label="Verified"     :value="verifiedCount" icon="pi pi-check"     variant="green" />
+      <AppStatCard label="In Progress" :value="totalCount" icon="pi pi-users" variant="blueberry" />
+      <AppStatCard label="Pending" :value="pendingCount" icon="pi pi-hourglass" variant="apricot" />
+      <AppStatCard label="Under Review" :value="reviewCount" icon="pi pi-clock" variant="citrus" />
+      <AppStatCard label="Verified" :value="verifiedCount" icon="pi pi-check" variant="green" />
     </div>
 
     <!-- ─── Filters ────────────────────────────────── -->
@@ -392,33 +371,19 @@ async function handleDownload(): Promise<void> {
 
     <!-- ─── Table ──────────────────────────────────── -->
     <AppCard :padding="'none'" :shadow="'soft'">
-      <ApplicantTable
-        :applicants="store.applicants"
-        :pagination="store.pagination"
-        :loading="store.loading"
-        :submitting="store.submitting"
-        @page-change="onPageChange"
-        @limit-change="onLimitChange"
-        @delete="onDelete"
-      />
+      <ApplicantTable :applicants="store.applicants" :pagination="store.pagination" :loading="store.loading"
+        :submitting="store.submitting" @page-change="onPageChange" @limit-change="onLimitChange" @delete="onDelete" />
     </AppCard>
 
     <!-- ═══════════════════════════════════════════════════
          📊 Excel Export Dialog
     ════════════════════════════════════════════════════ -->
-    <Dialog
-      v-model:visible="showExportDialog"
-      modal
-      :draggable="false"
-      :dismissable-mask="true"
-      :closable="false"
-      :style="{ width: '640px' }"
-      :pt="{
-        root:    { class: 'rounded-2xl overflow-hidden' },
-        header:  { class: '!p-0' },
+    <Dialog v-model:visible="showExportDialog" modal :draggable="false" :dismissable-mask="true" :closable="false"
+      :style="{ width: '640px' }" :pt="{
+        root: { class: 'rounded-2xl overflow-hidden' },
+        header: { class: '!p-0' },
         content: { class: '!p-0' },
-      }"
-    >
+      }">
       <template #container>
         <div class="bg-white rounded-2xl overflow-hidden flex flex-col max-h-[85vh]">
 
@@ -435,11 +400,9 @@ async function handleDownload(): Promise<void> {
                 <p class="text-[11px] text-blueberry-500">Configure your export</p>
               </div>
             </div>
-            <button
-              type="button"
+            <button type="button"
               class="w-7 h-7 rounded-full flex items-center justify-center hover:bg-appleCore-100 text-blueberry-500"
-              @click="closeExportDialog"
-            >
+              @click="closeExportDialog">
               <i class="pi pi-times text-xs" />
             </button>
           </div>
@@ -453,29 +416,19 @@ async function handleDownload(): Promise<void> {
                 1. Export Scope
               </p>
               <div class="grid grid-cols-3 gap-2">
-                <button
-                  v-for="opt in [
-                    { key: 'current',  icon: 'pi-table',      title: 'Current View',  desc: `Current page (${store.applicants.length})` },
-                    { key: 'location', icon: 'pi-map-marker', title: 'By Location',   desc: 'Group by province' },
-                    { key: 'status',   icon: 'pi-tag',        title: 'By Status',     desc: 'One sheet per status' },
-                  ]"
-                  :key="opt.key"
-                  type="button"
-                  class="flex flex-col items-start gap-1.5 p-3 rounded-xl border-2 text-left transition-all"
-                  :class="exportScope === opt.key
+                <button v-for="opt in [
+                  { key: 'current', icon: 'pi-table', title: 'Current View', desc: `Current page (${store.applicants.length})` },
+                  { key: 'location', icon: 'pi-map-marker', title: 'By Location', desc: 'Group by province' },
+                  { key: 'status', icon: 'pi-tag', title: 'By Status', desc: 'One sheet per status' },
+                ]" :key="opt.key" type="button"
+                  class="flex flex-col items-start gap-1.5 p-3 rounded-xl border-2 text-left transition-all" :class="exportScope === opt.key
                     ? 'border-apricot-400 bg-apricot-50'
-                    : 'border-appleCore-100 hover:border-appleCore-300'"
-                  @click="exportScope = opt.key as any"
-                >
+                    : 'border-appleCore-100 hover:border-appleCore-300'" @click="exportScope = opt.key as any">
                   <div class="flex items-center gap-2">
-                    <div
-                      class="w-7 h-7 rounded-lg flex items-center justify-center"
-                      :class="exportScope === opt.key ? 'bg-apricot-100' : 'bg-appleCore-100'"
-                    >
-                      <i
-                        class="pi text-xs"
-                        :class="[opt.icon, exportScope === opt.key ? 'text-apricot-600' : 'text-blueberry-500']"
-                      />
+                    <div class="w-7 h-7 rounded-lg flex items-center justify-center"
+                      :class="exportScope === opt.key ? 'bg-apricot-100' : 'bg-appleCore-100'">
+                      <i class="pi text-xs"
+                        :class="[opt.icon, exportScope === opt.key ? 'text-apricot-600' : 'text-blueberry-500']" />
                     </div>
                     <span class="text-xs font-semibold text-blueberry-800">{{ opt.title }}</span>
                   </div>
@@ -488,20 +441,11 @@ async function handleDownload(): Promise<void> {
                 <label class="block text-xs font-medium text-blueberry-700 mb-1.5">
                   Filter Location <span class="text-blueberry-400 font-normal">(optional)</span>
                 </label>
-                <Select
-                  v-model="exportLocation"
-                  :options="[
-                    { label: 'All Locations (grouped by province)', value: '' },
-                    ...availableLocations.map(l => ({ label: l, value: l }))
-                  ]"
-                  option-label="label"
-                  option-value="value"
-                  placeholder="All locations..."
-                  class="w-full"
-                  size="small"
-                  filter
-                  show-clear
-                />
+                <Select v-model="exportLocation" :options="[
+                  { label: 'All Locations (grouped by province)', value: '' },
+                  ...availableLocations.map(l => ({ label: l, value: l }))
+                ]" option-label="label" option-value="value" placeholder="All locations..." class="w-full"
+                  size="small" filter show-clear />
               </div>
 
               <!-- Status picker -->
@@ -509,22 +453,14 @@ async function handleDownload(): Promise<void> {
                 <label class="block text-xs font-medium text-blueberry-700 mb-1.5">
                   Filter Status <span class="text-blueberry-400 font-normal">(optional)</span>
                 </label>
-                <Select
-                  v-model="exportStatus"
-                  :options="[
-                    { label: 'All Statuses (one sheet each)', value: '' },
-                    ...availableStatuses.map(s => ({
-                      label: s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' '),
-                      value: s,
-                    }))
-                  ]"
-                  option-label="label"
-                  option-value="value"
-                  placeholder="All statuses..."
-                  class="w-full"
-                  size="small"
-                  show-clear
-                />
+                <Select v-model="exportStatus" :options="[
+                  { label: 'All Statuses (one sheet each)', value: '' },
+                  ...availableStatuses.map(s => ({
+                    label: s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' '),
+                    value: s,
+                  }))
+                ]" option-label="label" option-value="value" placeholder="All statuses..." class="w-full"
+                  size="small" show-clear />
               </div>
 
               <!-- Note about pagination -->
@@ -547,19 +483,11 @@ async function handleDownload(): Promise<void> {
                   </span>
                 </p>
                 <div class="flex items-center gap-1">
-                  <button
-                    type="button"
-                    class="text-[11px] text-apricot-600 hover:underline"
-                    @click="selectAllColumns"
-                  >
+                  <button type="button" class="text-[11px] text-apricot-600 hover:underline" @click="selectAllColumns">
                     Select all
                   </button>
                   <span class="text-blueberry-300">•</span>
-                  <button
-                    type="button"
-                    class="text-[11px] text-red-500 hover:underline"
-                    @click="clearAllColumns"
-                  >
+                  <button type="button" class="text-[11px] text-red-500 hover:underline" @click="clearAllColumns">
                     Clear
                   </button>
                 </div>
@@ -567,64 +495,41 @@ async function handleDownload(): Promise<void> {
 
               <div class="flex flex-wrap items-center gap-1.5 mb-3">
                 <span class="text-[11px] text-blueberry-500 font-medium">Presets:</span>
-                <button
-                  v-for="preset in [
-                    { key: 'minimal',    label: 'Minimal (5)',  icon: 'pi-file' },
-                    { key: 'contact',    label: 'Contact Info', icon: 'pi-id-card' },
-                    { key: 'deployment', label: 'Deployment',   icon: 'pi-send' },
-                    { key: 'full',       label: 'Everything',   icon: 'pi-list' },
-                  ]"
-                  :key="preset.key"
-                  type="button"
-                  class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px]
+                <button v-for="preset in [
+                  { key: 'minimal', label: 'Minimal (5)', icon: 'pi-file' },
+                  { key: 'contact', label: 'Contact Info', icon: 'pi-id-card' },
+                  { key: 'deployment', label: 'Deployment', icon: 'pi-send' },
+                  { key: 'full', label: 'Everything', icon: 'pi-list' },
+                ]" :key="preset.key" type="button" class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px]
                          bg-appleCore-50 hover:bg-apricot-50 hover:text-apricot-700
-                         text-blueberry-700 font-medium transition-colors"
-                  @click="applyPreset(preset.key as any)"
-                >
+                         text-blueberry-700 font-medium transition-colors" @click="applyPreset(preset.key as any)">
                   <i :class="`pi ${preset.icon} text-[9px]`" />
                   {{ preset.label }}
                 </button>
               </div>
 
               <div class="border border-appleCore-100 rounded-lg max-h-[280px] overflow-y-auto">
-                <div
-                  v-for="group in columnGroups"
-                  :key="group.name"
-                  class="border-b border-appleCore-100 last:border-b-0"
-                >
-                  <label
-                    class="flex items-center gap-2 px-3 py-2 bg-appleCore-50/70 cursor-pointer
-                           hover:bg-appleCore-100 transition-colors sticky top-0 z-10"
-                  >
-                    <input
-                      type="checkbox"
-                      class="w-3.5 h-3.5 rounded accent-apricot-500 cursor-pointer"
-                      :checked="isGroupChecked(group.name)"
-                      :indeterminate.prop="isGroupPartial(group.name)"
-                      @change="toggleGroup(group.name)"
-                    />
+                <div v-for="group in columnGroups" :key="group.name"
+                  class="border-b border-appleCore-100 last:border-b-0">
+                  <label class="flex items-center gap-2 px-3 py-2 bg-appleCore-50/70 cursor-pointer
+                           hover:bg-appleCore-100 transition-colors sticky top-0 z-10">
+                    <input type="checkbox" class="w-3.5 h-3.5 rounded accent-apricot-500 cursor-pointer"
+                      :checked="isGroupChecked(group.name)" :indeterminate.prop="isGroupPartial(group.name)"
+                      @change="toggleGroup(group.name)" />
                     <span class="text-xs font-bold text-blueberry-700 uppercase tracking-wider">
                       {{ group.name }}
                     </span>
                     <span class="text-[10px] text-blueberry-400 ml-auto">
-                      {{ group.columns.filter(c => selectedColumnKeys.includes(c.key)).length }}
+                      {{group.columns.filter(c => selectedColumnKeys.includes(c.key)).length}}
                       / {{ group.columns.length }}
                     </span>
                   </label>
 
                   <div class="grid grid-cols-2 gap-x-2 p-2">
-                    <label
-                      v-for="col in group.columns"
-                      :key="col.key"
-                      class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-appleCore-50
-                             cursor-pointer text-xs text-blueberry-700 transition-colors"
-                    >
-                      <input
-                        type="checkbox"
-                        class="w-3 h-3 rounded accent-apricot-500 cursor-pointer"
-                        :checked="selectedColumnKeys.includes(col.key)"
-                        @change="toggleColumn(col.key)"
-                      />
+                    <label v-for="col in group.columns" :key="col.key" class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-appleCore-50
+                             cursor-pointer text-xs text-blueberry-700 transition-colors">
+                      <input type="checkbox" class="w-3 h-3 rounded accent-apricot-500 cursor-pointer"
+                        :checked="selectedColumnKeys.includes(col.key)" @change="toggleColumn(col.key)" />
                       <span class="flex-1 truncate">{{ col.header }}</span>
                     </label>
                   </div>
@@ -646,23 +551,11 @@ async function handleDownload(): Promise<void> {
 
           <!-- Footer -->
           <div
-            class="flex items-center justify-end gap-2 px-5 py-4 border-t border-appleCore-100 bg-appleCore-50/50 shrink-0"
-          >
-            <Button
-              label="Cancel"
-              severity="secondary"
-              text
-              size="small"
-              @click="closeExportDialog"
-            />
-            <Button
-              label="Download .xlsx"
-              icon="pi pi-file-excel"
-              :loading="exporting"
+            class="flex items-center justify-end gap-2 px-5 py-4 border-t border-appleCore-100 bg-appleCore-50/50 shrink-0">
+            <Button label="Cancel" severity="secondary" text size="small" @click="closeExportDialog" />
+            <Button label="Download .xlsx" icon="pi pi-file-excel" :loading="exporting"
               :disabled="selectedColumnKeys.length === 0 || exportApplicants.length === 0"
-              class="!bg-green-600 hover:!bg-green-700 !border-green-600 !text-white"
-              @click="handleDownload"
-            />
+              class="!bg-green-600 hover:!bg-green-700 !border-green-600 !text-white" @click="handleDownload" />
           </div>
         </div>
       </template>

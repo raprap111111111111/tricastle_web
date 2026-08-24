@@ -14,5 +14,6 @@ export const DOCUMENT_TYPE_IDS = {
   BIRTH_CERT:    6,
   TESDA:         7,
   VISA:          8,
-  BIODATA:       9,   // ← add this to your seeder (see below)
+  BIODATA:       9, 
+  ID_PHOTO: 10,
 } as const

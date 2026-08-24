@@ -1,3 +1,4 @@
+<!-- src/features/applicants/components/tabs/EducationTab.vue -->
 <script setup lang="ts">
 import { ref } from 'vue'
 import InputText from 'primevue/inputtext'
@@ -133,12 +134,13 @@ function onNext() {
 
           <div class="flex flex-col gap-1">
             <label class="text-sm font-medium text-blueberry-700">Year Started</label>
-            <InputNumber v-model="entry.year_started" :min="1950" :max="2100" :use-grouping="false" />
+            <InputNumber v-model="entry.year_started" placeholder="e.g. 2018" :min="1950" :max="2100" :use-grouping="false" />
           </div>
 
+          <!-- 🎯 RELABELED TO "Year Graduated" -->
           <div class="flex flex-col gap-1">
-            <label class="text-sm font-medium text-blueberry-700">Year Ended</label>
-            <InputNumber v-model="entry.year_ended" :min="1950" :max="2100" :use-grouping="false" />
+            <label class="text-sm font-medium text-blueberry-700">Year Graduated</label>
+            <InputNumber v-model="entry.year_ended" placeholder="e.g. 2022" :min="1950" :max="2100" :use-grouping="false" />
           </div>
 
           <div class="flex flex-col gap-1 md:col-span-3">

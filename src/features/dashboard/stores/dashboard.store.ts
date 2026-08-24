@@ -1,3 +1,4 @@
+// src/features/dashboard/stores/dashboard.store.ts
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { DashboardApi } from '../api/dashboard.api'
@@ -12,6 +13,7 @@ import type {
   StatusBreakdown,
   TrendData,
   TrendRange,
+  BirthdaysData, // NEW
 } from '../types'
 
 export const useDashboardStore = defineStore('dashboard', () => {
@@ -24,6 +26,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const activeBatches = ref<ActiveBatch[]>([])
   const quickStats = ref<QuickStatsData | null>(null)
   const attention = ref<AttentionData | null>(null)
+  const birthdays = ref<BirthdaysData | null>(null) // NEW
 
   const trendRange = ref<TrendRange>('14d')
 
@@ -35,6 +38,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const loadingBatches = ref(false)
   const loadingQuickStats = ref(false)
   const loadingAttention = ref(false)
+  const loadingBirthdays = ref(false) // NEW
 
   const error = ref<string | null>(null)
   const lastFetchedAt = ref<string | null>(null)
@@ -59,10 +63,10 @@ export const useDashboardStore = defineStore('dashboard', () => {
       loadingPipeline.value ||
       loadingBatches.value ||
       loadingQuickStats.value ||
-      loadingAttention.value,
+      loadingAttention.value ||
+      loadingBirthdays.value // NEW
   )
 
-  // Attention items in UI-friendly shape
   const attentionItems = computed(() => {
     if (!attention.value) return []
     return [
@@ -93,7 +97,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
     ]
   })
 
-  // Quick stats in UI-friendly shape
   const quickStatsList = computed(() => {
     if (!quickStats.value) return []
     return [
@@ -228,6 +231,19 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   }
 
+  // NEW: Fetch Birthdays
+  async function fetchBirthdays() {
+    loadingBirthdays.value = true
+    try {
+      const { data } = await DashboardApi.birthdays()
+      birthdays.value = data.data ?? data
+    } catch {
+      birthdays.value = null
+    } finally {
+      loadingBirthdays.value = false
+    }
+  }
+
   async function refresh() {
     await Promise.all([
       fetchStats(),
@@ -238,6 +254,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
       fetchActiveBatches(),
       fetchQuickStats(),
       fetchAttention(),
+      fetchBirthdays(), // NEW
     ])
   }
 
@@ -250,6 +267,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     activeBatches.value = []
     quickStats.value = null
     attention.value = null
+    birthdays.value = null // NEW
     error.value = null
     lastFetchedAt.value = null
   }
@@ -264,7 +282,10 @@ export const useDashboardStore = defineStore('dashboard', () => {
     activeBatches,
     quickStats,
     attention,
+    birthdays,
     trendRange,
+    
+    // loading flags
     loadingStats,
     loadingActivities,
     loadingTrends,
@@ -273,13 +294,17 @@ export const useDashboardStore = defineStore('dashboard', () => {
     loadingBatches,
     loadingQuickStats,
     loadingAttention,
+    loadingBirthdays,
+    
     error,
     lastFetchedAt,
+    
     // getters
     statList,
     isLoading,
     attentionItems,
     quickStatsList,
+    
     // actions
     fetchStats,
     fetchActivities,
@@ -289,6 +314,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     fetchActiveBatches,
     fetchQuickStats,
     fetchAttention,
+    fetchBirthdays,
     refresh,
     reset,
   }

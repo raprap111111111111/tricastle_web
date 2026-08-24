@@ -21,13 +21,21 @@ export const personalSchema = z.object({
   phone: z.string().max(20).nullable().optional().or(z.literal('')),
   mobile: z.string().max(20).nullable().optional().or(z.literal('')),
   date_of_birth: dateString,
+  birthplace: z.string().max(150).nullable().optional(),           // AIS
   gender: z.enum(['male', 'female']).nullable().optional(),
   civil_status: z
     .enum(['single', 'married', 'widowed', 'separated', 'divorced'])
     .nullable()
     .optional(),
+  religion: z.string().max(100).nullable().optional(),             // AIS
   number_of_children: z.coerce.number().int().min(0).default(0),
   nationality: z.string().max(100).nullable().optional(),
+  english_proficiency_pct: z.coerce.number().int().min(0).max(100).default(0), // AIS
+
+  // AIS Trade header (shown on print sheet)
+  applied_position: z.string().max(100).nullable().optional(),     // AIS e.g. Steelman
+  trade_test_try:   z.string().max(20).nullable().optional(),      // AIS e.g. 1st
+  trade_test_date:  dateString,                                    // AIS
 })
 
 // ─── Step 2: Physical & Address ───────────────────────────────────────────────
@@ -45,10 +53,6 @@ export const physicalAddressSchema = z.object({
 })
 
 // ─── Step 3: Documents ────────────────────────────────────────────────────────
-// biodata_file and biodata_notes are UI-only fields.
-// They are NOT sent in the main createApplicant JSON payload.
-// After the applicant is created, the file is uploaded separately
-// via POST /applicant-documents with document_type = BIODATA.
 
 export const documentsSchema = z.object({
   passport_number:   z.string().max(50).nullable().optional(),
@@ -58,48 +62,63 @@ export const documentsSchema = z.object({
   philhealth_number: z.string().max(50).nullable().optional(),
   pagibig_number:    z.string().max(50).nullable().optional(),
 
-  // UI-only — stripped before the main API call
+  id_photo_file: z.instanceof(File).nullable().optional(),
   biodata_file:  z.instanceof(File).nullable().optional(),
   biodata_notes: z.string().max(500).nullable().optional(),
 })
 
-// ─── Step 4: Japan Deployment Profile (Phase 1) ───────────────────────────────
-// All fields optional — the tab can be skipped entirely.
-// japan_deployment_ready and ssw_eligible are staff-set fields,
-// not collected from the applicant directly during intake.
+// ─── Japan contact entry (AIS) ────────────────────────────────────────────────
+
+export const japanContactEntrySchema = z.object({
+  affiliation_type: z.enum(['marucon', 'non_marucon']),
+  name:             z.string().max(150).default(''),
+  batch_no:         z.string().max(50).nullable().optional(),
+  company_name:     z.string().max(150).nullable().optional(),
+  relation:         z.string().max(100).nullable().optional(),
+  contact_number:   z.string().max(30).nullable().optional(),
+})
+
+// ─── Step 4: Japan Deployment Profile ─────────────────────────────────────────
 
 export const deploymentSchema = z.object({
-  // Skill / Trade
   skill_category: z
     .enum(['skilled', 'semi_skilled', 'unskilled'])
     .nullable()
     .optional(),
   trade_or_occupation: z.string().max(100).nullable().optional(),
 
-  // Language
   understands_basic_english: z.boolean().default(false),
   jlpt_level: z
     .enum(['N5', 'N4', 'N3', 'N2', 'N1'])
     .nullable()
     .optional(),
 
-  // Japan Deployment Willingness (applicant-declared)
   willing_to_be_deployed:  z.boolean().default(false),
   preferred_work_location: z.string().max(100).nullable().optional(),
 
-  // Japan Experience
   previous_japan_experience: z.boolean().default(false),
   years_japan_experience:    z.coerce.number().int().min(0).max(50).default(0),
 
-  // TITP / SSW Certifications
   has_titp_certificate: z.boolean().default(false),
   titp_occupation:      z.string().max(100).nullable().optional(),
 
-  // Salary
   expected_salary:          z.coerce.number().min(0).nullable().optional(),
   expected_salary_currency: z.string().length(3).default('JPY'),
   current_salary:           z.coerce.number().min(0).nullable().optional(),
   current_salary_currency:  z.string().length(3).default('PHP'),
+
+  // Japan Contacts (AIS)
+  japan_contacts: z.array(japanContactEntrySchema).default([]),
+})
+
+// ─── Step 5: Family Background ────────────────────────────────────────────────
+
+export const familySchema = z.object({
+  // ─── AIS Family Background Sentences ────────────────────────────────
+  living_situation:     z.string().max(500).nullable().optional(),                    // AIS
+  birth_order:          z.coerce.number().int().min(1).max(20).nullable().optional(), // AIS
+  siblings_count:       z.coerce.number().int().min(0).max(30).nullable().optional(), // AIS
+  siblings_description: z.string().max(100).nullable().optional(),                    // AIS
 
   // Family — Father
   father_name:       z.string().max(150).nullable().optional(),
@@ -111,10 +130,12 @@ export const deploymentSchema = z.object({
   mother_occupation: z.string().max(100).nullable().optional(),
   mother_contact:    z.string().max(30).nullable().optional(),
 
-  // Family — Spouse
-  spouse_name:       z.string().max(150).nullable().optional(),
-  spouse_occupation: z.string().max(100).nullable().optional(),
-  spouse_contact:    z.string().max(30).nullable().optional(),
+  // Family — Spouse (+ AIS salary)
+  spouse_name:        z.string().max(150).nullable().optional(),
+  spouse_occupation:  z.string().max(100).nullable().optional(),
+  spouse_contact:     z.string().max(30).nullable().optional(),
+  spouse_salary:      z.coerce.number().min(0).nullable().optional(),                    // AIS
+  spouse_salary_unit: z.enum(['per_day', 'per_month', 'per_year']).nullable().optional(),// AIS
 
   // Emergency Contact
   emergency_contact_name:         z.string().max(150).nullable().optional(),
@@ -123,7 +144,7 @@ export const deploymentSchema = z.object({
   emergency_contact_address:      z.string().max(500).nullable().optional(),
 })
 
-// ─── Step 5: Lifestyle ────────────────────────────────────────────────────────
+// ─── Step 6: Lifestyle ────────────────────────────────────────────────────────
 
 export const lifestyleSchema = z.object({
   is_smoking:           z.boolean().default(false),
@@ -141,7 +162,7 @@ export const lifestyleSchema = z.object({
   allergies_notes:       z.string().max(500).nullable().optional(),
 })
 
-// ─── Step 6: Education ────────────────────────────────────────────────────────
+// ─── Step 7: Education ────────────────────────────────────────────────────────
 
 export const educationEntrySchema = z.object({
   id: z.number().optional(),
@@ -161,13 +182,14 @@ export const educationEntrySchema = z.object({
   year_started: z.coerce.number().int().min(1950).max(2100).nullable().optional(),
   year_ended:   z.coerce.number().int().min(1950).max(2100).nullable().optional(),
   honors:       z.string().max(200).nullable().optional(),
+  remarks:      z.string().max(500).nullable().optional(), // AIS
 })
 
 export const educationSchema = z.object({
   educations: z.array(educationEntrySchema).default([]),
 })
 
-// ─── Step 7: Employment ───────────────────────────────────────────────────────
+// ─── Step 8: Employment ───────────────────────────────────────────────────────
 
 export const employmentEntrySchema = z.object({
   id:              z.number().optional(),
@@ -184,8 +206,10 @@ export const employmentEntrySchema = z.object({
   is_current:         z.boolean().default(false),
   country:            z.string().max(100).default('Philippines'),
   city:               z.string().max(100).nullable().optional(),
+  is_overseas:        z.boolean().default(false),                          // AIS
   salary:             z.coerce.number().min(0).nullable().optional(),
   salary_currency:    z.string().max(3).default('PHP'),
+  salary_unit:        z.enum(['per_day', 'per_month', 'per_year']).nullable().optional(), // AIS
   reason_for_leaving: z.string().max(500).nullable().optional(),
 })
 
@@ -193,7 +217,7 @@ export const employmentSchema = z.object({
   employments: z.array(employmentEntrySchema).default([]),
 })
 
-// ─── Step 8: Tattoos ──────────────────────────────────────────────────────────
+// ─── Step 9: Tattoos ──────────────────────────────────────────────────────────
 
 export const tattooEntrySchema = z.object({
   id:          z.number().optional(),
@@ -208,7 +232,7 @@ export const tattooSchema = z.object({
   tattoos: z.array(tattooEntrySchema).default([]),
 })
 
-// ─── Legacy: Batch Assignment (kept for backward compat) ──────────────────────
+// ─── Legacy: Batch Assignment ─────────────────────────────────────────────────
 
 export const batchAssignmentSchema = z.object({
   batch_id: z.number().int().positive().nullable().optional(),
@@ -234,14 +258,13 @@ export const batchAssignmentSchema = z.object({
     .optional(),
 })
 
-// ─── Combined Full Schema (for single-page forms if needed) ───────────────────
-// Note: biodata_file is intentionally excluded from fullApplicantSchema
-// because File objects cannot be sent as JSON.
+// ─── Combined Full Schema ─────────────────────────────────────────────────────
 
 export const fullApplicantSchema = personalSchema
   .merge(physicalAddressSchema)
   .merge(documentsSchema)
   .merge(deploymentSchema)
+  .merge(familySchema)
 
 // ─── Inferred Types ───────────────────────────────────────────────────────────
 
@@ -249,6 +272,7 @@ export type PersonalFormValues        = z.infer<typeof personalSchema>
 export type PhysicalAddressFormValues = z.infer<typeof physicalAddressSchema>
 export type DocumentsFormValues       = z.infer<typeof documentsSchema>
 export type DeploymentFormValues      = z.infer<typeof deploymentSchema>
+export type FamilyFormValues          = z.infer<typeof familySchema>
 export type LifestyleFormValues       = z.infer<typeof lifestyleSchema>
 export type EducationEntryValues      = z.infer<typeof educationEntrySchema>
 export type EducationFormValues       = z.infer<typeof educationSchema>
@@ -258,3 +282,4 @@ export type TattooEntryValues         = z.infer<typeof tattooEntrySchema>
 export type TattooFormValues          = z.infer<typeof tattooSchema>
 export type BatchAssignmentValues     = z.infer<typeof batchAssignmentSchema>
 export type FullApplicantFormValues   = z.infer<typeof fullApplicantSchema>
+export type JapanContactEntryValues   = z.infer<typeof japanContactEntrySchema>

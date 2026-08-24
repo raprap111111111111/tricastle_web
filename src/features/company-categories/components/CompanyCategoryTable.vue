@@ -1,10 +1,11 @@
+<!-- src/features/company-categories/components/CompanyCategoryTable.vue -->
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import DataTable, { type DataTableRowClickEvent } from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
-import Paginator, { type PageState } from 'primevue/paginator'
+import AppPagination from '@shared/ui/table/AppPagination.vue'
 import CompanyCategoryDeleteDialog from './CompanyCategoryDeleteDialog.vue'
 import type { CompanyCategory, Pagination } from '../types'
 
@@ -26,37 +27,26 @@ const router = useRouter()
 const deleteDialog = ref(false)
 const selected = ref<CompanyCategory | null>(null)
 
-const currentLimit = computed(() => props.pagination?.per_page ?? 15)
-const currentFirst = computed(() => {
-  if (props.pagination?.current_page && currentLimit.value) {
-    return (props.pagination.current_page - 1) * currentLimit.value
-  }
-  return 0
-})
-
 function confirmDelete(cat: CompanyCategory) {
   selected.value = cat
   deleteDialog.value = true
 }
+
 function onDeleteConfirmed() {
   if (selected.value) {
     emit('delete', selected.value.id)
     deleteDialog.value = false
   }
 }
-function onPageChange(event: PageState) {
-  if (event.rows !== currentLimit.value) {
-    emit('limit-change', event.rows)
-    return
-  }
-  emit('page-change', event.page + 1)
-}
+
 function goToView(id: number) {
   router.push({ name: 'company-categories.show', params: { id } })
 }
+
 function goToEdit(id: number) {
   router.push({ name: 'company-categories.edit', params: { id } })
 }
+
 function onRowClick(event: DataTableRowClickEvent) {
   const target = event.originalEvent?.target as HTMLElement | null
   if (target?.closest('button, a, .p-button')) return
@@ -65,7 +55,7 @@ function onRowClick(event: DataTableRowClickEvent) {
 </script>
 
 <template>
-  <div class="flex flex-col">
+  <div class="flex flex-col relative">
     <DataTable
       :value="props.categories"
       :loading="props.loading"
@@ -165,23 +155,13 @@ function onRowClick(event: DataTableRowClickEvent) {
       </template>
     </DataTable>
 
-    <div
+    <!-- 🎯 UNIFIED CUSTOM PAGINATION BAR -->
+    <AppPagination
       v-if="props.pagination && props.pagination.total > 0"
-      class="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-appleCore-100 bg-appleCore-50/30"
-    >
-      <div class="text-xs text-blueberry-500">
-        <span class="font-semibold text-blueberry-700">{{ props.pagination.total }}</span> total
-      </div>
-      <Paginator
-        :rows="currentLimit"
-        :total-records="props.pagination.total"
-        :first="currentFirst"
-        :rows-per-page-options="[15, 25, 50, 100]"
-        template="PrevPageLink PageLinks NextPageLink RowsPerPageDropdown"
-        class="!bg-transparent !p-0"
-        @page="onPageChange"
-      />
-    </div>
+      :pagination="props.pagination"
+      @page-change="(page) => emit('page-change', page)"
+      @limit-change="(limit) => emit('limit-change', limit)"
+    />
 
     <CompanyCategoryDeleteDialog
       v-model:visible="deleteDialog"

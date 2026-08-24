@@ -36,6 +36,8 @@ export type EducationLevel =
 
 export type EducationStatus = 'graduate' | 'undergraduate' | 'ongoing'
 export type TattooSize      = 'small' | 'medium' | 'large'
+export type SalaryUnit      = 'per_day' | 'per_month' | 'per_year'
+export type JapanAffiliationType = 'marucon' | 'non_marucon'
 
 export type ApplicantBatchStatus =
   | 'assigned'
@@ -104,7 +106,6 @@ export interface ApplicantBatch {
   rejection_reason:  string | null
   remarks:           string | null
 
-  // Deployment fields on pivot
   deployment_country:        string | null
   deployment_company:        string | null
   deployment_position:       string | null
@@ -157,6 +158,11 @@ export interface FamilyMember {
   contact:    string | null
 }
 
+export interface SpouseMember extends FamilyMember {
+  salary?:      number | null
+  salary_unit?: SalaryUnit | null
+}
+
 export interface EmergencyContact {
   name:         string | null
   relationship: string | null
@@ -167,8 +173,22 @@ export interface EmergencyContact {
 export interface ApplicantFamily {
   father:            FamilyMember
   mother:            FamilyMember
-  spouse:            FamilyMember
+  spouse:            SpouseMember
   emergency_contact: EmergencyContact
+}
+
+// ─── Japan Contacts ───────────────────────────────────────────────────────────
+
+export interface ApplicantJapanContact {
+  id?: number
+  affiliation_type: JapanAffiliationType
+  name: string
+  batch_no?: string | null
+  company_name?: string | null
+  relation?: string | null
+  contact_number?: string | null
+  created_at?: string
+  updated_at?: string
 }
 
 // ─── Main Applicant ───────────────────────────────────────────────────────────
@@ -177,21 +197,28 @@ export interface Applicant {
   id: number
   applicant_code: string
 
+  applied_position?: string | null
+  trade_test_try?:   string | null
+  trade_test_date?:  string | null
+  birthplace?:       string | null
+  religion?:         string | null
+  english_proficiency_pct?: number
+
   // Personal
-  first_name:        string
-  middle_name:       string | null
-  last_name:         string
-  suffix:            string | null
-  full_name?:        string
-  email:             string
-  phone:             string | null
-  mobile:            string | null
-  date_of_birth:     string | null
-  age?:              number | null
-  gender:            ApplicantGender | null
-  civil_status:      CivilStatus | null
+  first_name:         string
+  middle_name:        string | null
+  last_name:          string
+  suffix:             string | null
+  full_name?:         string
+  email:              string
+  phone:              string | null
+  mobile:             string | null
+  date_of_birth:      string | null
+  age?:               number | null
+  gender:             ApplicantGender | null
+  civil_status:       CivilStatus | null
   number_of_children: number
-  nationality:       string | null
+  nationality:        string | null
 
   // Physical
   height_cm:     number | null
@@ -232,22 +259,20 @@ export interface Applicant {
   created_by?:        number | null
   creator?:           StaffRef | null
 
-  // Phase 1 — flat fields (also on model for filter access)
-  skill_category?:     SkillCategory | null
+  skill_category?:      SkillCategory | null
   trade_or_occupation?: string | null
 
-  // Phase 1 — nested objects (from resource)
   language?:   ApplicantLanguage
   deployment?: ApplicantDeploymentProfile
   salary?:     ApplicantSalary
   family?:     ApplicantFamily
 
-  // Timestamps
+  japan_contacts?: ApplicantJapanContact[]
+
   created_at:  string
   updated_at:  string
   deleted_at?: string | null
 
-  // Relations
   lifestyle?:         ApplicantLifestyle | null
   educations?:        ApplicantEducation[]
   employments?:       ApplicantEmployment[]
@@ -281,14 +306,15 @@ export interface ApplicantLifestyle {
 
 export interface ApplicantEducation {
   id: number
-  applicant_id:      number
-  education_level:   EducationLevel
-  education_status:  EducationStatus
-  school_name:       string
-  course:            string | null
-  year_started:      number | null
-  year_ended:        number | null
-  honors:            string | null
+  applicant_id:     number
+  education_level:  EducationLevel
+  education_status: EducationStatus
+  school_name:      string
+  course:           string | null
+  year_started:     number | null
+  year_ended:       number | null
+  honors:           string | null
+  remarks?:         string | null
   created_at: string
   updated_at: string
 }
@@ -307,8 +333,10 @@ export interface ApplicantEmployment {
   is_current:         boolean
   country:            string
   city:               string | null
+  is_overseas?:       boolean
   salary:             number | null
   salary_currency:    string
+  salary_unit?:       SalaryUnit | null
   reason_for_leaving: string | null
   created_at: string
   updated_at: string
@@ -331,34 +359,37 @@ export interface ApplicantTattoo {
 // ─── Create / Update Payloads ─────────────────────────────────────────────────
 
 export interface CreateApplicantPayload {
-  // Personal
-  first_name:        string
-  middle_name?:      string | null
-  last_name:         string
-  suffix?:           string | null
-  email:             string
-  phone?:            string | null
-  mobile?:           string | null
-  date_of_birth?:    string | null
-  gender?:           ApplicantGender | null
-  civil_status?:     CivilStatus | null
-  number_of_children?: number
-  nationality?:      string | null
+  applied_position?: string | null
+  trade_test_try?:   string | null
+  trade_test_date?:  string | null
+  birthplace?:       string | null
+  religion?:         string | null
+  english_proficiency_pct?: number
 
-  // Physical
+  first_name:         string
+  middle_name?:       string | null
+  last_name:          string
+  suffix?:            string | null
+  email:              string
+  phone?:             string | null
+  mobile?:            string | null
+  date_of_birth?:     string | null
+  gender?:            ApplicantGender | null
+  civil_status?:      CivilStatus | null
+  number_of_children?: number
+  nationality?:       string | null
+
   height_cm?:     number | null
   weight_kg?:     number | null
   dominant_hand?: DominantHand | null
   blood_type?:    BloodType | null
 
-  // Address
   current_address?:   string | null
   permanent_address?: string | null
   city?:              string | null
   province?:          string | null
   postal_code?:       string | null
 
-  // Passport / IDs
   passport_number?:   string | null
   passport_expiry?:   string | null
   sss_number?:        string | null
@@ -366,52 +397,47 @@ export interface CreateApplicantPayload {
   philhealth_number?: string | null
   pagibig_number?:    string | null
 
-  // Phase 1 — Skill / Trade
   skill_category?:      SkillCategory | null
   trade_or_occupation?: string | null
 
-  // Phase 1 — Language
   understands_basic_english?: boolean
   jlpt_level?:                JlptLevel | null
 
-  // Phase 1 — Japan Deployment
-  willing_to_be_deployed?:    boolean
-  japan_deployment_ready?:    boolean
-  preferred_work_location?:   string | null
+  willing_to_be_deployed?:  boolean
+  japan_deployment_ready?:  boolean
+  preferred_work_location?: string | null
 
-  // Phase 1 — Japan Experience
   previous_japan_experience?: boolean
   years_japan_experience?:    number
 
-  // Phase 1 — Certifications
   has_titp_certificate?: boolean
   titp_occupation?:      string | null
   ssw_eligible?:         boolean
 
-  // Phase 1 — Salary
   expected_salary?:          number | null
   expected_salary_currency?: string
   current_salary?:           number | null
   current_salary_currency?:  string
 
-  // Phase 1 — Family
-  father_name?:       string | null
-  father_occupation?: string | null
-  father_contact?:    string | null
-  mother_name?:       string | null
-  mother_occupation?: string | null
-  mother_contact?:    string | null
-  spouse_name?:       string | null
-  spouse_occupation?: string | null
-  spouse_contact?:    string | null
+  father_name?:        string | null
+  father_occupation?:  string | null
+  father_contact?:     string | null
+  mother_name?:        string | null
+  mother_occupation?:  string | null
+  mother_contact?:     string | null
+  spouse_name?:        string | null
+  spouse_occupation?:  string | null
+  spouse_contact?:     string | null
+  spouse_salary?:      number | null
+  spouse_salary_unit?: SalaryUnit | null
 
-  // Phase 1 — Emergency Contact
+  japan_contacts?: ApplicantJapanContact[]
+
   emergency_contact_name?:         string | null
   emergency_contact_relationship?: string | null
   emergency_contact_phone?:        string | null
   emergency_contact_address?:      string | null
 
-  // Staff
   assigned_staff_id?: number | null
 }
 
@@ -442,14 +468,15 @@ export interface UpsertLifestylePayload {
 }
 
 export interface CreateEducationPayload {
-  applicant_id:    number
-  education_level: EducationLevel
+  applicant_id:     number
+  education_level:  EducationLevel
   education_status?: EducationStatus
   school_name:  string
   course?:      string | null
   year_started?: number | null
   year_ended?:   number | null
   honors?:       string | null
+  remarks?:      string | null
 }
 
 export type UpdateEducationPayload = Partial<Omit<CreateEducationPayload, 'applicant_id'>>
@@ -465,8 +492,10 @@ export interface CreateEmploymentPayload {
   is_current?:     boolean
   country?:        string
   city?:           string | null
+  is_overseas?:    boolean
   salary?:         number | null
   salary_currency?: string
+  salary_unit?:    SalaryUnit | null
   reason_for_leaving?: string | null
 }
 
@@ -489,6 +518,7 @@ export interface ApplicantFilters {
   search?:        string
   offset?:        number
   limit?:         number
+  page?:          number | null  // 🎯 Added page parameter support
   order_by?:      string
   order_dir?:     'asc' | 'desc'
   status?:        ApplicantStatus | ''
@@ -507,7 +537,18 @@ export interface ApplicantFilters {
   province?: string
   address?:  string
 
-  // Phase 1 — Japan deployment filters
+  // AIS filters
+  applied_position?:          string
+  trade_test_try?:            string
+  trade_test_date_from?:      string
+  trade_test_date_to?:        string
+  birthplace?:                string
+  religion?:                  string
+  min_english_proficiency?:   number | null
+  has_marucon_contact?:       boolean | ''
+  has_japan_contact?:         boolean | ''
+
+  // Deployment filters
   skill_category?:             SkillCategory | ''
   jlpt_level?:                 JlptLevel | ''
   trade_or_occupation?:        string
@@ -533,8 +574,8 @@ export interface Pagination {
   offset:       number
   limit:        number
   has_more:     boolean
-  from?:        number | null
-  to?:          number | null
+  from?:        number | null  // 🎯 Nullable for API response compatibility
+  to?:          number | null  // 🎯 Nullable for API response compatibility
 }
 
 export interface PaginatedResponse<T> {
@@ -546,6 +587,8 @@ export interface PaginatedResponse<T> {
   last_page:    number
   per_page:     number
   has_more:     boolean
+  from?:        number | null
+  to?:          number | null
 }
 
 export type PaginatedApplicants = PaginatedResponse<Applicant>
@@ -571,8 +614,8 @@ export interface DuplicateMatch {
   applicant_code:  string
   full_name:       string
   email:           string
-  status?:         ApplicantStatus    // added from backend fix
-  passport_number?: string | null      // added from backend fix
+  status?:         ApplicantStatus
+  passport_number?: string | null
   created_at:      string
 }
 
@@ -586,7 +629,7 @@ export interface DuplicateItem {
 export interface DuplicateCheckResult {
   has_duplicates: boolean
   has_blockers:   boolean
-  has_warnings:   boolean            // added from backend fix
+  has_warnings:   boolean
   duplicates:     DuplicateItem[]
 }
 

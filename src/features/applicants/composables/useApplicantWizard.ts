@@ -35,8 +35,15 @@ const STEPS: WizardStep[] = [
     key:         'deployment',
     label:       'Deployment',
     icon:        'pi pi-send',
-    description: 'Japan deployment profile, family & emergency contact',
-    optional:    true,   // all fields optional — user can skip
+    description: 'Japan deployment profile & salary expectations',
+    optional:    true,
+  },
+  {
+    key:         'family',
+    label:       'Family',
+    icon:        'pi pi-users',
+    description: 'Family background, spouse & emergency contacts',
+    optional:    true,
   },
   {
     key:         'lifestyle',

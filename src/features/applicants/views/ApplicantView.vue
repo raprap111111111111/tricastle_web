@@ -1,3 +1,4 @@
+<!-- src/features/applicants/views/ApplicantDetail.vue -->
 <script setup lang="ts">
 import { onMounted, computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -17,6 +18,9 @@ import {
   type AISData,
   type BulkProgress,
 } from '@shared/utils/ais'
+
+// ✅ NEW — Photo utilities
+import { getApplicantPhoto, getDefaultAvatar } from '@shared/utils/applicant-photo'
 
 const props = defineProps<{ id: number }>()
 
@@ -107,13 +111,9 @@ async function handleGenerateAIS(): Promise<void> {
       a.value.assigned_staff?.full_name,
     )
 
-    // ✅ Embed photo if the applicant has one (adjust field name to your API)
-    const photoUrl =
-      (a.value as any).photo_url ??
-      (a.value as any).profile_photo_url ??
-      (a.value as any).avatar_url
-
-    if (photoUrl) {
+    // ✅ Embed real photo into PDF if available (ignoring ui-avatars fallback)
+    const photoUrl = getApplicantPhoto(a.value)
+    if (photoUrl && !photoUrl.includes('ui-avatars.com')) {
       const base64 = await urlToBase64(photoUrl)
       if (base64) aisData.photo = base64
     }
@@ -179,10 +179,6 @@ function gradeColor(grade: string): string {
   return map[grade] ?? 'text-gray-600 bg-gray-50 ring-gray-200'
 }
 
-function getInitials(first?: string | null, last?: string | null): string {
-  return ((first?.charAt(0) ?? '') + (last?.charAt(0) ?? '')).toUpperCase() || '?'
-}
-
 function skillCategoryColor(cat: string): string {
   const map: Record<string, string> = {
     skilled:      'bg-green-50 text-green-700 ring-green-200',
@@ -241,7 +237,6 @@ function batchStatusColor(status?: string): string {
           @click="toggleMap"
         />
 
-        <!-- ✅ NEW — Generate AIS PDF -->
         <Button
           label="Generate AIS"
           icon="pi pi-file-pdf"
@@ -339,10 +334,16 @@ function batchStatusColor(status?: string): string {
       <!-- ─── Profile Header ─────────────────────────────────────────────────── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
         <div class="flex items-start gap-5">
-          <div class="w-20 h-20 rounded-full bg-apricot-500 text-white flex items-center
-                       justify-center flex-shrink-0 font-serif font-bold text-2xl">
-            {{ getInitials(a.first_name, a.last_name) }}
+          <!-- 🖼️ APPLICANT PHOTO AVATAR -->
+          <div class="w-24 h-24 rounded-full bg-appleCore-50 border border-appleCore-200 flex-shrink-0 shadow-sm overflow-hidden flex items-center justify-center">
+            <img
+              :src="getApplicantPhoto(a)"
+              :alt="a.full_name || `${a.first_name} ${a.last_name}`"
+              class="w-full h-full object-cover"
+              @error="($event.target as HTMLImageElement).src = getDefaultAvatar(a.full_name || `${a.first_name} ${a.last_name}`)"
+            />
           </div>
+
           <div class="flex-1 min-w-0">
             <div class="flex flex-wrap items-center gap-2 mb-1">
               <span class="font-mono text-xs text-apricot-600 font-semibold bg-apricot-50 px-2 py-0.5 rounded">

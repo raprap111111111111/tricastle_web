@@ -50,7 +50,8 @@ export interface AISData {
   present_job_description?: string
   work_years?:              number
   work_months?:             number
-  salary_amount?:           number
+  salary_amount?:           number | string  // 👈 FIXED: Allow string for formatted numbers
+  salary_unit?:             string           // 👈 FIXED: Added missing salary_unit property
   overseas_duration_years?:  number
   overseas_duration_months?: number
 

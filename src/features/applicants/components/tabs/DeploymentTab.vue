@@ -1,3 +1,4 @@
+<!-- src/features/applicants/components/tabs/Step4Deployment.vue -->
 <script setup lang="ts">
 import { watch } from 'vue'
 import { useForm } from 'vee-validate'
@@ -39,7 +40,7 @@ const skillCategoryOptions = [
   { label: 'Select skill category...', value: null },
   { label: 'Skilled',                  value: 'skilled' },
   { label: 'Semi-Skilled',             value: 'semi_skilled' },
-  { label: 'Unskilled',               value: 'unskilled' },
+  { label: 'Unskilled',                value: 'unskilled' },
 ]
 
 const jlptOptions = [
@@ -296,7 +297,7 @@ const onNext = handleSubmit((data) => {
     <div class="bg-white rounded-2xl border border-appleCore-100 p-6">
       <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-1 flex items-center gap-2">
         <i class="pi pi-money-bill text-apricot-500" />
-        Salary
+        Salary Expectations
       </h3>
       <p class="text-xs text-blueberry-400 mb-4">
         Expected salary defaults to JPY for Japan deployment context.
@@ -320,7 +321,7 @@ const onNext = handleSubmit((data) => {
               placeholder="0"
               :min="0"
               :max-fraction-digits="2"
-              class="flex-1"
+              class="flex-1 min-w-0"
               @update:model-value="(v) => setFieldValue('expected_salary', v ?? null)"
             />
           </div>
@@ -343,172 +344,10 @@ const onNext = handleSubmit((data) => {
               placeholder="0"
               :min="0"
               :max-fraction-digits="2"
-              class="flex-1"
+              class="flex-1 min-w-0"
               @update:model-value="(v) => setFieldValue('current_salary', v ?? null)"
             />
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ─── Family ───────────────────────────────────────────────────────────── -->
-    <div class="bg-white rounded-2xl border border-appleCore-100 p-6">
-      <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-1 flex items-center gap-2">
-        <i class="pi pi-users text-apricot-500" />
-        Family Information
-      </h3>
-      <p class="text-xs text-blueberry-400 mb-4">
-        Required for Japan deployment documentation and next-of-kin records.
-      </p>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-        <!-- Father -->
-        <div class="space-y-3">
-          <p class="text-xs font-bold text-blueberry-600 uppercase tracking-wider">Father</p>
-          <div>
-            <label class="block text-xs font-medium text-blueberry-700 mb-1">Full Name</label>
-            <InputText
-              :model-value="values.father_name ?? ''"
-              placeholder="Father's full name"
-              class="w-full"
-              @update:model-value="(v) => setFieldValue('father_name', v || null)"
-            />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-blueberry-700 mb-1">Occupation</label>
-            <InputText
-              :model-value="values.father_occupation ?? ''"
-              placeholder="Occupation"
-              class="w-full"
-              @update:model-value="(v) => setFieldValue('father_occupation', v || null)"
-            />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-blueberry-700 mb-1">Contact Number</label>
-            <InputText
-              :model-value="values.father_contact ?? ''"
-              placeholder="e.g. 09xxxxxxxxx"
-              class="w-full"
-              @update:model-value="(v) => setFieldValue('father_contact', v || null)"
-            />
-          </div>
-        </div>
-
-        <!-- Mother -->
-        <div class="space-y-3">
-          <p class="text-xs font-bold text-blueberry-600 uppercase tracking-wider">Mother</p>
-          <div>
-            <label class="block text-xs font-medium text-blueberry-700 mb-1">Full Name</label>
-            <InputText
-              :model-value="values.mother_name ?? ''"
-              placeholder="Mother's full name"
-              class="w-full"
-              @update:model-value="(v) => setFieldValue('mother_name', v || null)"
-            />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-blueberry-700 mb-1">Occupation</label>
-            <InputText
-              :model-value="values.mother_occupation ?? ''"
-              placeholder="Occupation"
-              class="w-full"
-              @update:model-value="(v) => setFieldValue('mother_occupation', v || null)"
-            />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-blueberry-700 mb-1">Contact Number</label>
-            <InputText
-              :model-value="values.mother_contact ?? ''"
-              placeholder="e.g. 09xxxxxxxxx"
-              class="w-full"
-              @update:model-value="(v) => setFieldValue('mother_contact', v || null)"
-            />
-          </div>
-        </div>
-
-        <!-- Spouse -->
-        <div class="space-y-3">
-          <p class="text-xs font-bold text-blueberry-600 uppercase tracking-wider flex items-center gap-1.5">
-            Spouse
-            <span class="text-[10px] font-normal text-blueberry-400 normal-case tracking-normal">(if married)</span>
-          </p>
-          <div>
-            <label class="block text-xs font-medium text-blueberry-700 mb-1">Full Name</label>
-            <InputText
-              :model-value="values.spouse_name ?? ''"
-              placeholder="Spouse's full name"
-              class="w-full"
-              @update:model-value="(v) => setFieldValue('spouse_name', v || null)"
-            />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-blueberry-700 mb-1">Occupation</label>
-            <InputText
-              :model-value="values.spouse_occupation ?? ''"
-              placeholder="Occupation"
-              class="w-full"
-              @update:model-value="(v) => setFieldValue('spouse_occupation', v || null)"
-            />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-blueberry-700 mb-1">Contact Number</label>
-            <InputText
-              :model-value="values.spouse_contact ?? ''"
-              placeholder="e.g. 09xxxxxxxxx"
-              class="w-full"
-              @update:model-value="(v) => setFieldValue('spouse_contact', v || null)"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ─── Emergency Contact ─────────────────────────────────────────────────── -->
-    <div class="bg-white rounded-2xl border border-appleCore-100 p-6">
-      <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-1 flex items-center gap-2">
-        <i class="pi pi-phone text-apricot-500" />
-        Emergency Contact
-      </h3>
-      <p class="text-xs text-blueberry-400 mb-4">
-        Person to contact in case of emergency during deployment.
-        Can be any trusted relative or friend.
-      </p>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">Full Name</label>
-          <InputText
-            :model-value="values.emergency_contact_name ?? ''"
-            placeholder="Emergency contact full name"
-            class="w-full"
-            @update:model-value="(v) => setFieldValue('emergency_contact_name', v || null)"
-          />
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">Relationship</label>
-          <InputText
-            :model-value="values.emergency_contact_relationship ?? ''"
-            placeholder="e.g. Brother, Aunt, Close Friend..."
-            class="w-full"
-            @update:model-value="(v) => setFieldValue('emergency_contact_relationship', v || null)"
-          />
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">Phone Number</label>
-          <InputText
-            :model-value="values.emergency_contact_phone ?? ''"
-            placeholder="e.g. 09xxxxxxxxx"
-            class="w-full"
-            @update:model-value="(v) => setFieldValue('emergency_contact_phone', v || null)"
-          />
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">Address</label>
-          <InputText
-            :model-value="values.emergency_contact_address ?? ''"
-            placeholder="Full home address"
-            class="w-full"
-            @update:model-value="(v) => setFieldValue('emergency_contact_address', v || null)"
-          />
         </div>
       </div>
     </div>

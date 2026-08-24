@@ -1,44 +1,30 @@
 <!-- src/features/users/components/UserTable.vue -->
 <script setup lang="ts">
-import { computed }                  from 'vue'
-import { useRouter }                 from 'vue-router'
+import { useRouter } from 'vue-router'
 import DataTable, { type DataTableRowClickEvent } from 'primevue/datatable'
-import Column                        from 'primevue/column'
-import Button                        from 'primevue/button'
-import Paginator, { type PageState } from 'primevue/paginator'
-import UserAvatar        from './UserAvatar.vue'
-import UserStatusBadge   from './UserStatusBadge.vue'
+import Column from 'primevue/column'
+import Button from 'primevue/button'
+import AppPagination from '@shared/ui/table/AppPagination.vue'
+import UserAvatar from './UserAvatar.vue'
+import UserStatusBadge from './UserStatusBadge.vue'
 import type { User, Pagination } from '../types'
 
 const props = defineProps<{
-  users:      User[]
+  users: User[]
   pagination: Pagination | null
-  loading:    boolean
+  loading: boolean
   submitting: boolean
 }>()
 
 const emit = defineEmits<{
-  (e: 'page',         page:  number): void
-  (e: 'limit',        limit: number): void
-  (e: 'toggle',       user:  User): void
-  (e: 'assign-roles', user:  User): void
-  (e: 'delete',       user:  User): void
+  (e: 'page', page: number): void
+  (e: 'limit', limit: number): void
+  (e: 'toggle', user: User): void
+  (e: 'assign-roles', user: User): void
+  (e: 'delete', user: User): void
 }>()
 
 const router = useRouter()
-
-const currentLimit = computed(() => props.pagination?.per_page ?? 10)
-const currentFirst = computed(() =>
-  props.pagination ? (props.pagination.current_page - 1) * currentLimit.value : 0,
-)
-
-function onPageChange(event: PageState) {
-  if (event.rows !== currentLimit.value) {
-    emit('limit', event.rows)
-    return
-  }
-  emit('page', event.page + 1)
-}
 
 function onRowClick(event: DataTableRowClickEvent) {
   const target = event.originalEvent?.target as HTMLElement | null
@@ -55,7 +41,7 @@ function formatDate(d: string | null): string {
 </script>
 
 <template>
-  <div class="flex flex-col">
+  <div class="flex flex-col relative">
     <DataTable
       :value="users"
       :loading="loading"
@@ -204,29 +190,12 @@ function formatDate(d: string | null): string {
       </template>
     </DataTable>
 
-    <div
-      v-if="pagination && pagination.total > 0"
-      class="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3
-             border-t border-appleCore-100 bg-appleCore-50/30"
-    >
-      <p class="text-xs text-blueberry-500">
-        Showing
-        <span class="font-semibold text-blueberry-700">{{ pagination.from ?? currentFirst + 1 }}</span> –
-        <span class="font-semibold text-blueberry-700">
-          {{ pagination.to ?? Math.min(currentFirst + currentLimit, pagination.total) }}
-        </span>
-        of <span class="font-semibold text-blueberry-700">{{ pagination.total }}</span> users
-      </p>
-
-      <Paginator
-        :rows="currentLimit"
-        :total-records="pagination.total"
-        :first="currentFirst"
-        :rows-per-page-options="[10, 25, 50, 100]"
-        template="PrevPageLink PageLinks NextPageLink RowsPerPageDropdown"
-        class="!bg-transparent !p-0"
-        @page="onPageChange"
-      />
-    </div>
+    <!-- 🎯 UNIFIED CUSTOM PAGINATION BAR -->
+    <AppPagination
+      v-if="props.pagination && props.pagination.total > 0"
+      :pagination="props.pagination"
+      @page-change="(page) => emit('page', page)"
+      @limit-change="(limit) => emit('limit', limit)"
+    />
   </div>
 </template>

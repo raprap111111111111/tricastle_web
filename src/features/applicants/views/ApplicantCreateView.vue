@@ -1,3 +1,4 @@
+<!-- src/features/applicants/views/ApplicantCreateView.vue -->
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
@@ -13,12 +14,15 @@ import PersonalTab from '../components/tabs/PersonalTab.vue'
 import PhysicalAddressTab from '../components/tabs/PhysicalAddressTab.vue'
 import DocumentsTab from '../components/tabs/DocumentsTab.vue'
 import DeploymentTab from '../components/tabs/DeploymentTab.vue'
+import FamilyTab from '../components/tabs/FamilyTab.vue'
 import LifestyleTab from '../components/tabs/LifestyleTab.vue'
 import EducationTab from '../components/tabs/EducationTab.vue'
 import EmploymentTab from '../components/tabs/EmploymentTab.vue'
 import TattooTab from '../components/tabs/TattooTab.vue'
 import ReviewTab from '../components/tabs/ReviewTab.vue'
 import DuplicateWarningDialog from '../components/DuplicateWarningDialog.vue'
+
+// Make sure ID_PHOTO (10) is added to your constants file!
 import { DOCUMENT_TYPE_IDS } from '../constants/document-types'
 
 import type {
@@ -26,6 +30,7 @@ import type {
   PhysicalAddressFormValues,
   DocumentsFormValues,
   DeploymentFormValues,
+  FamilyFormValues,
   LifestyleFormValues,
   EducationEntryValues,
   EmploymentEntryValues,
@@ -58,6 +63,7 @@ const personalData    = ref<PersonalFormValues | null>(null)
 const physicalData    = ref<PhysicalAddressFormValues | null>(null)
 const documentsData   = ref<DocumentsFormValues | null>(null)
 const deploymentData  = ref<DeploymentFormValues | null>(null)
+const familyData      = ref<FamilyFormValues | null>(null)
 const lifestyleData   = ref<LifestyleFormValues | null>(null)
 const educationsData  = ref<EducationEntryValues[]>([])
 const employmentsData = ref<EmploymentEntryValues[]>([])
@@ -96,10 +102,14 @@ function onDocumentsValidate(values: DocumentsFormValues | null) {
   }
 }
 
-// Deployment is fully optional — always valid
 function onDeploymentValidate(values: DeploymentFormValues | null) {
   deploymentData.value = values
   setStepState('deployment', 'valid')
+}
+
+function onFamilyValidate(values: FamilyFormValues | null) {
+  familyData.value = values
+  setStepState('family', 'valid')
 }
 
 function onLifestyleValidate(values: LifestyleFormValues | null) {
@@ -134,6 +144,12 @@ function onDocumentsNext(values: DocumentsFormValues) {
 function onDeploymentNext(values: DeploymentFormValues) {
   deploymentData.value = values
   setStepState('deployment', 'valid')
+  goNext()
+}
+
+function onFamilyNext(values: FamilyFormValues) {
+  familyData.value = values
+  setStepState('family', 'valid')
   goNext()
 }
 
@@ -226,16 +242,20 @@ async function onFinalSubmit() {
   if (!canProceed) return
 
   try {
-    // ── Build main payload ─────────────────────────────────────────────────────
-    // biodata_file and biodata_notes are UI-only — strip them from the payload.
-    // They are uploaded separately after the applicant is created.
-    const { biodata_file, biodata_notes, ...docFields } = documentsData.value ?? {}
+    // 🎯 FIX: Extract id_photo_file alongside biodata_file so they don't break the JSON payload!
+    const { 
+      biodata_file, 
+      biodata_notes, 
+      id_photo_file, 
+      ...docFields 
+    } = documentsData.value ?? {}
 
     const payload: CreateApplicantPayload = {
       ...personalData.value,
       ...(physicalData.value ?? {}),
       ...docFields,
       ...(deploymentData.value ?? {}),
+      ...(familyData.value ?? {}),
     }
 
     const created = await store.createApplicant(payload)
@@ -260,14 +280,27 @@ async function onFinalSubmit() {
       await subStore.createTattoo({ applicant_id: created.id, ...tattoo })
     }
 
-    // ── Biodata upload ─────────────────────────────────────────────────────────
-    // Non-fatal — applicant is created regardless of upload result.
+    // 📸 Upload 2x2 ID Photo
+    if (id_photo_file instanceof File) {
+      try {
+        await subStore.uploadBiodata(
+          created.id,
+          id_photo_file,
+          DOCUMENT_TYPE_IDS.ID_PHOTO ?? 10, // Uses ID_PHOTO type
+          'Applicant 2x2 ID Photo'
+        )
+      } catch {
+        console.warn('ID Photo upload failed after creation')
+      }
+    }
+
+    // 📄 Upload Biodata
     if (biodata_file instanceof File) {
       try {
         await subStore.uploadBiodata(
           created.id,
           biodata_file,
-          DOCUMENT_TYPE_IDS.BIODATA,
+          DOCUMENT_TYPE_IDS.BIODATA ?? 9,
           biodata_notes ?? undefined,
         )
       } catch {
@@ -280,7 +313,6 @@ async function onFinalSubmit() {
       }
     }
 
-    // ── Success ────────────────────────────────────────────────────────────────
     toast.add({
       severity: 'success',
       summary:  'Applicant Created',
@@ -316,11 +348,16 @@ async function onFinalSubmit() {
         errors.trade_or_occupation    ||
         errors.jlpt_level             ||
         errors.willing_to_be_deployed ||
-        errors.expected_salary        ||
-        errors.father_name            ||
-        errors.emergency_contact_phone
+        errors.expected_salary
       ) {
         goToStep(steps.findIndex((s) => s.key === 'deployment'))
+      } else if (
+        errors.father_name ||
+        errors.mother_name ||
+        errors.spouse_name ||
+        errors.emergency_contact_phone
+      ) {
+        goToStep(steps.findIndex((s) => s.key === 'family'))
       }
       return
     }
@@ -418,11 +455,6 @@ function onDuplicateDialogClose() {
       @back="goBack"
     />
 
-    <!--
-      DocumentsTab — @next and @validate are wired to DOCUMENTS handlers.
-      biodata_file and biodata_notes live inside DocumentsFormValues
-      but are stripped before the main createApplicant payload is built.
-    -->
     <DocumentsTab
       v-else-if="currentStep.key === 'documents'"
       :initial-values="documentsData ?? undefined"
@@ -431,15 +463,19 @@ function onDuplicateDialogClose() {
       @back="goBack"
     />
 
-    <!--
-      DeploymentTab — @next and @validate are wired to DEPLOYMENT handlers.
-      All fields optional — user can skip through with no input.
-    -->
     <DeploymentTab
       v-else-if="currentStep.key === 'deployment'"
       :initial-values="deploymentData ?? undefined"
       @next="onDeploymentNext"
       @validate="onDeploymentValidate"
+      @back="goBack"
+    />
+
+    <FamilyTab
+      v-else-if="currentStep.key === 'family'"
+      :initial-values="familyData ?? undefined"
+      @next="onFamilyNext"
+      @validate="onFamilyValidate"
       @back="goBack"
     />
 
@@ -478,6 +514,7 @@ function onDuplicateDialogClose() {
       :physical="physicalData"
       :documents="documentsData"
       :deployment="deploymentData"
+      :family="familyData"
       :lifestyle="lifestyleData"
       :educations="educationsData"
       :employments="employmentsData"

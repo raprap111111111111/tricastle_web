@@ -1,9 +1,9 @@
+<!-- src/features/activity-logs/components/ActivityLogTable.vue -->
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import DataTable, { type DataTableRowClickEvent } from 'primevue/datatable'
 import Column from 'primevue/column'
-import Paginator, { type PageState } from 'primevue/paginator'
+import AppPagination from '@shared/ui/table/AppPagination.vue'
 import ActivityLogActionBadge from './ActivityLogActionBadge.vue'
 import type { ActivityLog, Pagination } from '../types'
 
@@ -19,25 +19,6 @@ const emit = defineEmits<{
 }>()
 
 const router = useRouter()
-
-const currentLimit = computed(
-  () => props.pagination?.per_page ?? props.pagination?.limit ?? 15,
-)
-
-const currentFirst = computed(() => {
-  if (props.pagination?.current_page && currentLimit.value) {
-    return (props.pagination.current_page - 1) * currentLimit.value
-  }
-  return props.pagination?.offset ?? 0
-})
-
-function onPageChange(event: PageState) {
-  if (event.rows !== currentLimit.value) {
-    emit('limit-change', event.rows)
-    return
-  }
-  emit('page-change', event.page + 1)
-}
 
 function onRowClick(event: DataTableRowClickEvent) {
   router.push({
@@ -70,7 +51,7 @@ function timeAgo(dateStr: string): string {
 </script>
 
 <template>
-  <div class="flex flex-col">
+  <div class="flex flex-col relative">
     <DataTable
       :value="logs"
       :loading="loading"
@@ -165,31 +146,12 @@ function timeAgo(dateStr: string): string {
       </template>
     </DataTable>
 
-    <div
-      v-if="pagination && pagination.total > 0"
-      class="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3
-             border-t border-appleCore-100 bg-appleCore-50/30"
-    >
-      <div class="text-xs text-blueberry-500">
-        Showing
-        <span class="font-semibold text-blueberry-700">{{ pagination.from ?? currentFirst + 1 }}</span>
-        to
-        <span class="font-semibold text-blueberry-700">
-          {{ pagination.to ?? Math.min(currentFirst + currentLimit, pagination.total) }}
-        </span>
-        of
-        <span class="font-semibold text-blueberry-700">{{ pagination.total }}</span>
-      </div>
-
-      <Paginator
-        :rows="currentLimit"
-        :total-records="pagination.total"
-        :first="currentFirst"
-        :rows-per-page-options="[15, 25, 50, 100]"
-        template="PrevPageLink PageLinks NextPageLink RowsPerPageDropdown"
-        class="!bg-transparent !p-0"
-        @page="onPageChange"
-      />
-    </div>
+    <!-- 🎯 UNIFIED CUSTOM PAGINATION BAR -->
+    <AppPagination
+      v-if="props.pagination && props.pagination.total > 0"
+      :pagination="props.pagination"
+      @page-change="(page) => emit('page-change', page)"
+      @limit-change="(limit) => emit('limit-change', limit)"
+    />
   </div>
 </template>

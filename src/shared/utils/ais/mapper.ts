@@ -26,105 +26,233 @@ export async function attachPhoto(applicant: any, aisData: AISData): Promise<voi
 export function mapApplicantToAIS(applicant: any, staffName?: string): AISData {
   const familyNotes = buildFamilyNotes(applicant)
   const employment  = getPrimaryEmployment(applicant)
+  const overseasEmp = getOverseasEmployment(applicant)
   const education   = extractEducation(applicant)
+
+  const marucon    = extractJapanContact(applicant, 'marucon')
+  const nonMarucon = extractJapanContact(applicant, 'non_marucon')
+
+  // Spouse
+  const spouseObj       = applicant.family?.spouse ?? {}
+  const spouseName      = spouseObj.name || applicant.spouse_name || ''
+  const spouseWork      = spouseObj.occupation || applicant.spouse_occupation || ''
+  const spouseSalaryVal = spouseObj.salary ?? applicant.spouse_salary
+  const spouseUnit      = spouseObj.salary_unit || applicant.spouse_salary_unit || 'per_month'
+
+  const spouseSalaryFmt = spouseSalaryVal
+    ? `P ${Number(spouseSalaryVal).toLocaleString()} ${formatSalaryUnit(spouseUnit)}`
+    : ''
+
+  // Work — total experience across all jobs, prefer primary job title
+  const jobTitle = employment?.position
+    || applicant.applied_position
+    || applicant.trade_or_occupation
+    || ''
+  const jobDesc  = employment?.job_description || ''
+  const jobRole  = employment?.position || jobTitle
+
+  const { years: workYears, months: workMonths } = sumEmploymentDuration(applicant.employments)
+
+  const salaryAmt  = employment?.salary != null
+    ? Number(employment.salary).toLocaleString()
+    : ''
+  const salaryUnit = formatSalaryUnit(employment?.salary_unit ?? 'per_day')
+
+  const { years: overseasYears, months: overseasMonths } = overseasEmp
+    ? {
+        years:  calcYears(overseasEmp.date_started, overseasEmp.date_ended),
+        months: calcMonths(overseasEmp.date_started, overseasEmp.date_ended),
+      }
+    : { years: 0, months: 0 }
 
   return {
     // Header
-    position:        applicant.trade_or_occupation ?? '',
-    trade_test_try:  '1st',
-    trade_test_date: '',
+    position:        applicant.applied_position || applicant.trade_or_occupation || '',
+    trade_test_try:  applicant.trade_test_try || '1st',
+    trade_test_date: applicant.trade_test_date ? formatDateDots(applicant.trade_test_date) : '',
     applicant_code:  applicant.applicant_code,
 
     // Personal
-    last_name:          applicant.last_name,
-    first_name:         applicant.first_name,
+    last_name:          applicant.last_name || '',
+    first_name:         applicant.first_name || '',
     middle_name:        applicant.middle_name || 'NMN',
-    current_address:    applicant.current_address,
-    contact_number:     applicant.phone || applicant.mobile,
-    blood_type:         applicant.blood_type,
-    english_percent:    applicant.language?.understands_basic_english ? 30 : 0,
-    date_of_birth:      applicant.date_of_birth,
-    birthplace:         applicant.city,
-    age:                applicant.age,
+    current_address:    applicant.current_address || '',
+    contact_number:     applicant.phone || applicant.mobile || '',
+    blood_type:         applicant.blood_type || '',
+    english_percent:    applicant.english_proficiency_pct
+      ?? (applicant.language?.understands_basic_english ? 30 : 0),
+    date_of_birth:      applicant.date_of_birth ? formatDateDots(applicant.date_of_birth) : '',
+    birthplace:         applicant.birthplace || applicant.city || '',
+    age:                applicant.age ?? 0,
     civil_status:       capitalize(applicant.civil_status),
     height_cm:          applicant.height_cm,
     weight_kg:          applicant.weight_kg,
-    number_of_children: applicant.number_of_children,
-    religion:           applicant.religion,
+    number_of_children: applicant.number_of_children ?? 0,
+    religion:           applicant.religion || '',
     dominant_hand:      formatDominantHand(applicant.dominant_hand),
 
     // Lifestyle
     is_smoking:         applicant.lifestyle?.is_smoking,
-    smoking_frequency:  applicant.lifestyle?.is_smoking ? applicant.lifestyle?.smoking_frequency ?? '' : '',
+    smoking_frequency:  applicant.lifestyle?.is_smoking
+      ? (applicant.lifestyle?.smoking_frequency ?? '')
+      : '',
     is_drinking:        applicant.lifestyle?.is_drinking_alcohol,
-    drinking_frequency: applicant.lifestyle?.is_drinking_alcohol ? applicant.lifestyle?.drinking_frequency ?? '' : '',
+    drinking_frequency: applicant.lifestyle?.is_drinking_alcohol
+      ? (applicant.lifestyle?.drinking_frequency ?? '')
+      : '',
 
-    // Family
+    // Family sentences + spouse
     family_background_notes: familyNotes,
-    spouse_name:   applicant.family?.spouse?.name,
-    spouse_work:   applicant.family?.spouse?.occupation,
-    spouse_salary: '',
+    spouse_name:   spouseName,
+    spouse_work:   spouseWork,
+    spouse_salary: spouseSalaryFmt,
 
     // Education
-    vocational:        education.vocational?.school_name,
-    high_school:       education.highSchool?.school_name,
-    education_remarks: 'Completed without stopping',
-    year_started:      fmtMonthYear(education.primary?.year_started ? `${education.primary.year_started}-06-01` : ''),
-    year_ended:        fmtMonthYear(education.primary?.year_ended   ? `${education.primary.year_ended}-03-01`   : ''),
+    vocational:        education.vocational?.school_name || '',
+    high_school:       education.highSchool?.school_name || '',
+    education_remarks: education.primary?.remarks || 'Completed without stopping',
+    year_started:      fmtMonthYear(
+      education.primary?.year_started ? `${education.primary.year_started}-06-01` : '',
+    ),
+    year_ended: fmtMonthYear(
+      education.primary?.year_ended ? `${education.primary.year_ended}-03-01` : '',
+    ),
 
-    // Work
-    present_job_title:        employment?.position,
-    present_job_role:         employment?.position === 'Helper' ? 'Helper' : employment?.position,
-    present_job_description:  employment?.job_description,
-    work_years:               employment ? calcYears(employment.date_started, employment.date_ended)  : 0,
-    work_months:              employment ? calcMonths(employment.date_started, employment.date_ended) : 0,
-    salary_amount:            employment?.salary,
-    overseas_duration_years:  0,
-    overseas_duration_months: 0,
+    // Work Experience → "has experienced working as {title} for X year/s & Y month/s"
+    present_job_title:       jobTitle,
+    present_job_role:        jobRole,
+    present_job_description: jobDesc,
+    work_years:              workYears,
+    work_months:             workMonths,
+    salary_amount:           salaryAmt,
+    salary_unit:             salaryUnit,
+
+    overseas_duration_years:  overseasYears,
+    overseas_duration_months: overseasMonths,
+
+    // Japan contacts
+    marucon_name:         marucon?.name || '',
+    marucon_batch:        marucon?.batch_no || '',
+    marucon_company:      marucon?.company_name || '',
+    marucon_relation:     marucon?.relation || '',
+
+    non_marucon_name:     nonMarucon?.name || '',
+    non_marucon_contact:  nonMarucon?.contact_number || '',
+    non_marucon_company:  nonMarucon?.company_name || '',
+    non_marucon_relation: nonMarucon?.relation || '',
 
     // Footer
-    ais_by:           staffName ?? applicant.assigned_staff?.full_name ?? '',
-    signature_date:   new Date().toLocaleDateString('en-US', {
-      year: 'numeric', month: 'long', day: 'numeric',
+    ais_by: staffName ?? applicant.assigned_staff?.full_name ?? '',
+    signature_date: new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
     }),
     applicant_number: applicant.id ? String(applicant.id).padStart(3, '0') : '',
     status_code:      applicant.quality_grade ?? '',
   }
 }
 
-// ─── Private helpers ─────────────────────────────────────────────────────────
+// ─── Private Helpers ─────────────────────────────────────────────────────────
 
+/**
+ * Build AIS Family Background sentences:
+ *   : living in his parents house together with his siblings
+ *   : 2nd child among 4 siblings (all boys)
+ */
 function buildFamilyNotes(applicant: any): string[] {
   const notes: string[] = []
+  const family = applicant.family ?? {}
 
-  if (applicant.family?.emergency_contact?.address) {
-    notes.push(`Living in ${applicant.family.emergency_contact.address}`)
+  // Sentence 1 — living situation
+  const living =
+    family.living_situation ||
+    applicant.living_situation ||
+    ''
+
+  if (living?.trim()) {
+    notes.push(living.trim())
   }
 
-  if (applicant.family?.father?.name || applicant.family?.mother?.name) {
-    const parents = [applicant.family?.father?.name, applicant.family?.mother?.name]
-      .filter(Boolean).join(' & ')
-    notes.push(`Parents: ${parents}`)
-  }
+  // Sentence 2 — birth order / siblings
+  const birthOrder = family.birth_order ?? applicant.birth_order
+  const sibCount   = family.siblings_count ?? applicant.siblings_count
+  const sibDesc    = family.siblings_description ?? applicant.siblings_description
 
-  if (applicant.family?.siblings_count) {
-    notes.push(`Eldest among ${applicant.family.siblings_count} siblings`)
+  if (birthOrder && sibCount) {
+    let line = `${formatOrdinal(birthOrder)} child among ${sibCount} siblings`
+    if (sibDesc?.trim()) line += ` (${sibDesc.trim()})`
+    notes.push(line)
+  } else if (sibCount) {
+    let line = `One of ${sibCount} siblings`
+    if (sibDesc?.trim()) line += ` (${sibDesc.trim()})`
+    notes.push(line)
   }
 
   return notes
 }
 
+/** Sum years/months across all employment records. */
+function sumEmploymentDuration(employments?: any[]): { years: number; months: number } {
+  if (!employments?.length) return { years: 0, months: 0 }
+
+  let totalMonths = 0
+  for (const emp of employments) {
+    if (!emp?.date_started) continue
+    const y = calcYears(emp.date_started, emp.date_ended)
+    const m = calcMonths(emp.date_started, emp.date_ended)
+    totalMonths += y * 12 + m
+  }
+
+  return {
+    years:  Math.floor(totalMonths / 12),
+    months: totalMonths % 12,
+  }
+}
+
 function getPrimaryEmployment(applicant: any): any {
-  return applicant.employments?.find((e: any) => e.is_current)
-    ?? applicant.employments?.[0]
-    ?? null
+  return (
+    applicant.employments?.find((e: any) => e.is_current) ??
+    applicant.employments?.[0] ??
+    null
+  )
+}
+
+function getOverseasEmployment(applicant: any): any {
+  return (
+    applicant.employments?.find(
+      (e: any) => e.is_overseas || (e.country && e.country.toLowerCase() !== 'philippines'),
+    ) ?? null
+  )
 }
 
 function extractEducation(applicant: any) {
-  const highSchool = applicant.educations?.find((e: any) => e.education_level === 'high_school')
-  const vocational = applicant.educations?.find((e: any) => e.education_level === 'vocational')
-  const primary    = highSchool ?? applicant.educations?.[0]
+  const highSchool = applicant.educations?.find(
+    (e: any) => e.education_level === 'high_school' || e.education_level === 'senior_high',
+  )
+  const vocational = applicant.educations?.find(
+    (e: any) => e.education_level === 'vocational' || e.education_level === 'college',
+  )
+  const primary = highSchool ?? applicant.educations?.[0]
   return { highSchool, vocational, primary }
+}
+
+function extractJapanContact(applicant: any, type: 'marucon' | 'non_marucon'): any {
+  const list = applicant.japan_contacts ?? applicant.japanContacts ?? []
+  return list.find((c: any) => c.affiliation_type === type) ?? null
+}
+
+function formatOrdinal(n: number | string): string {
+  const num = Number(n)
+  if (Number.isNaN(num)) return String(n)
+  const s = ['th', 'st', 'nd', 'rd']
+  const v = num % 100
+  return num + (s[(v - 20) % 10] || s[v] || s[0])
+}
+
+function formatDateDots(d: string): string {
+  if (!d) return ''
+  return d.replace(/-/g, '.')
 }
 
 function capitalize(s?: string): string {
@@ -134,7 +262,14 @@ function capitalize(s?: string): string {
 
 function formatDominantHand(v?: string): string {
   if (v === 'right') return 'Right Hand'
-  if (v === 'left')  return 'Left Hand'
-  if (v === 'both')  return 'Both Hands'
+  if (v === 'left') return 'Left Hand'
+  if (v === 'both') return 'Both Hands'
   return ''
+}
+
+function formatSalaryUnit(unit?: string): string {
+  if (unit === 'per_day') return 'per day'
+  if (unit === 'per_month') return 'per month'
+  if (unit === 'per_year') return 'per year'
+  return unit ?? 'per day'
 }

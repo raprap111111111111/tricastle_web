@@ -15,7 +15,7 @@ export function renderWorkExperience(
 
   y = drawSectionHeader(doc, 'WORK EXPERIENCE / JOB DESCRIPTION', y, contentW, marginL)
 
-  // "has experienced working as X for Y year/s & Z month/s"
+  // Line 1: "has experienced working as [Title] for X year/s & Y month/s"
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.text(':  has experienced working as', marginL + 15, y)
@@ -24,16 +24,16 @@ export function renderWorkExperience(
   doc.setFont('helvetica', 'normal')
   doc.text('for', marginL + 125, y)
   doc.setFont('helvetica', 'bold')
-  doc.text(String(data.work_years ?? ''), marginL + 132, y)
+  doc.text(String(data.work_years ?? 0), marginL + 132, y)
   doc.setFont('helvetica', 'normal')
   doc.text('year/s &', marginL + 138, y)
   doc.setFont('helvetica', 'bold')
-  doc.text(String(data.work_months ?? ''), marginL + 158, y)
+  doc.text(String(data.work_months ?? 0), marginL + 158, y)
   doc.setFont('helvetica', 'normal')
   doc.text('month/s', marginL + 165, y)
   y += 4
 
-  // Job description
+  // Line 2: Job description
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   if (data.present_job_description) {
@@ -41,7 +41,7 @@ export function renderWorkExperience(
   }
   y += 4
 
-  // Present Job + Salary
+  // Line 3: Present Job + Salary
   doc.setFontSize(9)
   doc.setFont('helvetica', 'bold')
   doc.text('Present Job', marginL, y)
@@ -52,22 +52,24 @@ export function renderWorkExperience(
   doc.setFont('helvetica', 'bold')
   doc.text('Salary:', marginL + 115, y)
   doc.setFont('helvetica', 'normal')
-  doc.text(data.salary_amount ? `P ${data.salary_amount}` : '', marginL + 132, y)
-  doc.text('per day', marginL + 160, y)
+  const salaryText = data.salary_amount
+    ? `P ${data.salary_amount} ${data.salary_unit || 'per day'}`
+    : ''
+  doc.text(salaryText, marginL + 132, y)
   y += 5
 
-  // Overseas
+  // Line 4: Overseas duration
   doc.setFont('helvetica', 'bold')
   doc.text('Overseas', marginL, y)
   doc.text(':', marginL + 28, y)
 
   doc.text('Duration: for', marginL + 115, y)
   doc.setFont('helvetica', 'normal')
-  doc.text(String(data.overseas_duration_years ?? ''), marginL + 143, y)
+  doc.text(String(data.overseas_duration_years ?? 0), marginL + 143, y)
   doc.setFont('helvetica', 'bold')
   doc.text('year/s &', marginL + 148, y)
   doc.setFont('helvetica', 'normal')
-  doc.text(String(data.overseas_duration_months ?? ''), marginL + 168, y)
+  doc.text(String(data.overseas_duration_months ?? 0), marginL + 168, y)
   doc.setFont('helvetica', 'bold')
   doc.text('month/s', marginL + 173, y)
 

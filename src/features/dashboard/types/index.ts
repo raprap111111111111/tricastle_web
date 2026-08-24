@@ -1,8 +1,6 @@
-export type StatVariant =
-  | 'apricot'
-  | 'blueberry'
-  | 'citrus'
-  | 'appleCore'
+// src/features/dashboard/types/index.ts
+
+export type StatVariant = 'apricot' | 'blueberry' | 'citrus' | 'appleCore'
 
 export interface StatCard {
   label: string
@@ -30,14 +28,12 @@ export interface ActivityItem {
   created_at: string
 }
 
-// ─── NEW: Trend Chart ─────────────────────────────
 export interface TrendData {
   labels: string[]
   applicants: number[]
   documents: number[]
 }
 
-// ─── NEW: Status Breakdown ────────────────────────
 export interface StatusBreakdown {
   pending: number
   under_review: number
@@ -46,7 +42,6 @@ export interface StatusBreakdown {
   incomplete: number
 }
 
-// ─── NEW: Pipeline ────────────────────────────────
 export interface PipelineData {
   applied: number
   documents_submitted: number
@@ -56,7 +51,6 @@ export interface PipelineData {
   deployed: number
 }
 
-// ─── NEW: Active Batch ────────────────────────────
 export interface ActiveBatch {
   id: number
   name: string
@@ -68,7 +62,6 @@ export interface ActiveBatch {
   deployment_date?: string | null
 }
 
-// ─── NEW: Quick Stats ─────────────────────────────
 export interface QuickStat {
   label: string
   value: string | number
@@ -84,7 +77,6 @@ export interface QuickStatsData {
   active_batches: number
 }
 
-// ─── NEW: Attention Items ─────────────────────────
 export interface AttentionItem {
   id: string | number
   type: 'expiring' | 'correction' | 'mismatch' | 'incomplete'
@@ -100,7 +92,6 @@ export interface AttentionData {
   incomplete_applications: number
 }
 
-// ─── Existing ─────────────────────────────────────
 export interface DashboardStatsFilters {
   range?: 'today' | 'week' | 'month' | 'year'
   from?: string
@@ -108,3 +99,19 @@ export interface DashboardStatsFilters {
 }
 
 export type TrendRange = '7d' | '14d' | '30d'
+
+// ─── NEW: Birthdays ───────────────────────────────
+export interface BirthdayPerson {
+  id: string | number
+  name: string
+  date_of_birth: string
+  age: number
+  is_today: boolean
+  days_left: number
+  formatted_date: string
+}
+
+export interface BirthdaysData {
+  applicants: BirthdayPerson[]
+  staff: BirthdayPerson[]
+}
