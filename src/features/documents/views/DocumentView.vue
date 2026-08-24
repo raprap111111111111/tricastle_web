@@ -17,7 +17,6 @@ import { documentApi } from '../api/document.api'
 import http from '@shared/api/http'
 import { useDocumentRealtime } from '@shared/pubnub/useDocumentRealtime'
 
-
 const props = defineProps<{ id: number }>()
 
 const router = useRouter()
@@ -210,7 +209,7 @@ async function downloadFile() {
   <div class="flex flex-col gap-6 p-6 max-w-6xl mx-auto">
 
     <!-- ── Header nav ──────────────────────────────────────────────────── -->
-    <div class="flex items-center justify-between gap-3">
+    <div class="flex items-center justify-between gap-3 flex-wrap">
       <div class="flex items-center gap-3">
         <Button icon="pi pi-arrow-left" text rounded @click="router.back()" />
         <div>
@@ -223,23 +222,17 @@ async function downloadFile() {
         </div>
       </div>
 
+      <!-- 🎯 FIXED HEADER BUTTONS -->
       <div v-if="d" class="flex items-center gap-2">
-        <AppButton variant="secondary" icon="pi pi-history" @click="router.push({
+        <Button label="Version History" icon="pi pi-history" severity="secondary" outlined @click="router.push({
           name: 'document-versions.list',
           params: { applicantDocumentId: d.id }
-        })">
-          Version History
-        </AppButton>
-        <AppButton variant="secondary" icon="pi pi-refresh" @click="versionOpen = true">
-          New Version
-        </AppButton>
-        <AppButton variant="secondary" icon="pi pi-pencil"
-          @click="router.push({ name: 'documents.edit', params: { id: d.id } })">
-          Edit
-        </AppButton>
+        })" />
+        <Button label="New Version" icon="pi pi-upload" severity="secondary" outlined @click="versionOpen = true" />
+        <Button label="Edit" icon="pi pi-pencil" severity="secondary" outlined
+          @click="router.push({ name: 'documents.edit', params: { id: d.id } })" />
       </div>
     </div>
-    <!-- ✅ Header nav div properly closed here -->
 
     <!-- ── Loading ─────────────────────────────────────────────────────── -->
     <template v-if="store.loading">
@@ -472,7 +465,7 @@ async function downloadFile() {
             </span>
           </h3>
 
-          <!-- ✨ NEW: View all button -->
+          <!-- View all button -->
           <Button label="View All" icon="pi pi-external-link" text size="small"
             class="!text-apricot-600 hover:!text-apricot-700" @click="router.push({
               name: 'document-versions.list',
@@ -480,7 +473,7 @@ async function downloadFile() {
             })" />
         </div>
 
-        <!-- ✨ Clickable rows -->
+        <!-- Clickable rows -->
         <div class="space-y-3">
           <div v-for="v in d.versions" :key="v.id" role="button" tabindex="0" class="group flex items-center justify-between gap-4
              border border-appleCore-100 rounded-xl p-4
@@ -521,14 +514,13 @@ async function downloadFile() {
       </section>
 
       <!-- ═══════════════════ ACTION BAR ═══════════════════ -->
-      <section v-if="d.status !== 'verified' && d.status !== 'rejected'" class="bg-white rounded-2xl border border-appleCore-100 p-6
-               flex items-center justify-end gap-3">
-        <Button severity="danger" outlined icon="pi pi-times" label="Reject" @click="rejectOpen = true" />
-        <AppButton icon="pi pi-check" :loading="store.submitting" @click="handleVerify(d.id)">
-          Mark Verified
-        </AppButton>
+      <section v-if="d.status !== 'verified' && d.status !== 'rejected'"
+        class="bg-white rounded-2xl border border-appleCore-100 p-6 flex flex-wrap items-center justify-end gap-3">
+        <Button label="Reject" icon="pi pi-times" severity="danger" outlined @click="rejectOpen = true" />
+        <Button label="Mark Verified" icon="pi pi-check" :loading="store.submitting"
+          class="!bg-green-600 hover:!bg-green-700 !border-green-600 !text-white whitespace-nowrap"
+          @click="handleVerify(d.id)" />
       </section>
-
     </template>
 
     <!-- ═══════════════════ REJECT DIALOG ═══════════════════ -->
