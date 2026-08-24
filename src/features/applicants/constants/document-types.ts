@@ -15,5 +15,5 @@ export const DOCUMENT_TYPE_IDS = {
   TESDA:         7,
   VISA:          8,
   BIODATA:       9, 
-  ID_PHOTO: 10,
+  ID_PHOTO:      10,
 } as const

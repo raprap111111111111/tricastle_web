@@ -74,9 +74,7 @@ export const applicantApi = {
     return (res.data as any).data ?? res.data
   },
 
-  // ─── Biodata Upload ────────────────────────────────────────────────────────
-  // Reuses POST /applicant-documents — no custom endpoint needed.
-  // The existing UploadApplicantDocumentRequest + UploadApplicantDocumentAction handle it.
+  // ─── Document / Biodata Upload ─────────────────────────────────────────────
   async uploadBiodata(
     applicantId:    number,
     file:           File,
@@ -88,6 +86,8 @@ export const applicantApi = {
     form.append('document_type_id', String(documentTypeId))
     form.append('file',             file)
     form.append('priority',         'normal')
+    form.append('status',           'verified')
+    form.append('source',           'upload')
     if (notes?.trim()) form.append('notes', notes.trim())
 
     const res = await http.post('/applicant-documents', form, {

@@ -22,7 +22,6 @@ import TattooTab from '../components/tabs/TattooTab.vue'
 import ReviewTab from '../components/tabs/ReviewTab.vue'
 import DuplicateWarningDialog from '../components/DuplicateWarningDialog.vue'
 
-// Make sure ID_PHOTO (10) is added to your constants file!
 import { DOCUMENT_TYPE_IDS } from '../constants/document-types'
 
 import type {
@@ -242,7 +241,7 @@ async function onFinalSubmit() {
   if (!canProceed) return
 
   try {
-    // 🎯 FIX: Extract id_photo_file alongside biodata_file so they don't break the JSON payload!
+    // 🎯 Strip File objects from JSON payload to prevent breaking API
     const { 
       biodata_file, 
       biodata_notes, 
@@ -280,21 +279,26 @@ async function onFinalSubmit() {
       await subStore.createTattoo({ applicant_id: created.id, ...tattoo })
     }
 
-    // 📸 Upload 2x2 ID Photo
+    // 📸 Upload 2x2 Photo if scanned/uploaded
     if (id_photo_file instanceof File) {
       try {
         await subStore.uploadBiodata(
           created.id,
           id_photo_file,
-          DOCUMENT_TYPE_IDS.ID_PHOTO ?? 10, // Uses ID_PHOTO type
-          'Applicant 2x2 ID Photo'
+          DOCUMENT_TYPE_IDS.ID_PHOTO ?? 10,
+          '2x2 Profile Photo',
         )
-      } catch {
-        console.warn('ID Photo upload failed after creation')
+      } catch (err: any) {
+        toast.add({
+          severity: 'warn',
+          summary:  'Photo Upload Issue',
+          detail:   err?.response?.data?.message ?? 'Applicant created, but 2x2 photo could not be attached.',
+          life:     6000,
+        })
       }
     }
 
-    // 📄 Upload Biodata
+    // 📄 Upload Biodata if scanned/uploaded
     if (biodata_file instanceof File) {
       try {
         await subStore.uploadBiodata(
@@ -303,12 +307,12 @@ async function onFinalSubmit() {
           DOCUMENT_TYPE_IDS.BIODATA ?? 9,
           biodata_notes ?? undefined,
         )
-      } catch {
+      } catch (err: any) {
         toast.add({
           severity: 'warn',
-          summary:  'Biodata Upload Failed',
-          detail:   'Applicant was created but the biodata could not be uploaded. Retry from their profile.',
-          life:     7000,
+          summary:  'Biodata Upload Issue',
+          detail:   err?.response?.data?.message ?? 'Applicant created, but biodata file could not be attached.',
+          life:     6000,
         })
       }
     }
@@ -378,8 +382,6 @@ function onDuplicateDialogClose() {
 
 <template>
   <div class="flex flex-col gap-6 p-6 max-w-5xl mx-auto">
-
-    <!-- ─── Header ─────────────────────────────────────────────────────────── -->
     <div class="flex items-center gap-3">
       <Button
         icon="pi pi-arrow-left"
@@ -395,14 +397,12 @@ function onDuplicateDialogClose() {
       </div>
     </div>
 
-    <!-- ─── Info Banner ────────────────────────────────────────────────────── -->
     <div class="flex items-center gap-2 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
       <i class="pi pi-info-circle text-blue-500" />
       Applicant will start as <strong class="mx-1">Pending</strong>.
       Batch assignment is available after moving to <strong class="ml-1">Final List</strong>.
     </div>
 
-    <!-- ─── Stepper ─────────────────────────────────────────────────────────── -->
     <WizardStepper
       :steps="steps"
       :current-index="currentStepIndex"
@@ -411,7 +411,6 @@ function onDuplicateDialogClose() {
       @go-to="goToStep"
     />
 
-    <!-- ─── Error Summary ───────────────────────────────────────────────────── -->
     <div
       v-if="hasErrors"
       class="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg"
@@ -437,8 +436,6 @@ function onDuplicateDialogClose() {
         </div>
       </div>
     </div>
-
-    <!-- ─── Step Tabs ────────────────────────────────────────────────────────── -->
 
     <PersonalTab
       v-if="currentStep.key === 'personal'"
@@ -529,7 +526,6 @@ function onDuplicateDialogClose() {
       @go-to="goToStep"
     />
 
-    <!-- ─── Duplicate Warning Dialog ─────────────────────────────────────────── -->
     <DuplicateWarningDialog
       v-model:visible="duplicateDialog"
       :duplicates="foundDuplicates"
