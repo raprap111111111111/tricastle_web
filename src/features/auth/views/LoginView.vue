@@ -25,10 +25,10 @@
       </div>
     </form>
 
-    <p class="text-center text-sm text-blueberry-500 mt-6">
+    <!-- <p class="text-center text-sm text-blueberry-500 mt-6">
       Don't have an account?
       <RouterLink to="/auth/register" class="text-apricot-500 hover:text-apricot-600 font-medium">Create one</RouterLink>
-    </p>
+    </p> -->
   </div>
 </template>
 
