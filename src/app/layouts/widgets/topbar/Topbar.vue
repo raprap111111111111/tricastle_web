@@ -1,11 +1,24 @@
 <template>
   <header
-    class="h-16 bg-white border-b border-appleCore-200 px-6
+    class="h-16 bg-white border-b border-appleCore-200 px-3 sm:px-6
            flex items-center justify-between flex-shrink-0"
   >
-    <h2 class="text-lg font-serif font-semibold text-blueberry-800">
-      {{ pageTitle }}
-    </h2>
+    <div class="flex items-center gap-2 min-w-0">
+      <!-- ☰ Mobile menu button -->
+      <button
+        type="button"
+        class="md:hidden w-10 h-10 rounded-lg hover:bg-appleCore-100
+               flex items-center justify-center text-blueberry-700 transition-colors"
+        aria-label="Open menu"
+        @click="toggleMobile"
+      >
+        <i class="pi pi-bars text-lg" />
+      </button>
+
+      <h2 class="text-base sm:text-lg font-serif font-semibold text-blueberry-800 truncate">
+        {{ pageTitle }}
+      </h2>
+    </div>
 
     <div class="flex items-center gap-2 sm:gap-4">
       <!-- 🔔 Notifications Bell with dropdown + live badge -->
@@ -79,12 +92,14 @@ import Menu from 'primevue/menu'
 import { useAuthStore } from '@features/auth/stores/auth.store'
 import { usePermissions } from '@shared/composables/usePermissions'
 import NotificationBell from '@features/notifications/components/NotificationBell.vue'
+import { useSidebar } from '../../composables/useSidebar'
 
-const route     = useRoute()
-const router    = useRouter()
-const toast     = useToast()
-const authStore = useAuthStore()
-const { role }  = usePermissions()
+const route          = useRoute()
+const router         = useRouter()
+const toast          = useToast()
+const authStore      = useAuthStore()
+const { role }       = usePermissions()
+const { toggleMobile } = useSidebar()
 
 const loggingOut   = ref(false)
 const settingsMenu = ref()
