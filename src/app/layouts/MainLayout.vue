@@ -1,13 +1,13 @@
 <template>
   <div class="h-screen flex bg-appleCore-50 overflow-hidden">
-    <!-- Mobile overlay -->
+    <!-- Mobile backdrop overlay -->
     <div
       v-if="isMobileOpen"
       class="fixed inset-0 z-40 bg-black/40 md:hidden"
       @click="closeMobile"
     />
 
-    <!-- Sidebar -->
+    <!-- Sidebar wrapper -->
     <div
       class="fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 md:static md:translate-x-0 md:flex-shrink-0"
       :class="[
@@ -18,7 +18,7 @@
       <Sidebar />
     </div>
 
-    <!-- Main -->
+    <!-- Main Content Area -->
     <div class="flex-1 flex flex-col overflow-hidden min-w-0">
       <Topbar />
       <main class="flex-1 overflow-auto p-4 sm:p-6 bg-appleCore-50">
@@ -32,7 +32,7 @@
 import { RouterView } from 'vue-router'
 import Sidebar from './widgets/sidebar/Sidebar.vue'
 import Topbar from './widgets/topbar/Topbar.vue'
-import { useSidebar } from '/Users/raprap/Desktop/tricastle_web/src/app/layouts/composables/useSidebar.ts'
+import { useSidebar } from './composables/useSidebar'
 
 const { isMobileOpen, sidebarWidthClass, closeMobile } = useSidebar()
 </script>
