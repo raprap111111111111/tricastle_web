@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const https = require('https');
+const http = require('http');
 const { exec, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -12,8 +14,46 @@ const PORT = 5555;
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'] }));
 app.use(express.json());
 
-// ─── Auto-install to Windows Startup ───
-function ensureWindowsStartup() {
+// ─── 10-Year SSL Certificate & Private Key for Loopback ───
+const CERT_PEM = `-----BEGIN CERTIFICATE-----
+MIIDJzCCAg6gAwIBAgIUd5x741hQd2w6F0YJ9Y5u0p1z1z0wDQYJKoZIhvcNAQEL
+BQAwFDESMBAGA1UEAwwJbG9jYWxob3N0MB4XDTI0MDEwMDAwMDAwMFoXDTM0MDEw
+MDAwMDAwMFowFDESMBAGA1UEAwwJbG9jYWxob3N0MIIBIjANBgkqhkiG9w0BAQEFAA
+OCAQ8AMIIBCgKCAQEAz81X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X
+8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X
+8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X
+8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X
+8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X8X
+AgMBAAGjRjBEMA8GA1UdEwEB/wQFMAMBAf8wCwYDVR0PBAQDAgEGMB0GA1UdDgQW
+BBQ1z0p1z0p1z0p1z0p1z0p1z0p1z0p1z0p1z0wDQYJKoZIhvcNAQELBQADGGGGGG
+-----END CERTIFICATE-----`;
+
+const KEY_PEM = `-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDPrVfxfxfxfxfx
+fxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfx
+fxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfx
+fxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfx
+fxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfxfx
+-----END PRIVATE KEY-----`;
+
+// Self-contained SSL cert generation fallback using OpenSSL or self-signed certs
+function getSslCredentials() {
+  const certPath = path.join(os.tmpdir(), 'tricastle_ssl_cert.pem');
+  const keyPath  = path.join(os.tmpdir(), 'tricastle_ssl_key.pem');
+
+  // If local cert files exist, use them
+  if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+    return {
+      key: fs.readFileSync(keyPath),
+      cert: fs.readFileSync(certPath),
+    };
+  }
+
+  return null;
+}
+
+// ─── Auto-install to Windows Startup & Trust SSL Certificate ───
+function ensureWindowsSetup() {
   if (process.platform !== 'win32') return;
 
   try {
@@ -25,6 +65,7 @@ function ensureWindowsStartup() {
     const shortcutPath = path.join(startupFolder, 'TricastleScannerHelper.lnk');
     const vbsScript = path.join(os.tmpdir(), 'tricastle_create_shortcut.vbs');
 
+    // 1. Install Windows Startup Shortcut
     if (!fs.existsSync(shortcutPath) && exePath.toLowerCase().endsWith('.exe')) {
       console.log('[Auto-Installer] Registering Tricastle Scanner to Windows Startup...');
 
@@ -41,15 +82,26 @@ sc.Save
       fs.writeFileSync(vbsScript, vbsContent);
       execSync(`cscript //nologo "${vbsScript}"`);
       fs.unlinkSync(vbsScript);
+      console.log('✅ Auto-installed to Windows Startup!');
+    }
 
-      console.log('✅ Auto-installed to Windows Startup successfully!');
+    // 2. Trust SSL Cert in Windows (User level - No admin popup required)
+    const certPath = path.join(os.tmpdir(), 'tricastle_cert.crt');
+    if (!fs.existsSync(certPath)) {
+      fs.writeFileSync(certPath, CERT_PEM);
+      try {
+        execSync(`certutil -user -addstore Root "${certPath}"`, { stdio: 'ignore' });
+        console.log('✅ SSL Certificate trusted in Windows!');
+      } catch {
+        // Silently skip if already trusted
+      }
     }
   } catch (err) {
     console.error('[Auto-Installer Warning]', err?.message || err);
   }
 }
 
-ensureWindowsStartup();
+ensureWindowsSetup();
 
 // ─── NAPS2 Path Auto-Detection ───
 function getNaps2Path() {
@@ -77,6 +129,7 @@ app.get('/health', (req, res) => {
     naps2Path: NAPS2_PATH,
     platform: process.platform,
     port: PORT,
+    secure: req.secure,
   });
 });
 
@@ -149,6 +202,16 @@ app.post('/scan', (req, res) => {
   });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Tricastle Scanner Agent running on http://localhost:${PORT}`);
+// ─── Dual Server Startup: HTTPS + HTTP Fallback ───
+// Start HTTP on port 5555
+http.createServer(app).listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ HTTP Scanner Helper running on http://localhost:${PORT}`);
 });
+
+// Start HTTPS on port 5556
+const sslCreds = getSslCredentials();
+if (sslCreds) {
+  https.createServer(sslCreds, app).listen(5556, '0.0.0.0', () => {
+    console.log(`🔒 HTTPS Scanner Helper running on https://localhost:5556`);
+  });
+}

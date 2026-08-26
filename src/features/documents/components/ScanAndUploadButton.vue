@@ -27,7 +27,10 @@ const router = useRouter()
 const toast = useToast()
 
 // ─── Helper endpoints ───────────────────────────────────
+// ─── Helper Endpoints (HTTPS on 5556 first, then HTTP fallback on 5555) ───
 const HELPER_ENDPOINTS = [
+  'https://127.0.0.1:5556',
+  'https://localhost:5556',
   'http://127.0.0.1:5555',
   'http://localhost:5555',
 ]
@@ -230,27 +233,14 @@ defineExpose({ openDialog })
 
 <template>
   <div>
-    <Button
-      icon="pi pi-print"
-      label="Scan & Auto-Upload"
-      type="button"
-      class="!bg-purple-500 !border-purple-500 !text-white
+    <Button icon="pi pi-print" label="Scan & Auto-Upload" type="button" class="!bg-purple-500 !border-purple-500 !text-white
              hover:!bg-purple-600 hover:!border-purple-600
-             !rounded-xl !font-semibold !px-4 !py-2"
-      :disabled="!canScan"
-      v-tooltip.top="validationMessage ?? 'Scan and upload directly'"
-      @click="openDialog"
-    />
+             !rounded-xl !font-semibold !px-4 !py-2" :disabled="!canScan"
+      v-tooltip.top="validationMessage ?? 'Scan and upload directly'" @click="openDialog" />
 
-    <Dialog
-      v-model:visible="dialogVisible"
-      modal
-      :closable="!isBusy"
-      :style="{ width: '540px' }"
-      :pt="{
-        header: { class: '!bg-purple-50 !border-b !border-purple-100' },
-      }"
-    >
+    <Dialog v-model:visible="dialogVisible" modal :closable="!isBusy" :style="{ width: '540px' }" :pt="{
+      header: { class: '!bg-purple-50 !border-b !border-purple-100' },
+    }">
       <template #header>
         <div class="flex items-center gap-2">
           <div class="w-9 h-9 rounded-xl bg-purple-500 flex items-center justify-center">
@@ -296,10 +286,8 @@ defineExpose({ openDialog })
       <!-- Helper Not Installed -->
       <div v-else-if="!helperInstalled" class="flex flex-col gap-4">
         <!-- Mixed Content Warning -->
-        <div
-          v-if="isHttps && isMixedContentBlocked"
-          class="bg-amber-50 border border-amber-300 rounded-xl p-4 text-xs text-amber-900 space-y-2"
-        >
+        <div v-if="isHttps && isMixedContentBlocked"
+          class="bg-amber-50 border border-amber-300 rounded-xl p-4 text-xs text-amber-900 space-y-2">
           <h4 class="font-bold flex items-center gap-2 text-amber-800 text-sm">
             <i class="pi pi-shield" />
             Chrome Security Setup (Required Once)
@@ -334,42 +322,27 @@ defineExpose({ openDialog })
         <div class="flex flex-col sm:flex-row gap-2">
           <!-- 1-click download from Vercel public folder -->
           <a href="/downloads/TricastleScannerSetup.exe" download class="flex-1">
-            <Button
-              label="Download Helper (.exe)"
-              icon="pi pi-download"
-              class="w-full !bg-purple-600 !border-purple-600 !text-white"
-            />
+            <Button label="Download Helper (.exe)" icon="pi pi-download"
+              class="w-full !bg-purple-600 !border-purple-600 !text-white" />
           </a>
 
           <a href="https://www.naps2.com/download" target="_blank" class="flex-1">
-            <Button
-              label="Install NAPS2"
-              icon="pi pi-external-link"
-              outlined
-              class="w-full !border-purple-300 !text-purple-600"
-            />
+            <Button label="Install NAPS2" icon="pi pi-external-link" outlined
+              class="w-full !border-purple-300 !text-purple-600" />
           </a>
         </div>
 
-        <Button
-          label="Retry Connection"
-          icon="pi pi-refresh"
-          class="w-full !bg-purple-500 !border-purple-500"
-          @click="checkHelper"
-        />
+        <Button label="Retry Connection" icon="pi pi-refresh" class="w-full !bg-purple-500 !border-purple-500"
+          @click="checkHelper" />
       </div>
 
       <!-- Scanner ready -->
       <div v-else class="flex flex-col gap-4">
         <!-- Busy / Complete status -->
-        <div
-          v-if="currentStatus"
-          class="rounded-xl p-6 text-center border"
-          :class="{
-            'bg-blue-50 border-blue-200': scanning || uploading,
-            'bg-green-50 border-green-200': completed,
-          }"
-        >
+        <div v-if="currentStatus" class="rounded-xl p-6 text-center border" :class="{
+          'bg-blue-50 border-blue-200': scanning || uploading,
+          'bg-green-50 border-green-200': completed,
+        }">
           <div v-if="!completed" class="flex justify-center mb-3">
             <ProgressSpinner style="width: 40px" strokeWidth="4" />
           </div>
@@ -388,13 +361,8 @@ defineExpose({ openDialog })
             <label class="block text-sm font-medium text-blueberry-700 mb-1.5">
               Scanner Device
             </label>
-            <Select
-              v-model="selectedScanner"
-              :options="scanners"
-              option-label="name"
-              option-value="name"
-              class="w-full"
-            />
+            <Select v-model="selectedScanner" :options="scanners" option-label="name" option-value="name"
+              class="w-full" />
           </div>
 
           <div class="grid grid-cols-2 gap-3">
@@ -402,34 +370,21 @@ defineExpose({ openDialog })
               <label class="block text-sm font-medium text-blueberry-700 mb-1.5">
                 Resolution
               </label>
-              <Select
-                v-model="resolution"
-                :options="resolutionOptions"
-                option-label="label"
-                option-value="value"
-                class="w-full"
-              />
+              <Select v-model="resolution" :options="resolutionOptions" option-label="label" option-value="value"
+                class="w-full" />
             </div>
             <div>
               <label class="block text-sm font-medium text-blueberry-700 mb-1.5">
                 Color Mode
               </label>
-              <Select
-                v-model="colorMode"
-                :options="colorModeOptions"
-                option-label="label"
-                option-value="value"
-                class="w-full"
-              />
+              <Select v-model="colorMode" :options="colorModeOptions" option-label="label" option-value="value"
+                class="w-full" />
             </div>
           </div>
         </template>
 
         <!-- No scanners -->
-        <div
-          v-else-if="scanners.length === 0 && !isBusy"
-          class="bg-amber-50 border border-amber-200 rounded-xl p-3"
-        >
+        <div v-else-if="scanners.length === 0 && !isBusy" class="bg-amber-50 border border-amber-200 rounded-xl p-3">
           <p class="text-sm text-amber-800 mb-2">⚠️ No USB scanners detected</p>
           <p class="text-xs text-amber-700 mb-2">
             Make sure your scanner is powered on and connected via USB. Also install NAPS2.
@@ -445,13 +400,8 @@ defineExpose({ openDialog })
 
       <template #footer>
         <Button label="Cancel" text :disabled="isBusy" @click="dialogVisible = false" />
-        <Button
-          v-if="helperInstalled && scanners.length > 0 && !isBusy && !completed"
-          label="Start Scan"
-          icon="pi pi-play"
-          class="!bg-purple-500 !border-purple-500"
-          @click="scanAndUpload"
-        />
+        <Button v-if="helperInstalled && scanners.length > 0 && !isBusy && !completed" label="Start Scan"
+          icon="pi pi-play" class="!bg-purple-500 !border-purple-500" @click="scanAndUpload" />
       </template>
     </Dialog>
   </div>
