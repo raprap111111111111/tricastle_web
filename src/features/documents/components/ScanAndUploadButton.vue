@@ -8,8 +8,6 @@ import Button from 'primevue/button'
 import Select from 'primevue/select'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
-
-// ✅ Shared HTTP instance
 import http from '@shared/api/http'
 
 // ─── Props ──────────────────────────────────────────────
@@ -26,16 +24,16 @@ const emit = defineEmits<{
 }>()
 
 const router = useRouter()
-const toast  = useToast()
+const toast = useToast()
 
-// ─── Helper Endpoints (127.0.0.1 preferred over localhost on Chrome) ───
+// ─── Helper endpoints ───────────────────────────────────
 const HELPER_ENDPOINTS = [
   'http://127.0.0.1:5555',
   'http://localhost:5555',
 ]
 const activeHelperUrl = ref(HELPER_ENDPOINTS[0])
 
-// ─── State ───────────────────────────────────────────────
+// ─── State ──────────────────────────────────────────────
 const dialogVisible = ref(false)
 const checkingHelper = ref(false)
 const helperInstalled = ref(false)
@@ -49,33 +47,41 @@ const scanning = ref(false)
 const uploading = ref(false)
 const completed = ref(false)
 
-// Settings
 const resolution = ref(300)
 const colorMode = ref('Color')
 
 const resolutionOptions = [
-  { label: '📄 Draft (150 DPI)',  value: 150 },
+  { label: '📄 Draft (150 DPI)', value: 150 },
   { label: '📋 Normal (300 DPI)', value: 300 },
-  { label: '⭐ High (600 DPI)',    value: 600 },
+  { label: '⭐ High (600 DPI)', value: 600 },
 ]
 
 const colorModeOptions = [
-  { label: '🎨 Color',            value: 'Color' },
-  { label: '⚫ Grayscale',        value: 'Gray' },
-  { label: '⬛ Black & White',    value: 'BW' },
+  { label: '🎨 Color', value: 'Color' },
+  { label: '⚫ Grayscale', value: 'Gray' },
+  { label: '⬛ Black & White', value: 'BW' },
 ]
 
-// ─── Validation ──────────────────────────────────────────
+// ─── Validation ─────────────────────────────────────────
 const canScan = computed(() => !!props.applicantId && !!props.documentTypeId)
 
 const validationMessage = computed(() => {
-  if (!props.applicantId)    return 'Please select an applicant first'
+  if (!props.applicantId) return 'Please select an applicant first'
   if (!props.documentTypeId) return 'Please select a document type first'
-  if (!props.batchId)        return 'No batch selected — document will not appear in Batches view'
+  if (!props.batchId) return 'No batch selected — document will not appear in Batches view'
   return null
 })
 
-// ─── Actions ─────────────────────────────────────────────
+const isBusy = computed(() => scanning.value || uploading.value)
+
+const currentStatus = computed(() => {
+  if (scanning.value) return { icon: '📄', text: 'Scanning...', detail: 'Scanner is capturing the document' }
+  if (uploading.value) return { icon: '☁️', text: 'Uploading...', detail: 'Saving to server' }
+  if (completed.value) return { icon: '✅', text: 'Complete!', detail: 'Document uploaded successfully' }
+  return null
+})
+
+// ─── Actions ────────────────────────────────────────────
 async function openDialog() {
   if (!canScan.value) {
     toast.add({
@@ -92,7 +98,6 @@ async function openDialog() {
   await checkHelper()
 }
 
-// Test both 127.0.0.1 and localhost to bypass Chrome DNS loopback blocks
 async function checkHelper() {
   checkingHelper.value = true
   helperInstalled.value = false
@@ -113,7 +118,6 @@ async function checkHelper() {
         return
       }
     } catch (err: any) {
-      // Detect browser Mixed Content / CORS preflight block
       if (isHttps.value && (err.code === 'ERR_NETWORK' || !err.response)) {
         isMixedContentBlocked.value = true
       }
@@ -136,7 +140,6 @@ async function loadScanners() {
   }
 }
 
-// ─── Main: Scan → Auto-Upload ────────────────────────────
 async function scanAndUpload() {
   scanning.value = true
   try {
@@ -150,10 +153,10 @@ async function scanAndUpload() {
     const { data: scanData } = await axios.post(
       `${activeHelperUrl.value}/scan`,
       {
-        device:     selectedScanner.value,
+        device: selectedScanner.value,
         resolution: resolution.value,
-        colorMode:  colorMode.value,
-        format:     'pdf',
+        colorMode: colorMode.value,
+        format: 'pdf',
       },
       { timeout: 120000 },
     )
@@ -163,10 +166,10 @@ async function scanAndUpload() {
     scanning.value = false
     uploading.value = true
 
-    // Convert Base64 -> File
+    // Base64 → File
     const response = await fetch(scanData.data)
-    const blob     = await response.blob()
-    const file     = new File(
+    const blob = await response.blob()
+    const file = new File(
       [blob],
       `scan_${props.applicantId}_${Date.now()}.pdf`,
       { type: scanData.mimeType ?? 'application/pdf' },
@@ -180,12 +183,10 @@ async function scanAndUpload() {
     })
 
     const formData = new FormData()
-    formData.append('file',             file)
-    formData.append('applicant_id',     String(props.applicantId))
+    formData.append('file', file)
+    formData.append('applicant_id', String(props.applicantId))
     formData.append('document_type_id', String(props.documentTypeId))
-    if (props.batchId) {
-      formData.append('batch_id', String(props.batchId))
-    }
+    if (props.batchId) formData.append('batch_id', String(props.batchId))
     formData.append('source', 'scanner')
     formData.append('status', 'uploaded')
 
@@ -210,7 +211,6 @@ async function scanAndUpload() {
         query: props.batchId ? { from_batch: String(props.batchId) } : undefined,
       })
     }, 1500)
-
   } catch (err: any) {
     console.error('[Scan Upload Error]', err)
     toast.add({
@@ -224,15 +224,6 @@ async function scanAndUpload() {
     uploading.value = false
   }
 }
-
-const isBusy = computed(() => scanning.value || uploading.value)
-
-const currentStatus = computed(() => {
-  if (scanning.value)  return { icon: '📄', text: 'Scanning...',  detail: 'Scanner is capturing the document' }
-  if (uploading.value) return { icon: '☁️', text: 'Uploading...', detail: 'Saving to server' }
-  if (completed.value) return { icon: '✅', text: 'Complete!',    detail: 'Document uploaded successfully' }
-  return null
-})
 
 defineExpose({ openDialog })
 </script>
@@ -255,7 +246,7 @@ defineExpose({ openDialog })
       v-model:visible="dialogVisible"
       modal
       :closable="!isBusy"
-      :style="{ width: '520px' }"
+      :style="{ width: '540px' }"
       :pt="{
         header: { class: '!bg-purple-50 !border-b !border-purple-100' },
       }"
@@ -302,60 +293,80 @@ defineExpose({ openDialog })
         <p class="text-sm text-blueberry-500">Connecting to scanner helper...</p>
       </div>
 
-      <!-- Helper Not Installed / Blocked -->
+      <!-- Helper Not Installed -->
       <div v-else-if="!helperInstalled" class="flex flex-col gap-4">
-        <!-- Mixed Content Warning on HTTPS -->
-        <div v-if="isHttps && isMixedContentBlocked" class="bg-amber-50 border border-amber-300 rounded-xl p-4 text-xs text-amber-900 space-y-2">
+        <!-- Mixed Content Warning -->
+        <div
+          v-if="isHttps && isMixedContentBlocked"
+          class="bg-amber-50 border border-amber-300 rounded-xl p-4 text-xs text-amber-900 space-y-2"
+        >
           <h4 class="font-bold flex items-center gap-2 text-amber-800 text-sm">
-            <i class="pi pi-shield" /> Chrome Security Blocking Local Scanner
+            <i class="pi pi-shield" />
+            Chrome Security Setup (Required Once)
           </h4>
           <p>
-            Your browser is running on <strong>HTTPS (Vercel)</strong> and blocking calls to your local scanner on <code>http://127.0.0.1:5555</code>.
+            Your browser is on <strong>HTTPS (Vercel)</strong> and blocks local scanner calls.
           </p>
           <div class="bg-white/80 p-2.5 rounded-lg border border-amber-200 font-mono text-[11px] space-y-1">
-            <p>1. Click the <strong>🔒 Padlock / Tune icon</strong> next to the URL above.</p>
+            <p>1. Click the <strong>🔒 Padlock / Tune icon</strong> next to the URL.</p>
             <p>2. Click <strong>Site settings</strong>.</p>
             <p>3. Set <strong>Insecure content</strong> to <strong>ALLOW</strong>.</p>
-            <p>4. Refresh the page and click Retry.</p>
+            <p>4. Refresh page and click Retry Connection.</p>
           </div>
         </div>
 
-        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <h4 class="font-semibold text-amber-900 mb-2 flex items-center gap-2">
-            <i class="pi pi-exclamation-triangle" />
-            Scanner Helper Not Detected
+        <!-- Install helper box -->
+        <div class="bg-purple-50 border border-purple-200 rounded-xl p-4">
+          <h4 class="font-semibold text-purple-900 mb-1 flex items-center gap-2">
+            <i class="pi pi-download" />
+            Install Tricastle Scanner Helper
           </h4>
-          <p class="text-sm text-amber-800 mb-3">
-            Please make sure <code>npm run dev</code> or <code>node scanner-helper.js</code> is running on your computer.
+          <p class="text-xs text-purple-700 mb-2">
+            Download and run the helper once on this computer. It will auto-start every time Windows boots.
           </p>
+          <ol class="text-xs text-purple-800 space-y-1 list-decimal pl-4">
+            <li>Click <strong>Download Helper</strong></li>
+            <li>Double-click <code>TricastleScannerSetup.exe</code></li>
+            <li>Click <strong>Retry Connection</strong></li>
+          </ol>
         </div>
 
-        <div class="flex gap-2">
+        <div class="flex flex-col sm:flex-row gap-2">
+          <!-- 1-click download from Vercel public folder -->
+          <a href="/downloads/TricastleScannerSetup.exe" download class="flex-1">
+            <Button
+              label="Download Helper (.exe)"
+              icon="pi pi-download"
+              class="w-full !bg-purple-600 !border-purple-600 !text-white"
+            />
+          </a>
+
           <a href="https://www.naps2.com/download" target="_blank" class="flex-1">
             <Button
-              label="Download NAPS2"
+              label="Install NAPS2"
               icon="pi pi-external-link"
               outlined
               class="w-full !border-purple-300 !text-purple-600"
             />
           </a>
-          <Button
-            label="Retry Connection"
-            icon="pi pi-refresh"
-            class="!bg-purple-500 !border-purple-500 flex-1"
-            @click="checkHelper"
-          />
         </div>
+
+        <Button
+          label="Retry Connection"
+          icon="pi pi-refresh"
+          class="w-full !bg-purple-500 !border-purple-500"
+          @click="checkHelper"
+        />
       </div>
 
       <!-- Scanner ready -->
       <div v-else class="flex flex-col gap-4">
-        <!-- Status card -->
+        <!-- Busy / Complete status -->
         <div
           v-if="currentStatus"
           class="rounded-xl p-6 text-center border"
           :class="{
-            'bg-blue-50 border-blue-200':   scanning || uploading,
+            'bg-blue-50 border-blue-200': scanning || uploading,
             'bg-green-50 border-green-200': completed,
           }"
         >
@@ -371,7 +382,7 @@ defineExpose({ openDialog })
           </p>
         </div>
 
-        <!-- Scanner settings -->
+        <!-- Settings -->
         <template v-if="!isBusy && !completed && scanners.length > 0">
           <div>
             <label class="block text-sm font-medium text-blueberry-700 mb-1.5">
@@ -414,21 +425,26 @@ defineExpose({ openDialog })
           </div>
         </template>
 
-        <!-- No scanners found -->
+        <!-- No scanners -->
         <div
           v-else-if="scanners.length === 0 && !isBusy"
           class="bg-amber-50 border border-amber-200 rounded-xl p-3"
         >
           <p class="text-sm text-amber-800 mb-2">⚠️ No USB scanners detected</p>
           <p class="text-xs text-amber-700 mb-2">
-            Make sure your scanner is powered on and connected via USB.
+            Make sure your scanner is powered on and connected via USB. Also install NAPS2.
           </p>
-          <Button label="Refresh Scanners" icon="pi pi-refresh" text size="small" @click="loadScanners" />
+          <div class="flex gap-2">
+            <Button label="Refresh Scanners" icon="pi pi-refresh" text size="small" @click="loadScanners" />
+            <a href="https://www.naps2.com/download" target="_blank">
+              <Button label="Install NAPS2" icon="pi pi-external-link" text size="small" />
+            </a>
+          </div>
         </div>
       </div>
 
       <template #footer>
-        <Button label="Cancel" text @click="dialogVisible = false" :disabled="isBusy" />
+        <Button label="Cancel" text :disabled="isBusy" @click="dialogVisible = false" />
         <Button
           v-if="helperInstalled && scanners.length > 0 && !isBusy && !completed"
           label="Start Scan"
