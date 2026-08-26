@@ -9,10 +9,10 @@ import Select from 'primevue/select'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
 
-// ✅ Use the shared http instance (auth token + interceptors baked in)
+// ✅ Shared HTTP instance
 import http from '@shared/api/http'
 
-// ─── Props from parent form ──────────────────────────────
+// ─── Props ──────────────────────────────────────────────
 const props = defineProps<{
   applicantId?: number | null
   documentTypeId?: number | null
@@ -28,14 +28,20 @@ const emit = defineEmits<{
 const router = useRouter()
 const toast  = useToast()
 
-// ─── Helper client (talks to local NAPS2 helper) ─────────
-const HELPER_URL = 'http://localhost:5555'
-const helperApi = axios.create({ baseURL: HELPER_URL, timeout: 120000 })
+// ─── Helper Endpoints (127.0.0.1 preferred over localhost on Chrome) ───
+const HELPER_ENDPOINTS = [
+  'http://127.0.0.1:5555',
+  'http://localhost:5555',
+]
+const activeHelperUrl = ref(HELPER_ENDPOINTS[0])
 
 // ─── State ───────────────────────────────────────────────
 const dialogVisible = ref(false)
 const checkingHelper = ref(false)
 const helperInstalled = ref(false)
+const isHttps = ref(window.location.protocol === 'https:')
+const isMixedContentBlocked = ref(false)
+
 const scanners = ref<Array<{ name: string }>>([])
 const selectedScanner = ref('')
 
@@ -86,25 +92,41 @@ async function openDialog() {
   await checkHelper()
 }
 
+// Test both 127.0.0.1 and localhost to bypass Chrome DNS loopback blocks
 async function checkHelper() {
   checkingHelper.value = true
   helperInstalled.value = false
-  try {
-    const { data } = await helperApi.get('/health')
-    if (data.status === 'ok') {
-      helperInstalled.value = true
-      await loadScanners()
+  isMixedContentBlocked.value = false
+
+  for (const baseUrl of HELPER_ENDPOINTS) {
+    try {
+      const response = await axios.get(`${baseUrl}/health`, {
+        timeout: 4000,
+        headers: { 'Access-Control-Request-Private-Network': 'true' },
+      })
+
+      if (response.data?.status === 'ok') {
+        activeHelperUrl.value = baseUrl
+        helperInstalled.value = true
+        await loadScanners()
+        checkingHelper.value = false
+        return
+      }
+    } catch (err: any) {
+      // Detect browser Mixed Content / CORS preflight block
+      if (isHttps.value && (err.code === 'ERR_NETWORK' || !err.response)) {
+        isMixedContentBlocked.value = true
+      }
     }
-  } catch {
-    helperInstalled.value = false
-  } finally {
-    checkingHelper.value = false
   }
+
+  helperInstalled.value = false
+  checkingHelper.value = false
 }
 
 async function loadScanners() {
   try {
-    const { data } = await helperApi.get('/scanners')
+    const { data } = await axios.get(`${activeHelperUrl.value}/scanners`, { timeout: 5000 })
     scanners.value = data.scanners ?? []
     if (scanners.value.length > 0) {
       selectedScanner.value = scanners.value[0].name
@@ -118,27 +140,30 @@ async function loadScanners() {
 async function scanAndUpload() {
   scanning.value = true
   try {
-    // STEP 1: Trigger scan on the physical device
     toast.add({
       severity: 'info',
       summary: '📄 Scanning...',
-      detail: 'Please wait, this may take 10-30 seconds',
+      detail: 'Please wait, capturing document from scanner',
       life: 3000,
     })
 
-    const { data: scanData } = await helperApi.post('/scan', {
-      device:     selectedScanner.value,
-      resolution: resolution.value,
-      colorMode:  colorMode.value,
-      format:     'pdf',
-    })
+    const { data: scanData } = await axios.post(
+      `${activeHelperUrl.value}/scan`,
+      {
+        device:     selectedScanner.value,
+        resolution: resolution.value,
+        colorMode:  colorMode.value,
+        format:     'pdf',
+      },
+      { timeout: 120000 },
+    )
 
-    if (!scanData.success) throw new Error('Scan failed')
+    if (!scanData.success) throw new Error(scanData.message ?? 'Scan failed')
 
     scanning.value = false
     uploading.value = true
 
-    // STEP 2: Convert base64 → File
+    // Convert Base64 -> File
     const response = await fetch(scanData.data)
     const blob     = await response.blob()
     const file     = new File(
@@ -147,11 +172,10 @@ async function scanAndUpload() {
       { type: scanData.mimeType ?? 'application/pdf' },
     )
 
-    // STEP 3: Upload to Laravel via shared http (auth + unwrap handled)
     toast.add({
       severity: 'info',
       summary: '☁️ Uploading...',
-      detail: `Sending to ${props.applicantName ?? 'applicant'}'s folder`,
+      detail: `Saving to ${props.applicantName ?? 'applicant'}'s folder`,
       life: 2000,
     })
 
@@ -165,10 +189,8 @@ async function scanAndUpload() {
     formData.append('source', 'scanner')
     formData.append('status', 'uploaded')
 
-    // ✅ Correct endpoint + shared http instance
     const { data: uploadData } = await http.post('/applicant-documents', formData)
 
-    // STEP 4: SUCCESS
     completed.value = true
 
     toast.add({
@@ -180,11 +202,8 @@ async function scanAndUpload() {
 
     emit('uploaded', uploadData)
 
-    // Give user 1.5s to see success, then navigate
     setTimeout(() => {
       dialogVisible.value = false
-
-      // ✅ Forward batch context if we have it
       router.push({
         name: 'documents.folder',
         params: { applicantId: props.applicantId as number },
@@ -196,11 +215,8 @@ async function scanAndUpload() {
     console.error('[Scan Upload Error]', err)
     toast.add({
       severity: 'error',
-      summary: 'Failed',
-      detail:
-        err?.response?.data?.message ??
-        err?.message ??
-        'Could not scan and upload',
+      summary: 'Scan Failed',
+      detail: err?.response?.data?.message ?? err?.message ?? 'Could not scan and upload',
       life: 5000,
     })
   } finally {
@@ -218,7 +234,6 @@ const currentStatus = computed(() => {
   return null
 })
 
-// ─── Expose openDialog for parent components ────────────
 defineExpose({ openDialog })
 </script>
 
@@ -284,32 +299,48 @@ defineExpose({ openDialog })
       <!-- Checking helper -->
       <div v-if="checkingHelper" class="flex flex-col items-center py-8 gap-3">
         <ProgressSpinner style="width: 40px" strokeWidth="4" />
-        <p class="text-sm text-blueberry-500">Connecting to scanner...</p>
+        <p class="text-sm text-blueberry-500">Connecting to scanner helper...</p>
       </div>
 
-      <!-- Helper not installed -->
+      <!-- Helper Not Installed / Blocked -->
       <div v-else-if="!helperInstalled" class="flex flex-col gap-4">
+        <!-- Mixed Content Warning on HTTPS -->
+        <div v-if="isHttps && isMixedContentBlocked" class="bg-amber-50 border border-amber-300 rounded-xl p-4 text-xs text-amber-900 space-y-2">
+          <h4 class="font-bold flex items-center gap-2 text-amber-800 text-sm">
+            <i class="pi pi-shield" /> Chrome Security Blocking Local Scanner
+          </h4>
+          <p>
+            Your browser is running on <strong>HTTPS (Vercel)</strong> and blocking calls to your local scanner on <code>http://127.0.0.1:5555</code>.
+          </p>
+          <div class="bg-white/80 p-2.5 rounded-lg border border-amber-200 font-mono text-[11px] space-y-1">
+            <p>1. Click the <strong>🔒 Padlock / Tune icon</strong> next to the URL above.</p>
+            <p>2. Click <strong>Site settings</strong>.</p>
+            <p>3. Set <strong>Insecure content</strong> to <strong>ALLOW</strong>.</p>
+            <p>4. Refresh the page and click Retry.</p>
+          </div>
+        </div>
+
         <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
           <h4 class="font-semibold text-amber-900 mb-2 flex items-center gap-2">
             <i class="pi pi-exclamation-triangle" />
-            Scanner Helper Not Running
+            Scanner Helper Not Detected
           </h4>
           <p class="text-sm text-amber-800 mb-3">
-            Please make sure the Tricastle Scan Helper (NAPS2 bridge) is running on
-            <code class="bg-amber-100 px-1.5 py-0.5 rounded text-xs">localhost:5555</code>.
+            Please make sure <code>npm run dev</code> or <code>node scanner-helper.js</code> is running on your computer.
           </p>
         </div>
+
         <div class="flex gap-2">
           <a href="https://www.naps2.com/download" target="_blank" class="flex-1">
             <Button
-              label="Install NAPS2"
+              label="Download NAPS2"
               icon="pi pi-external-link"
               outlined
               class="w-full !border-purple-300 !text-purple-600"
             />
           </a>
           <Button
-            label="Retry"
+            label="Retry Connection"
             icon="pi pi-refresh"
             class="!bg-purple-500 !border-purple-500 flex-1"
             @click="checkHelper"
@@ -319,7 +350,7 @@ defineExpose({ openDialog })
 
       <!-- Scanner ready -->
       <div v-else class="flex flex-col gap-4">
-        <!-- Status card (busy / complete) -->
+        <!-- Status card -->
         <div
           v-if="currentStatus"
           class="rounded-xl p-6 text-center border"
@@ -340,7 +371,7 @@ defineExpose({ openDialog })
           </p>
         </div>
 
-        <!-- Scanner settings (only when idle + scanners found) -->
+        <!-- Scanner settings -->
         <template v-if="!isBusy && !completed && scanners.length > 0">
           <div>
             <label class="block text-sm font-medium text-blueberry-700 mb-1.5">
@@ -370,7 +401,7 @@ defineExpose({ openDialog })
             </div>
             <div>
               <label class="block text-sm font-medium text-blueberry-700 mb-1.5">
-                Color
+                Color Mode
               </label>
               <Select
                 v-model="colorMode"
@@ -390,9 +421,9 @@ defineExpose({ openDialog })
         >
           <p class="text-sm text-amber-800 mb-2">⚠️ No USB scanners detected</p>
           <p class="text-xs text-amber-700 mb-2">
-            Make sure your scanner is powered on and connected.
+            Make sure your scanner is powered on and connected via USB.
           </p>
-          <Button label="Refresh" icon="pi pi-refresh" text size="small" @click="loadScanners" />
+          <Button label="Refresh Scanners" icon="pi pi-refresh" text size="small" @click="loadScanners" />
         </div>
       </div>
 
