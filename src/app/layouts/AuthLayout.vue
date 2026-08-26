@@ -1,8 +1,18 @@
+<!-- src/layouts/AuthLayout.vue -->
 <template>
-  <div class="min-h-screen flex flex-col justify-between bg-appleCore-50 relative overflow-hidden select-none">
-    <!-- Ambient blobs -->
-    <div class="absolute top-0 left-0 w-96 h-96 bg-apricot-100 rounded-full -translate-x-1/2 -translate-y-1/2 opacity-40 pointer-events-none" />
-    <div class="absolute bottom-0 right-0 w-96 h-96 bg-blueberry-100 rounded-full translate-x-1/2 translate-y-1/2 opacity-40 pointer-events-none" />
+  <div
+    class="min-h-screen flex flex-col justify-between bg-appleCore-50 relative overflow-hidden select-none"
+  >
+    <!-- Animated journey scene: airplane / construction / globe -->
+    <AuthSceneBackground />
+
+    <!-- Ambient blobs (kept, softer under scene) -->
+    <div
+      class="absolute top-0 left-0 w-96 h-96 bg-apricot-100 rounded-full -translate-x-1/2 -translate-y-1/2 opacity-40 pointer-events-none z-[1]"
+    />
+    <div
+      class="absolute bottom-0 right-0 w-96 h-96 bg-blueberry-100 rounded-full translate-x-1/2 translate-y-1/2 opacity-40 pointer-events-none z-[1]"
+    />
 
     <!-- Top bar -->
     <header class="relative z-20 w-full max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -16,7 +26,7 @@
       <div class="flex items-center gap-2 sm:gap-3">
         <button
           type="button"
-          class="px-3.5 py-1.5 rounded-xl bg-white hover:bg-appleCore-50 border border-appleCore-200
+          class="px-3.5 py-1.5 rounded-xl bg-white/80 backdrop-blur-sm hover:bg-appleCore-50 border border-appleCore-200
                  text-blueberry-800 text-xs font-bold shadow-sm transition-all flex items-center gap-2"
           @click="openCompany('about')"
         >
@@ -27,7 +37,7 @@
         <button
           type="button"
           class="px-3.5 py-1.5 rounded-xl bg-apricot-500/10 hover:bg-apricot-500/20 border border-apricot-500/30
-                 text-apricot-600 text-xs font-bold transition-all flex items-center gap-2"
+                 text-apricot-600 text-xs font-bold transition-all flex items-center gap-2 backdrop-blur-sm"
           @click="openCompany('principles')"
         >
           <i class="pi pi-compass text-apricot-500 text-xs" />
@@ -36,7 +46,7 @@
       </div>
     </header>
 
-    <!-- Login center (unchanged look) -->
+    <!-- Login center -->
     <main class="relative z-10 w-full max-w-md px-4 my-auto mx-auto py-6">
       <div class="text-center mb-8 flex flex-col items-center">
         <button type="button" class="mb-4" @click="openCompany('about')">
@@ -55,7 +65,10 @@
         </p>
       </div>
 
-      <RouterView />
+      <!-- glass card wrapper so form floats above scene -->
+      <div class="relative z-10">
+        <RouterView />
+      </div>
     </main>
 
     <!-- Footer -->
@@ -81,7 +94,6 @@
       </button>
     </footer>
 
-    <!-- Lazy company experience (only mounts when open) -->
     <CompanyExperienceModal
       v-if="showCompany"
       :initial-tab="companyTab"
@@ -93,6 +105,7 @@
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent } from 'vue'
 import { RouterView } from 'vue-router'
+import AuthSceneBackground from '@/components/auth-scene/AuthSceneBackground.vue'
 
 const CompanyExperienceModal = defineAsyncComponent(
   () => import('./company-experience/CompanyExperienceModal.vue'),

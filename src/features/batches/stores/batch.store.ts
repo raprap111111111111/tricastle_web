@@ -1,3 +1,5 @@
+// src/features/batches/stores/batch.store.ts
+
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { batchApi } from '../api/batch.api'
@@ -10,12 +12,12 @@ import type {
 } from '../types'
 
 export const useBatchStore = defineStore('batch', () => {
-  const batches      = ref<Batch[]>([])
-  const batch        = ref<Batch | null>(null)
-  const activeBatch  = ref<Batch | null>(null)   // ← NEW
-  const pagination   = ref<Pagination | null>(null)
-  const loading      = ref(false)
-  const submitting   = ref(false)
+  const batches     = ref<Batch[]>([])
+  const batch       = ref<Batch | null>(null)
+  const activeBatch = ref<Batch | null>(null)
+  const pagination  = ref<Pagination | null>(null)
+  const loading     = ref(false)
+  const submitting  = ref(false)
 
   const filters = ref<BatchFilters>({
     search: '',
@@ -27,16 +29,65 @@ export const useBatchStore = defineStore('batch', () => {
     sort_dir: 'asc',
   })
 
-  // ─── Computed ─────────────────────────────────────────
   const hasActiveBatch = computed(() => activeBatch.value !== null)
+
+  // ─── Helpers ───────────────────────────────────────────
+  function cleanParams(obj: Record<string, any>): Record<string, any> {
+    const cleaned: Record<string, any> = {}
+    for (const key in obj) {
+      const val = obj[key]
+      if (val !== '' && val !== null && val !== undefined) {
+        cleaned[key] = val
+      }
+    }
+    return cleaned
+  }
+
+  function mapPagination(payload: any, fallbackPage = 1, fallbackLimit = 10): Pagination {
+    const meta =
+      payload?.meta ??
+      payload?.pagination ??
+      payload?.data?.meta ??
+      payload
+
+    const page   = Number(meta?.current_page ?? payload?.current_page ?? fallbackPage) || 1
+    const limit  = Number(meta?.per_page ?? meta?.limit ?? payload?.per_page ?? payload?.limit ?? fallbackLimit) || 10
+    const total  = Number(meta?.total ?? payload?.total ?? 0) || 0
+    const last   = Number(meta?.last_page ?? payload?.last_page ?? Math.max(1, Math.ceil(total / limit) || 1)) || 1
+    const offset = Number(meta?.offset ?? payload?.offset ?? (page - 1) * limit) || 0
+
+    return {
+      current_page: page,
+      last_page: last,
+      per_page: limit,
+      total,
+      offset,
+      limit,
+      from: meta?.from ?? payload?.from ?? (total === 0 ? 0 : offset + 1),
+      to: meta?.to ?? payload?.to ?? Math.min(offset + limit, total),
+    } as Pagination
+  }
+
+  function extractList(payload: any): Batch[] {
+    if (Array.isArray(payload)) return payload
+    if (Array.isArray(payload?.data)) return payload.data
+    if (Array.isArray(payload?.records)) return payload.records
+    if (Array.isArray(payload?.data?.records)) return payload.data.records
+    if (Array.isArray(payload?.data?.data)) return payload.data.data
+    return []
+  }
 
   // ─── Filter helpers ───────────────────────────────────
   function setFilters(patch: Partial<BatchFilters>) {
-    filters.value = { ...filters.value, ...patch, page: 1 }
+    filters.value = {
+      ...filters.value,
+      ...patch,
+      page: 1,
+    }
   }
 
   function setPage(page: number) {
-    filters.value.page = page
+    filters.value.page = Math.max(1, page)
   }
 
   function setLimit(limit: number) {
@@ -64,9 +115,23 @@ export const useBatchStore = defineStore('batch', () => {
   async function fetchBatches() {
     loading.value = true
     try {
-      const res = await batchApi.list(filters.value)
-      batches.value = res.data
-      pagination.value = res.meta ?? res.pagination ?? null
+      const page  = filters.value.page ?? 1
+      const limit = filters.value.limit ?? 10
+
+      const params = cleanParams({
+        ...filters.value,
+        page,
+        limit,
+        offset: (page - 1) * limit,
+      })
+
+      const res: any = await batchApi.list(params)
+
+      batches.value = extractList(res)
+      pagination.value = mapPagination(res, page, limit)
+
+      filters.value.page = pagination.value.current_page
+      filters.value.limit = pagination.value.per_page ?? limit
     } finally {
       loading.value = false
     }
@@ -94,7 +159,6 @@ export const useBatchStore = defineStore('batch', () => {
     submitting.value = true
     try {
       const created = await batchApi.create(payload)
-      // If this batch is active, refresh activeBatch
       if (created.is_active) activeBatch.value = created
       return created
     } finally {
@@ -146,7 +210,6 @@ export const useBatchStore = defineStore('batch', () => {
     try {
       const activated = await batchApi.activate(id)
 
-      // Update local state — deactivate all others
       batches.value = batches.value.map((b) => ({
         ...b,
         is_active: b.id === id,
@@ -179,16 +242,32 @@ export const useBatchStore = defineStore('batch', () => {
 
   return {
     // state
-    batches, batch, activeBatch, pagination, loading, submitting, filters,
+    batches,
+    batch,
+    activeBatch,
+    pagination,
+    loading,
+    submitting,
+    filters,
     // computed
     hasActiveBatch,
     // filter
-    setFilters, setPage, setLimit, resetFilters, clearBatch,
+    setFilters,
+    setPage,
+    setLimit,
+    resetFilters,
+    clearBatch,
     // fetch
-    fetchBatches, fetchBatch, fetchActiveBatch,
+    fetchBatches,
+    fetchBatch,
+    fetchActiveBatch,
     // CRUD
-    createBatch, updateBatch, deleteBatch, updateStatus,
+    createBatch,
+    updateBatch,
+    deleteBatch,
+    updateStatus,
     // active
-    activateBatch, deactivateBatch,
+    activateBatch,
+    deactivateBatch,
   }
 })

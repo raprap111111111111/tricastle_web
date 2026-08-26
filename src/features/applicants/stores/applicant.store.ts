@@ -235,9 +235,21 @@ export const useApplicantStore = defineStore('applicants', () => {
     }
   }
 
-  // ─── Filter management ──────────────────────────────────
   function setFilters(newFilters: Partial<ApplicantFilters>) {
-    filters.value = { ...filters.value, ...newFilters, offset: 0 }
+    const nextFilters = {
+      ...filters.value,
+      ...newFilters,
+    }
+
+    const limit = Number(nextFilters.limit ?? 10)
+    const page = Number(nextFilters.page ?? 1)
+
+    filters.value = {
+      ...nextFilters,
+      page,
+      limit,
+      offset: (page - 1) * limit,
+    }
   }
 
   function setPage(page: number) {
