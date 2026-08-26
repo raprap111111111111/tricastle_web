@@ -4,14 +4,52 @@ import type { AISData } from './types'
 import { loadPhotoBase64 } from './assets'
 import { calcYears, calcMonths, fmtMonthYear } from './formatters'
 
-/** Extract photo URL from any of the known applicant fields. */
+/**
+ * Extract photo URL from applicant record.
+ * Checks flat photo properties AND nested documents array (2x2 Photo / ID Photo).
+ */
 export function getApplicantPhotoUrl(applicant: any): string | null {
-  return (
-    applicant.photo_url ??
-    applicant.profile_photo_url ??
-    applicant.avatar_url ??
-    null
-  )
+  // 1. Direct photo properties check
+  if (applicant.photo_url) return applicant.photo_url
+  if (applicant.profile_photo_url) return applicant.profile_photo_url
+  if (applicant.avatar_url) return applicant.avatar_url
+
+  // 2. Scan documents / currentDocuments / applicant_documents array for 2x2 Photo
+  const docsList =
+    applicant.currentDocuments ??
+    applicant.documents ??
+    applicant.applicant_documents ??
+    applicant.current_documents ??
+    []
+
+  if (Array.isArray(docsList) && docsList.length > 0) {
+    const photoDoc = docsList.find((doc: any) => {
+      const code = String(doc?.document_type?.code ?? doc?.documentType?.code ?? doc?.code ?? '').toUpperCase()
+      const name = String(doc?.document_type?.name ?? doc?.documentType?.name ?? doc?.name ?? '').toUpperCase()
+      
+      return (
+        code.includes('PHOTO') ||
+        code.includes('2X2') ||
+        name.includes('PHOTO') ||
+        name.includes('2X2') ||
+        name.includes('ID PHOTO')
+      )
+    })
+
+    if (photoDoc) {
+      // Return file_url, public_url, path, or url
+      return (
+        photoDoc.file_url ??
+        photoDoc.public_url ??
+        photoDoc.url ??
+        photoDoc.file_path ??
+        photoDoc.path ??
+        null
+      )
+    }
+  }
+
+  return null
 }
 
 /** Attach applicant's photo as base64 to the AISData (skips on error). */
@@ -118,7 +156,7 @@ export function mapApplicantToAIS(applicant: any, staffName?: string): AISData {
       education.primary?.year_ended ? `${education.primary.year_ended}-03-01` : '',
     ),
 
-    // Work Experience → "has experienced working as {title} for X year/s & Y month/s"
+    // Work Experience
     present_job_title:       jobTitle,
     present_job_role:        jobRole,
     present_job_description: jobDesc,
@@ -155,16 +193,10 @@ export function mapApplicantToAIS(applicant: any, staffName?: string): AISData {
 
 // ─── Private Helpers ─────────────────────────────────────────────────────────
 
-/**
- * Build AIS Family Background sentences:
- *   : living in his parents house together with his siblings
- *   : 2nd child among 4 siblings (all boys)
- */
 function buildFamilyNotes(applicant: any): string[] {
   const notes: string[] = []
   const family = applicant.family ?? {}
 
-  // Sentence 1 — living situation
   const living =
     family.living_situation ||
     applicant.living_situation ||
@@ -174,7 +206,6 @@ function buildFamilyNotes(applicant: any): string[] {
     notes.push(living.trim())
   }
 
-  // Sentence 2 — birth order / siblings
   const birthOrder = family.birth_order ?? applicant.birth_order
   const sibCount   = family.siblings_count ?? applicant.siblings_count
   const sibDesc    = family.siblings_description ?? applicant.siblings_description
@@ -192,7 +223,6 @@ function buildFamilyNotes(applicant: any): string[] {
   return notes
 }
 
-/** Sum years/months across all employment records. */
 function sumEmploymentDuration(employments?: any[]): { years: number; months: number } {
   if (!employments?.length) return { years: 0, months: 0 }
 

@@ -3,6 +3,7 @@
 import { ref, computed, type Ref } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { generateBulkAIS, type BulkAISMode, type BulkProgress } from '@shared/utils/ais'
+import { applicantApi } from '../api/applicant.api'
 
 export type BulkAISSource = 'selected' | 'batch' | 'all'
 
@@ -51,22 +52,52 @@ export function useBulkAISDialog(
   }
 
   async function handleBulkAISGenerate() {
-    if (bulkAISApplicants.value.length === 0) return
+    const rawApplicants = bulkAISApplicants.value
+    if (rawApplicants.length === 0) return
 
     bulkAISGenerating.value = true
-    bulkAISProgress.value   = { current: 0, total: bulkAISApplicants.value.length }
+    bulkAISProgress.value   = { current: 0, total: rawApplicants.length }
 
     try {
+      // 🎯 Fetch full profile (documents, family, education, etc.) for each applicant
+      // so the 2x2 ID photo & full background data are rendered in the AIS PDF
+      const fullApplicants: any[] = []
+
+      for (let i = 0; i < rawApplicants.length; i++) {
+        const basic = rawApplicants[i]
+        const name = `${basic.first_name ?? ''} ${basic.last_name ?? ''}`.trim()
+
+        bulkAISProgress.value = {
+          current: i + 1,
+          total: rawApplicants.length,
+          applicant: `Loading full profile: ${name}`,
+        }
+
+        // If documents/lifestyle/family are already present, use as-is; otherwise fetch full profile
+        if (basic.currentDocuments || basic.documents || basic.lifestyle) {
+          fullApplicants.push(basic)
+        } else {
+          try {
+            const fullProfile = await applicantApi.get(basic.id)
+            fullApplicants.push(fullProfile)
+          } catch (e) {
+            console.warn(`[Bulk AIS] Could not fetch full profile for ID ${basic.id}, using basic:`, e)
+            fullApplicants.push(basic)
+          }
+        }
+      }
+
       await generateBulkAIS(
-        bulkAISApplicants.value,
+        fullApplicants,
         undefined,
         bulkAISMode.value,
         (p) => { bulkAISProgress.value = p },
       )
+
       toast.add({
         severity: 'success',
         summary:  'AIS Generated',
-        detail:   `${bulkAISApplicants.value.length} applicant information sheet${bulkAISApplicants.value.length !== 1 ? 's' : ''} generated`,
+        detail:   `${fullApplicants.length} applicant information sheet${fullApplicants.length !== 1 ? 's' : ''} generated`,
         life:     4000,
       })
       showBulkAISDialog.value = false
