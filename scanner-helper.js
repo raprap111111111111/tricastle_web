@@ -8,12 +8,10 @@ const os = require('os');
 const app = express();
 const PORT = 5555;
 
-// Catch unhandled errors so the app never closes silently
 process.on('uncaughtException', (err) => {
   console.error('❌ Uncaught Exception:', err.message);
 });
 
-// Enable CORS for Vercel & Localhost
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'] }));
 app.use(express.json());
 
@@ -31,8 +29,6 @@ function ensureWindowsStartup() {
     const vbsScript = path.join(os.tmpdir(), 'tricastle_create_shortcut.vbs');
 
     if (!fs.existsSync(shortcutPath) && exePath.toLowerCase().endsWith('.exe')) {
-      console.log('[Auto-Installer] Registering Tricastle Scanner to Windows Startup...');
-
       const vbsContent = `
 Set ws = CreateObject("WScript.Shell")
 Set sc = ws.CreateShortcut("${shortcutPath.replace(/\\/g, '\\\\')}")
@@ -46,8 +42,7 @@ sc.Save
       fs.writeFileSync(vbsScript, vbsContent);
       execSync(`cscript //nologo "${vbsScript}"`);
       fs.unlinkSync(vbsScript);
-
-      console.log('✅ Auto-installed to Windows Startup successfully!');
+      console.log('✅ Auto-installed to Windows Startup!');
     }
   } catch (err) {
     console.error('[Auto-Installer Warning]', err?.message || err);
@@ -85,38 +80,41 @@ app.get('/health', (req, res) => {
   });
 });
 
-// 2. Devices list
+// 2. Fetch list of USB devices + LAN / Wi-Fi profiles
 app.get('/scanners', (req, res) => {
-  const cmd = `${NAPS2_PATH} --listdevices`;
+  exec(`${NAPS2_PATH} --listprofiles`, (errProfiles, stdoutProfiles) => {
+    let profiles = parseItems(stdoutProfiles || '');
 
-  exec(cmd, (error, stdout) => {
-    if (error) {
-      exec(`${NAPS2_PATH} -l`, (err2, stdout2) => {
-        return res.json({ scanners: parseScanners(stdout2 || '') });
-      });
-      return;
-    }
-    res.json({ scanners: parseScanners(stdout) });
+    exec(`${NAPS2_PATH} --listdevices`, (errDevices, stdoutDevices) => {
+      let devices = parseItems(stdoutDevices || '');
+      
+      const allScanners = [];
+      
+      // Auto-detect list: USB devices + Wi-Fi Profiles
+      devices.forEach(d => allScanners.push({ name: `🔌 USB: ${d}`, isProfile: false, raw: d }));
+      profiles.forEach(p => allScanners.push({ name: `📶 Wi-Fi/LAN: ${p}`, isProfile: true, raw: p }));
+
+      if (allScanners.length === 0) {
+        allScanners.push({ name: '⚡ Auto-Detect (USB or Wi-Fi)', isProfile: false, raw: 'default' });
+      }
+
+      res.json({ scanners: allScanners });
+    });
   });
 });
 
-function parseScanners(output) {
-  const lines = output.split('\n').map(l => l.trim()).filter(Boolean);
-  const result = [];
-
-  for (const line of lines) {
-    if (line.toLowerCase().includes('device') || line.includes('-')) {
-      const parts = line.split('-').pop() || line;
-      result.push({ name: parts.trim() });
-    } else if (line) {
-      result.push({ name: line });
-    }
-  }
-
-  return result.length > 0 ? result : [{ name: 'Default Scanner' }];
+function parseItems(output) {
+  return output
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean)
+    .map(line => {
+      if (line.includes('-')) return line.split('-').pop().trim();
+      return line;
+    });
 }
 
-// 3. Perform scan
+// 3. Smart Scan Execution (USB with Auto-Fallback to Wi-Fi/LAN)
 app.post('/scan', (req, res) => {
   const { device, resolution = 300, colorMode = 'Color' } = req.body || {};
   const tempFile = path.join(os.tmpdir(), `scan_${Date.now()}.pdf`);
@@ -125,39 +123,75 @@ app.post('/scan', (req, res) => {
   if (colorMode === 'Gray') bitdepth = 'gray';
   if (colorMode === 'BW') bitdepth = 'bw';
 
+  // Clean raw device / profile name
+  let cleanDevice = device ? device.replace('🔌 USB: ', '').replace('📶 Wi-Fi/LAN: ', '').trim() : '';
+
+  // Attempt 1: Primary Scan Command
   let cmd = `${NAPS2_PATH} -o "${tempFile}" -f --dpi ${resolution} --bitdepth ${bitdepth}`;
-  if (device && device !== 'Default Scanner') {
-    cmd += ` --device "${device}"`;
+  if (device && device.includes('Wi-Fi/LAN:')) {
+    cmd += ` --profile "${cleanDevice}"`;
+  } else if (cleanDevice && !cleanDevice.includes('Auto-Detect') && cleanDevice !== 'Default Scanner') {
+    cmd += ` --device "${cleanDevice}"`;
   }
 
-  console.log('[Scanner Helper] Running scan command:', cmd);
+  console.log('🚀 [Scanner Helper] Attempting primary scan:', cmd);
 
-  exec(cmd, { timeout: 120000 }, (error, stdout, stderr) => {
+  // Execute Attempt 1 (15-second timeout for quick fallback if USB is disconnected)
+  exec(cmd, { timeout: 15000 }, (error, stdout, stderr) => {
+    
+    // IF USB FAILED OR NOT PLUGGED IN -> ATTEMPT 2: Wi-Fi / LAN Fallback!
     if (error || !fs.existsSync(tempFile)) {
-      console.error('[Scanner Helper] Scan failed:', error || stderr);
-      return res.status(500).json({ success: false, message: 'Scan failed or was cancelled.' });
-    }
+      console.warn('⚠️ [Scanner Helper] USB scan unavailable. Switching to Wi-Fi / LAN Auto-Fallback...');
 
-    try {
-      const fileBuffer = fs.readFileSync(tempFile);
-      const base64Data = `data:application/pdf;base64,${fileBuffer.toString('base64')}`;
-      fs.unlinkSync(tempFile);
+      // Fallback 1: Try network eSCL driver
+      let lanCmd = `${NAPS2_PATH} -o "${tempFile}" -f --driver escl --dpi ${resolution} --bitdepth ${bitdepth}`;
 
-      return res.json({
-        success: true,
-        data: base64Data,
-        mimeType: 'application/pdf',
+      exec(lanCmd, { timeout: 30000 }, (errLan, stdoutLan) => {
+        if (!errLan && fs.existsSync(tempFile)) {
+          return sendPdfResponse(res, tempFile);
+        }
+
+        // Fallback 2: Try NAPS2 default saved network profile
+        let profileCmd = `${NAPS2_PATH} -o "${tempFile}" -f --dpi ${resolution} --bitdepth ${bitdepth}`;
+
+        exec(profileCmd, { timeout: 30000 }, (errProfile) => {
+          if (!errProfile && fs.existsSync(tempFile)) {
+            return sendPdfResponse(res, tempFile);
+          }
+
+          console.error('❌ [Scanner Helper] All USB and Wi-Fi scan attempts failed.');
+          return res.status(500).json({
+            success: false,
+            message: 'No scanner found. Please plug in USB or connect to Wi-Fi network.',
+          });
+        });
       });
-    } catch (err) {
-      return res.status(500).json({ success: false, message: 'Failed to read scanned file.' });
+      return;
     }
+
+    return sendPdfResponse(res, tempFile);
   });
 });
 
-// Bind server
+function sendPdfResponse(res, filePath) {
+  try {
+    const fileBuffer = fs.readFileSync(filePath);
+    const base64Data = `data:application/pdf;base64,${fileBuffer.toString('base64')}`;
+    fs.unlinkSync(filePath);
+
+    console.log('✅ [Scanner Helper] Scan complete! Sending PDF to web app...');
+    return res.json({
+      success: true,
+      data: base64Data,
+      mimeType: 'application/pdf',
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Failed to read scanned file.' });
+  }
+}
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log('====================================================');
-  console.log(`✅ Tricastle Scanner Helper running on port ${PORT}`);
-  console.log(`👉 Health endpoint: http://127.0.0.1:${PORT}/health`);
+  console.log(`✅ Tricastle Smart USB + Wi-Fi Scanner Helper on ${PORT}`);
   console.log('====================================================');
 });
