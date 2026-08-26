@@ -1,32 +1,23 @@
 <template>
-  <div class="h-screen w-screen overflow-hidden relative select-none bg-appleCore-50 flex flex-col justify-between">
-    
-    <!-- 1. FULLSCREEN 3D BACKGROUND (Absolute) -->
-    <div class="absolute inset-0 z-0">
-      <BuildingHeroScene />
-    </div>
+  <div class="min-h-screen flex flex-col justify-between bg-appleCore-50 relative overflow-hidden select-none">
+    <!-- Ambient blobs -->
+    <div class="absolute top-0 left-0 w-96 h-96 bg-apricot-100 rounded-full -translate-x-1/2 -translate-y-1/2 opacity-40 pointer-events-none" />
+    <div class="absolute bottom-0 right-0 w-96 h-96 bg-blueberry-100 rounded-full translate-x-1/2 translate-y-1/2 opacity-40 pointer-events-none" />
 
-    <!-- 2. TOP HEADER BAR -->
-    <header class="relative z-20 w-full max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-      <!-- Brand Badge -->
-      <div class="flex items-center gap-2.5 bg-white/80 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/60 shadow-sm">
-        <img
-          src="/tri.png"
-          alt="Tricastle"
-          class="w-6 h-6 object-contain"
-          @error="(e) => ((e.target as HTMLElement).style.display = 'none')"
-        />
-        <span class="text-xs font-bold tracking-widest text-blueberry-900 uppercase">
+    <!-- Top bar -->
+    <header class="relative z-20 w-full max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-apricot-500 animate-pulse" />
+        <span class="text-xs font-bold tracking-widest text-blueberry-600 uppercase">
           Tricastle International
         </span>
       </div>
 
-      <!-- Action Buttons -->
-      <div class="flex items-center gap-2.5">
+      <div class="flex items-center gap-2 sm:gap-3">
         <button
           type="button"
-          class="px-4 py-2 rounded-2xl bg-white/80 backdrop-blur-md hover:bg-white border border-white/60
-                 text-blueberry-900 text-xs font-bold shadow-sm transition-all flex items-center gap-2 hover:scale-105 active:scale-95 cursor-pointer"
+          class="px-3.5 py-1.5 rounded-xl bg-white hover:bg-appleCore-50 border border-appleCore-200
+                 text-blueberry-800 text-xs font-bold shadow-sm transition-all flex items-center gap-2"
           @click="openCompany('about')"
         >
           <i class="pi pi-building text-apricot-500 text-xs" />
@@ -35,8 +26,8 @@
 
         <button
           type="button"
-          class="px-4 py-2 rounded-2xl bg-white/80 backdrop-blur-md hover:bg-white border border-white/60
-                 text-blueberry-900 text-xs font-bold shadow-sm transition-all flex items-center gap-2 hover:scale-105 active:scale-95 cursor-pointer"
+          class="px-3.5 py-1.5 rounded-xl bg-apricot-500/10 hover:bg-apricot-500/20 border border-apricot-500/30
+                 text-apricot-600 text-xs font-bold transition-all flex items-center gap-2"
           @click="openCompany('principles')"
         >
           <i class="pi pi-compass text-apricot-500 text-xs" />
@@ -45,46 +36,52 @@
       </div>
     </header>
 
-    <!-- 3. CENTER CONTENT AREA (Floating Overlay Card for Login) -->
-    <main class="relative z-20 w-full max-w-7xl mx-auto px-6 my-auto flex items-center justify-end pointer-events-none">
-      <!-- Floating Glass Login Card (Top-Right aligned over 3D background) -->
-      <div class="w-full max-w-md pointer-events-auto bg-white/85 backdrop-blur-xl border border-white/80 p-6 md:p-8 rounded-[2.5rem] shadow-[0_20px_50px_rgba(30,58,95,0.15)] space-y-5 animate-fadeIn">
-        <div class="text-center space-y-1">
-          <div class="w-12 h-12 rounded-2xl bg-apricot-50 border border-apricot-200/60 flex items-center justify-center mx-auto mb-3 shadow-sm">
-            <img src="/tri.png" alt="Logo" class="w-7 h-7 object-contain" />
-          </div>
-          <h2 class="text-2xl font-serif font-extrabold text-blueberry-900">
-            Tricastle Portal
-          </h2>
-          <p class="text-[11px] font-bold text-apricot-600 tracking-wider uppercase">
-            Construct Your Future
-          </p>
-        </div>
-
-        <!-- Login Router View -->
-        <div class="pt-1">
-          <RouterView />
-        </div>
+    <!-- Login center (unchanged look) -->
+    <main class="relative z-10 w-full max-w-md px-4 my-auto mx-auto py-6">
+      <div class="text-center mb-8 flex flex-col items-center">
+        <button type="button" class="mb-4" @click="openCompany('about')">
+          <img
+            src="/tri.png"
+            alt="Tricastle"
+            class="w-20 h-20 drop-shadow-md hover:scale-105 transition-transform"
+            @error="(e) => ((e.target as HTMLElement).style.display = 'none')"
+          />
+        </button>
+        <h1 class="text-3xl font-serif font-bold text-blueberry-800">
+          Tricastle Bacolod
+        </h1>
+        <p class="text-xs text-blueberry-500 mt-2 tracking-wide uppercase font-semibold">
+          WE BUILD YOUR DREAMS AND CONSTRUCT YOUR FUTURE
+        </p>
       </div>
+
+      <RouterView />
     </main>
 
-    <!-- 4. BOTTOM FOOTER BAR -->
-    <footer class="relative z-20 w-full max-w-7xl mx-auto px-6 py-3 flex items-center justify-between text-[11px] text-blueberry-700 bg-white/40 backdrop-blur-md border-t border-white/40 rounded-t-2xl">
-      <p class="font-medium">© {{ year }} Tricastle International, Inc. · Bacolod</p>
+    <!-- Footer -->
+    <footer
+      class="relative z-20 w-full max-w-6xl mx-auto px-6 py-4
+             flex flex-col sm:flex-row items-center justify-between
+             text-xs text-blueberry-500 gap-2 border-t border-appleCore-200/60"
+    >
+      <p>© {{ year }} Tricastle International, Inc.</p>
 
       <button
         type="button"
-        class="flex items-center gap-2 hover:text-blueberry-950 transition-colors group font-semibold cursor-pointer"
+        class="flex items-center gap-2 hover:text-blueberry-800 transition-colors group"
         @click="openCompany('team')"
       >
         <span>Engineered & Developed by</span>
-        <span class="px-2.5 py-0.5 rounded-lg bg-blueberry-900 text-white font-bold tracking-wide group-hover:bg-apricot-500 transition-colors shadow-sm">
+        <span
+          class="px-2 py-0.5 rounded-md bg-blueberry-800 text-white font-bold tracking-wide
+                 group-hover:bg-apricot-500 transition-colors"
+        >
           Ralph Barioga
         </span>
       </button>
     </footer>
 
-    <!-- Lazy company experience modal -->
+    <!-- Lazy company experience (only mounts when open) -->
     <CompanyExperienceModal
       v-if="showCompany"
       :initial-tab="companyTab"
@@ -96,7 +93,6 @@
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent } from 'vue'
 import { RouterView } from 'vue-router'
-import BuildingHeroScene from '@/components/landing/BuildingHeroScene.vue'
 
 const CompanyExperienceModal = defineAsyncComponent(
   () => import('./company-experience/CompanyExperienceModal.vue'),
@@ -111,19 +107,3 @@ function openCompany(tab: 'about' | 'principles' | 'team' = 'about') {
   showCompany.value = true
 }
 </script>
-
-<style>
-/* Lock body from scrolling on the login screen */
-html, body {
-  overflow: hidden !important;
-  height: 100% !important;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-.animate-fadeIn {
-  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-</style>
