@@ -1,18 +1,18 @@
-import express from 'express';
-import cors from 'cors';
-import { exec, execSync } from 'child_process';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
+const express = require('express');
+const cors = require('cors');
+const { exec, execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 
 const app = express();
 const PORT = 5555;
 
-// Allow CORS for Vercel, Localhost, and LAN IPs (192.168.x.x)
+// Allow CORS for Vercel & Localhost
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'] }));
 app.use(express.json());
 
-// ─── Auto-Install to Windows Startup ───
+// ─── Auto-install to Windows Startup ───
 function ensureWindowsStartup() {
   if (process.platform !== 'win32') return;
 
@@ -68,20 +68,6 @@ function getNaps2Path() {
 
 const NAPS2_PATH = getNaps2Path();
 
-// ─── Get LAN IPs for Network Diagnostics ───
-function getLanIps() {
-  const interfaces = os.networkInterfaces();
-  const ips = [];
-  for (const name of Object.keys(interfaces)) {
-    for (const iface of interfaces[name]) {
-      if (iface.family === 'IPv4' && !iface.internal) {
-        ips.push(iface.address);
-      }
-    }
-  }
-  return ips;
-}
-
 // 1. Health check
 app.get('/health', (req, res) => {
   const naps2Clean = NAPS2_PATH.replace(/"/g, '');
@@ -90,12 +76,11 @@ app.get('/health', (req, res) => {
     naps2Detected: fs.existsSync(naps2Clean) || naps2Clean === 'naps2.console',
     naps2Path: NAPS2_PATH,
     platform: process.platform,
-    lanIps: getLanIps(),
     port: PORT,
   });
 });
 
-// 2. Get list of scanners (USB & Network/eSCL devices)
+// 2. Devices list
 app.get('/scanners', (req, res) => {
   const cmd = `${NAPS2_PATH} --listdevices`;
 
@@ -115,7 +100,7 @@ function parseScanners(output) {
   const result = [];
 
   for (const line of lines) {
-    if (line.toLowerCase().includes('device') || line.includes('-') || line.toLowerCase().includes('escl') || line.toLowerCase().includes('wsd')) {
+    if (line.toLowerCase().includes('device') || line.includes('-')) {
       const parts = line.split('-').pop() || line;
       result.push({ name: parts.trim() });
     } else if (line) {
@@ -126,9 +111,9 @@ function parseScanners(output) {
   return result.length > 0 ? result : [{ name: 'Default Scanner' }];
 }
 
-// 3. Perform scan (Supports USB or Network Device/Profile)
+// 3. Perform scan
 app.post('/scan', (req, res) => {
-  const { device, profile, resolution = 300, colorMode = 'Color' } = req.body || {};
+  const { device, resolution = 300, colorMode = 'Color' } = req.body || {};
   const tempFile = path.join(os.tmpdir(), `scan_${Date.now()}.pdf`);
 
   let bitdepth = 'color';
@@ -136,10 +121,7 @@ app.post('/scan', (req, res) => {
   if (colorMode === 'BW') bitdepth = 'bw';
 
   let cmd = `${NAPS2_PATH} -o "${tempFile}" -f --dpi ${resolution} --bitdepth ${bitdepth}`;
-  
-  if (profile) {
-    cmd += ` --profile "${profile}"`;
-  } else if (device && device !== 'Default Scanner') {
+  if (device && device !== 'Default Scanner') {
     cmd += ` --device "${device}"`;
   }
 
@@ -154,17 +136,14 @@ app.post('/scan', (req, res) => {
     try {
       const fileBuffer = fs.readFileSync(tempFile);
       const base64Data = `data:application/pdf;base64,${fileBuffer.toString('base64')}`;
-
       fs.unlinkSync(tempFile);
 
-      console.log('[Scanner Helper] Network scan complete, sending PDF...');
       return res.json({
         success: true,
         data: base64Data,
         mimeType: 'application/pdf',
       });
     } catch (err) {
-      console.error('[Scanner Helper] Read failed:', err);
       return res.status(500).json({ success: false, message: 'Failed to read scanned file.' });
     }
   });
@@ -172,5 +151,4 @@ app.post('/scan', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Tricastle Scanner Agent running on http://localhost:${PORT}`);
-  console.log(`   Network LAN Access available at: ${getLanIps().map(ip => `http://${ip}:${PORT}`).join(', ')}`);
 });
