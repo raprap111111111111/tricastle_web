@@ -59,7 +59,9 @@ async function onSubmit(payload: DeployApplicantPayload) {
       @click="openDialog"
     />
 
+    <!-- ✅ ADDED v-if="showDialog" HERE -->
     <DeploymentDialog
+      v-if="showDialog"
       v-model:visible="showDialog"
       mode="deploy"
       :applicant-name="applicantName"

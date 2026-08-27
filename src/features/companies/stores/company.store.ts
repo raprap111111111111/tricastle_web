@@ -16,7 +16,9 @@ export const useCompanyStore = defineStore('company', () => {
   const activeCompanies  = ref<Company[]>([])
   const loadingActive    = ref(false)
   const hasFetchedActive = ref(false)
+
   let activeFetchPromise: Promise<Company[]> | null = null
+  let fetchCompaniesPromise: Promise<void> | null = null
 
   const filters = ref<CompanyFilters>({
     search: '', category_id: null, prefecture: '', city: '',
@@ -51,23 +53,30 @@ export const useCompanyStore = defineStore('company', () => {
   }
   function clearCompany() { company.value = null }
 
-  async function fetchCompanies() {
-    // 🛡️ GUARD: Prevent infinite re-entry if already loading
-    if (loading.value) return
+  async function fetchCompanies(force = false) {
+    // ⚡ FIX: Deduplicate concurrent requests
+    if (fetchCompaniesPromise && !force) return fetchCompaniesPromise
+    if (loading.value && !force) return
 
     loading.value = true
     error.value = null
-    try {
-      const res = await companyApi.list(cleanParams(filters.value))
-      companies.value = res.data
-      pagination.value = res.meta ?? res.pagination ?? null
-    } catch (e: any) {
-      error.value = e?.message ?? 'Failed to load companies'
-      companies.value = []
-      pagination.value = null
-    } finally {
-      loading.value = false
-    }
+
+    fetchCompaniesPromise = (async () => {
+      try {
+        const res = await companyApi.list(cleanParams(filters.value))
+        companies.value = res.data
+        pagination.value = res.meta ?? res.pagination ?? null
+      } catch (e: any) {
+        error.value = e?.message ?? 'Failed to load companies'
+        companies.value = []
+        pagination.value = null
+      } finally {
+        loading.value = false
+        fetchCompaniesPromise = null
+      }
+    })()
+
+    return fetchCompaniesPromise
   }
 
   async function fetchActiveCompanies(): Promise<Company[]> {

@@ -43,7 +43,6 @@ const deploymentStore = useDeploymentStore()
 const { handleBulkDeploy } = useDeployments()
 const toast = useToast()
 
-
 // ─── Filters composable ─────────────────────────────────────────────────────
 const filters = useFinalListFilters()
 
@@ -93,6 +92,8 @@ async function fetchFinalList(targetPage?: number | null): Promise<void> {
 }
 
 async function loadAllBatches(): Promise<void> {
+  // ⚡ FIX: Skip fetching if batches are already in memory
+  if (batchStore.batches.length > 0) return
   batchStore.setFilters({ limit: 1000 } as any)
   await batchStore.fetchBatches()
 }
@@ -132,6 +133,7 @@ async function onLimitChange(limit: number): Promise<void> {
 
   await fetchFinalList(1)
 }
+
 // ═══════════════════════════════════════════════════════════════════════════
 // BATCH OPTIONS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -268,21 +270,15 @@ async function onBulkDeploySubmit(payload: DeployApplicantPayload): Promise<void
   }
 }
 
-
 async function onDelete(id: number): Promise<void> {
   try {
-    // 1. Delete on the server & locally in store
     await store.deleteApplicant(id)
-
-    // 2. Remove ID from selectedIds if selected
     selectedIds.value = selectedIds.value.filter((selectedId) => selectedId !== id)
 
-    // 3. Handle last-page empty edge case
     const currentPage = store.pagination?.current_page ?? store.filters.page ?? 1
     const isNowEmptyPage = store.applicants.length === 0 && currentPage > 1
     const targetPage = isNowEmptyPage ? currentPage - 1 : currentPage
 
-    // 4. Refetch to keep server-side counts & limit in sync
     await fetchFinalList(targetPage)
 
     toast.add({
@@ -365,45 +361,90 @@ const bulkAIS = useBulkAISDialog(
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════════════
-         DIALOGS
+         DIALOGS (Wrapped with v-if to lazy-load on demand)
     ═══════════════════════════════════════════════════════════════════════ -->
 
-    <AdvancedFiltersDialog v-model:visible="filters.showAdvanced.value" v-model:gender="filters.gender.value"
-      v-model:civil-status="filters.civilStatus.value" v-model:nationality="filters.nationality.value"
-      v-model:quality-grade="filters.qualityGrade.value" v-model:city="filters.city.value"
-      v-model:province="filters.province.value" v-model:address="filters.address.value"
-      v-model:skill-category="filters.skillCategory.value" v-model:jlpt-level="filters.jlptLevel.value"
+    <AdvancedFiltersDialog
+      v-if="filters.showAdvanced.value"
+      v-model:visible="filters.showAdvanced.value"
+      v-model:gender="filters.gender.value"
+      v-model:civil-status="filters.civilStatus.value"
+      v-model:nationality="filters.nationality.value"
+      v-model:quality-grade="filters.qualityGrade.value"
+      v-model:city="filters.city.value"
+      v-model:province="filters.province.value"
+      v-model:address="filters.address.value"
+      v-model:skill-category="filters.skillCategory.value"
+      v-model:jlpt-level="filters.jlptLevel.value"
       v-model:willing-to-be-deployed="filters.willingToBeDeployed.value"
       v-model:japan-deployment-ready="filters.japanDeploymentReady.value"
       v-model:previous-japan-experience="filters.previousJapanExperience.value"
-      v-model:ssw-eligible="filters.sswEligible.value" :gender-options="filters.genderOptions"
-      :civil-status-options="filters.civilStatusOptions" :nationality-options="filters.nationalityOptions"
-      :quality-grade-options="filters.qualityGradeOptions" :skill-category-options="filters.skillCategoryOptions"
-      :jlpt-level-options="filters.jlptLevelOptions" :boolean-options="filters.booleanOptions"
-      :province-options="filters.provinceOptions.value" :city-options="filters.cityOptions.value"
-      :psgc-provinces="filters.psgcProvinces.value" :psgc-cities="filters.psgcCities.value"
-      :loading-provinces="filters.loadingProvinces.value" :loading-cities="filters.loadingCities.value"
-      :staged-advanced-count="filters.stagedAdvancedCount.value" :has-unsaved-changes="filters.hasUnsavedChanges.value"
-      @apply="filters.applyAdvanced" @clear="filters.clearAdvanced" />
+      v-model:ssw-eligible="filters.sswEligible.value"
+      :gender-options="filters.genderOptions"
+      :civil-status-options="filters.civilStatusOptions"
+      :nationality-options="filters.nationalityOptions"
+      :quality-grade-options="filters.qualityGradeOptions"
+      :skill-category-options="filters.skillCategoryOptions"
+      :jlpt-level-options="filters.jlptLevelOptions"
+      :boolean-options="filters.booleanOptions"
+      :province-options="filters.provinceOptions.value"
+      :city-options="filters.cityOptions.value"
+      :psgc-provinces="filters.psgcProvinces.value"
+      :psgc-cities="filters.psgcCities.value"
+      :loading-provinces="filters.loadingProvinces.value"
+      :loading-cities="filters.loadingCities.value"
+      :staged-advanced-count="filters.stagedAdvancedCount.value"
+      :has-unsaved-changes="filters.hasUnsavedChanges.value"
+      @apply="filters.applyAdvanced"
+      @clear="filters.clearAdvanced"
+    />
 
-    <ExcelExportDialog v-model:visible="excel.showExportDialog.value" v-model:export-scope="excel.exportScope.value"
-      v-model:export-batch-id="excel.exportBatchId.value" v-model:export-location="excel.exportLocation.value"
-      v-model:export-status="excel.exportStatus.value" :exporting="excel.exporting.value"
-      :filtered-count="store.applicants.length" :export-count="excel.exportApplicants.value.length"
-      :available-batches="availableBatches" :available-locations="excel.availableLocations.value"
-      :available-statuses="excel.availableStatuses.value" :selected-column-keys="excel.selectedColumnKeys.value"
-      :column-groups="excel.columnGroups.value" :all-columns="excel.ALL_COLUMNS" @toggle-column="excel.toggleColumn"
-      @toggle-group="excel.toggleGroup" @apply-preset="excel.applyPreset" @select-all="excel.selectAllColumns"
-      @clear-all="excel.clearAllColumns" @download="excel.handleDownload" />
+    <ExcelExportDialog
+      v-if="excel.showExportDialog.value"
+      v-model:visible="excel.showExportDialog.value"
+      v-model:export-scope="excel.exportScope.value"
+      v-model:export-batch-id="excel.exportBatchId.value"
+      v-model:export-location="excel.exportLocation.value"
+      v-model:export-status="excel.exportStatus.value"
+      :exporting="excel.exporting.value"
+      :filtered-count="store.applicants.length"
+      :export-count="excel.exportApplicants.value.length"
+      :available-batches="availableBatches"
+      :available-locations="excel.availableLocations.value"
+      :available-statuses="excel.availableStatuses.value"
+      :selected-column-keys="excel.selectedColumnKeys.value"
+      :column-groups="excel.columnGroups.value"
+      :all-columns="excel.ALL_COLUMNS"
+      @toggle-column="excel.toggleColumn"
+      @toggle-group="excel.toggleGroup"
+      @apply-preset="excel.applyPreset"
+      @select-all="excel.selectAllColumns"
+      @clear-all="excel.clearAllColumns"
+      @download="excel.handleDownload"
+    />
 
-    <BulkAISDialog v-model:visible="bulkAIS.showBulkAISDialog.value" v-model:source="bulkAIS.bulkAISSource.value"
-      v-model:batch-id="bulkAIS.bulkAISBatchId.value" v-model:mode="bulkAIS.bulkAISMode.value"
-      :generating="bulkAIS.bulkAISGenerating.value" :progress="bulkAIS.bulkAISProgress.value"
-      :selected-count="selectedIds.length" :filtered-count="store.applicants.length"
-      :applicants-count="bulkAIS.bulkAISApplicants.value.length" :available-batches="availableBatches"
-      @generate="bulkAIS.handleBulkAISGenerate" @close="bulkAIS.closeBulkAISDialog" />
+    <BulkAISDialog
+      v-if="bulkAIS.showBulkAISDialog.value"
+      v-model:visible="bulkAIS.showBulkAISDialog.value"
+      v-model:source="bulkAIS.bulkAISSource.value"
+      v-model:batch-id="bulkAIS.bulkAISBatchId.value"
+      v-model:mode="bulkAIS.bulkAISMode.value"
+      :generating="bulkAIS.bulkAISGenerating.value"
+      :progress="bulkAIS.bulkAISProgress.value"
+      :selected-count="selectedIds.length"
+      :filtered-count="store.applicants.length"
+      :applicants-count="bulkAIS.bulkAISApplicants.value.length"
+      :available-batches="availableBatches"
+      @generate="bulkAIS.handleBulkAISGenerate"
+      @close="bulkAIS.closeBulkAISDialog"
+    />
 
-    <BulkDeployDialog v-model:visible="bulkDeployDialog" :applicant-batch-ids="selectedApplicantBatchIds"
-      :submitting="deploymentStore.submitting" @submit="onBulkDeploySubmit" />
+    <BulkDeployDialog
+      v-if="bulkDeployDialog"
+      v-model:visible="bulkDeployDialog"
+      :applicant-batch-ids="selectedApplicantBatchIds"
+      :submitting="deploymentStore.submitting"
+      @submit="onBulkDeploySubmit"
+    />
   </div>
 </template>

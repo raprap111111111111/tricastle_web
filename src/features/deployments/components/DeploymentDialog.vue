@@ -88,26 +88,41 @@ const positionOptions = computed(() =>
 )
 
 // ─── Load companies + categories on mount ──────────────
-onMounted(async () => {
-  // Load companies
-  if (companyStore.companies.length === 0) {
-    try {
-      companyStore.setFilters({ limit: 1000, is_active: 1 } as any)
-      await companyStore.fetchCompanies()
-    } catch (err) {
-      console.error('Failed to load companies:', err)
-    }
-  }
+// ❌ REMOVE this entire onMounted block
+// onMounted(async () => { ... fetch companies/categories ... })
 
-  // Load categories
-  if (categoryStore.categories.length === 0) {
-    try {
-      categoryStore.setFilters({ limit: 1000, is_active: 1 } as any)
-      await categoryStore.fetchCategories()
-    } catch (err) {
-      console.error('Failed to load categories:', err)
+// ✅ Load ONLY when the dialog becomes visible
+watch(
+  () => props.visible,
+  async (isOpen) => {
+    if (!isOpen) return
+
+    if (companyStore.companies.length === 0) {
+      try {
+        companyStore.setFilters({ limit: 1000, is_active: true } as any)
+        await companyStore.fetchCompanies()
+      } catch (err) {
+        console.error('Failed to load companies:', err)
+      }
     }
+
+    if (categoryStore.categories.length === 0) {
+      try {
+        categoryStore.setFilters({ limit: 1000, is_active: true } as any)
+        await categoryStore.fetchCategories()
+      } catch (err) {
+        console.error('Failed to load categories:', err)
+      }
+    }
+// Load categories
+if (categoryStore.categories.length === 0) {
+  try {
+    categoryStore.setFilters({ limit: 1000, is_active: 1 } as any)
+    await categoryStore.fetchCategories()
+  } catch (err) {
+    console.error('Failed to load categories:', err)
   }
+}
 })
 
 // ─── Reset form ───────────────────────────────────────
@@ -252,26 +267,19 @@ const submitLabel = computed(() =>
 </script>
 
 <template>
-  <Dialog
-    :visible="visible"
-    @update:visible="emit('update:visible', $event)"
-    modal
-    :draggable="false"
-    :dismissable-mask="false"
-    :closable="false"
-    :style="{ width: '640px' }"
-    :pt="{
+  <Dialog :visible="visible" @update:visible="emit('update:visible', $event)" modal :draggable="false"
+    :dismissable-mask="false" :closable="false" :style="{ width: '640px' }" :pt="{
       root: { class: 'rounded-2xl overflow-hidden' },
       header: { class: '!p-0' },
       content: { class: '!p-0' },
-    }"
-  >
+    }">
     <template #container>
       <div class="bg-white rounded-2xl overflow-hidden">
         <!-- ─── Header ────────────────────────────── -->
         <div class="flex items-center justify-between p-5 border-b border-appleCore-100">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
+            <div
+              class="w-10 h-10 rounded-xl bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
               <i class="pi pi-send text-green-600 text-lg" />
             </div>
             <div>
@@ -282,11 +290,9 @@ const submitLabel = computed(() =>
               </p>
             </div>
           </div>
-          <button
-            type="button"
+          <button type="button"
             class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-appleCore-100 text-blueberry-500"
-            @click="onClose"
-          >
+            @click="onClose">
             <i class="pi pi-times text-sm" />
           </button>
         </div>
@@ -307,17 +313,9 @@ const submitLabel = computed(() =>
                 <label class="block text-xs font-medium text-blueberry-700 mb-1.5">
                   Country <span class="text-red-500">*</span>
                 </label>
-                <Select
-                  v-model="country"
-                  :options="countryOptions"
-                  option-label="label"
-                  option-value="value"
-                  placeholder="Select country..."
-                  class="w-full"
-                  filter
-                  editable
-                  :class="{ '!border-red-500': errors.country }"
-                />
+                <Select v-model="country" :options="countryOptions" option-label="label" option-value="value"
+                  placeholder="Select country..." class="w-full" filter editable
+                  :class="{ '!border-red-500': errors.country }" />
                 <p v-if="errors.country" class="text-[10px] text-red-500 mt-1">{{ errors.country }}</p>
               </div>
 
@@ -328,32 +326,20 @@ const submitLabel = computed(() =>
                   <span v-if="companyStore.loading" class="text-[10px] text-blueberry-400 font-normal">
                     <i class="pi pi-spin pi-spinner text-[9px]" /> Loading...
                   </span>
-                  <span
-                    v-else-if="country && companyOptions.length > 0"
-                    class="text-[10px] text-blueberry-400 font-normal"
-                  >
+                  <span v-else-if="country && companyOptions.length > 0"
+                    class="text-[10px] text-blueberry-400 font-normal">
                     ({{ companyOptions.length }} in {{ country }})
                   </span>
                 </label>
 
-                <Select
-                  v-model="companyId"
-                  :options="companyOptions"
-                  option-label="label"
-                  option-value="value"
-                  :placeholder="
-                    companyStore.loading
+                <Select v-model="companyId" :options="companyOptions" option-label="label" option-value="value"
+                  :placeholder="companyStore.loading
                       ? 'Loading companies...'
                       : companyOptions.length === 0 && country
                         ? 'No companies in ' + country
                         : 'Select company...'
-                  "
-                  class="w-full"
-                  filter
-                  show-clear
-                  :loading="companyStore.loading"
-                  :class="{ '!border-red-500': errors.company }"
-                >
+                    " class="w-full" filter show-clear :loading="companyStore.loading"
+                  :class="{ '!border-red-500': errors.company }">
                   <template #option="{ option }">
                     <div class="flex items-center gap-2 w-full">
                       <div class="w-7 h-7 rounded-lg bg-blueberry-50 flex items-center justify-center flex-shrink-0">
@@ -393,10 +379,8 @@ const submitLabel = computed(() =>
                 </Select>
                 <p v-if="errors.company" class="text-[10px] text-red-500 mt-1">{{ errors.company }}</p>
 
-                <p
-                  v-else-if="country && companyOptions.length === 0 && !companyStore.loading"
-                  class="text-[10px] text-amber-600 mt-1 flex items-center gap-1"
-                >
+                <p v-else-if="country && companyOptions.length === 0 && !companyStore.loading"
+                  class="text-[10px] text-amber-600 mt-1 flex items-center gap-1">
                   <i class="pi pi-exclamation-circle text-[9px]" />
                   No companies found in {{ country }}. Add one in the Companies module.
                 </p>
@@ -409,26 +393,14 @@ const submitLabel = computed(() =>
                   <span v-if="categoryStore.loading" class="text-[10px] text-blueberry-400 font-normal">
                     <i class="pi pi-spin pi-spinner text-[9px]" /> Loading...
                   </span>
-                  <span
-                    v-else-if="positionOptions.length > 0"
-                    class="text-[10px] text-blueberry-400 font-normal"
-                  >
+                  <span v-else-if="positionOptions.length > 0" class="text-[10px] text-blueberry-400 font-normal">
                     ({{ positionOptions.length }})
                   </span>
                 </label>
 
-                <Select
-                  v-model="position"
-                  :options="positionOptions"
-                  option-label="label"
-                  option-value="value"
-                  placeholder="Search or type position..."
-                  class="w-full"
-                  filter
-                  editable
-                  show-clear
-                  :loading="categoryStore.loading"
-                >
+                <Select v-model="position" :options="positionOptions" option-label="label" option-value="value"
+                  placeholder="Search or type position..." class="w-full" filter editable show-clear
+                  :loading="categoryStore.loading">
                   <template #option="{ option }">
                     <div class="flex items-center gap-2 w-full">
                       <div class="w-7 h-7 rounded-lg bg-apricot-50 flex items-center justify-center flex-shrink-0">
@@ -471,26 +443,14 @@ const submitLabel = computed(() =>
                 <label class="block text-xs font-medium text-blueberry-700 mb-1.5">
                   Deployment Date <span class="text-red-500">*</span>
                 </label>
-                <DatePicker
-                  v-model="deploymentDate"
-                  date-format="M dd, yy"
-                  show-icon
-                  icon-display="input"
-                  class="w-full"
-                  :class="{ '!border-red-500': errors.deploymentDate }"
-                />
+                <DatePicker v-model="deploymentDate" date-format="M dd, yy" show-icon icon-display="input"
+                  class="w-full" :class="{ '!border-red-500': errors.deploymentDate }" />
                 <p v-if="errors.deploymentDate" class="text-[10px] text-red-500 mt-1">{{ errors.deploymentDate }}</p>
               </div>
 
               <div>
                 <label class="block text-xs font-medium text-blueberry-700 mb-1.5">Flight Date</label>
-                <DatePicker
-                  v-model="flightDate"
-                  date-format="M dd, yy"
-                  show-icon
-                  icon-display="input"
-                  class="w-full"
-                />
+                <DatePicker v-model="flightDate" date-format="M dd, yy" show-icon icon-display="input" class="w-full" />
               </div>
             </div>
           </div>
@@ -505,24 +465,14 @@ const submitLabel = computed(() =>
             <div class="grid grid-cols-3 gap-3">
               <div>
                 <label class="block text-xs font-medium text-blueberry-700 mb-1.5">Duration (months)</label>
-                <InputNumber
-                  v-model="contractDurationMonths"
-                  placeholder="e.g. 12"
-                  :min="1"
-                  :max="120"
-                  class="w-full"
-                />
+                <InputNumber v-model="contractDurationMonths" placeholder="e.g. 12" :min="1" :max="120"
+                  class="w-full" />
               </div>
 
               <div>
                 <label class="block text-xs font-medium text-blueberry-700 mb-1.5">Start Date</label>
-                <DatePicker
-                  v-model="contractStartDate"
-                  date-format="M dd, yy"
-                  show-icon
-                  icon-display="input"
-                  class="w-full"
-                />
+                <DatePicker v-model="contractStartDate" date-format="M dd, yy" show-icon icon-display="input"
+                  class="w-full" />
               </div>
 
               <div>
@@ -530,13 +480,8 @@ const submitLabel = computed(() =>
                   <span>End Date</span>
                   <span class="text-[9px] text-blueberry-400 font-normal">(auto)</span>
                 </label>
-                <DatePicker
-                  v-model="contractEndDate"
-                  date-format="M dd, yy"
-                  show-icon
-                  icon-display="input"
-                  class="w-full"
-                />
+                <DatePicker v-model="contractEndDate" date-format="M dd, yy" show-icon icon-display="input"
+                  class="w-full" />
               </div>
             </div>
           </div>
@@ -551,24 +496,14 @@ const submitLabel = computed(() =>
             <div class="grid grid-cols-3 gap-3">
               <div class="col-span-2">
                 <label class="block text-xs font-medium text-blueberry-700 mb-1.5">Monthly Salary</label>
-                <InputNumber
-                  v-model="monthlySalary"
-                  placeholder="e.g. 1500"
-                  :min="0"
-                  :max-fraction-digits="2"
-                  class="w-full"
-                />
+                <InputNumber v-model="monthlySalary" placeholder="e.g. 1500" :min="0" :max-fraction-digits="2"
+                  class="w-full" />
               </div>
 
               <div>
                 <label class="block text-xs font-medium text-blueberry-700 mb-1.5">Currency</label>
-                <Select
-                  v-model="salaryCurrency"
-                  :options="SALARY_CURRENCIES"
-                  option-label="label"
-                  option-value="value"
-                  class="w-full"
-                />
+                <Select v-model="salaryCurrency" :options="SALARY_CURRENCIES" option-label="label" option-value="value"
+                  class="w-full" />
               </div>
             </div>
           </div>
@@ -582,41 +517,24 @@ const submitLabel = computed(() =>
 
             <div>
               <label class="block text-xs font-medium text-blueberry-700 mb-1.5">Visa Type</label>
-              <Select
-                v-model="visaType"
-                :options="visaTypeOptions"
-                option-label="label"
-                option-value="value"
-                placeholder="Select visa type..."
-                class="w-full"
-                editable
-                show-clear
-              />
+              <Select v-model="visaType" :options="visaTypeOptions" option-label="label" option-value="value"
+                placeholder="Select visa type..." class="w-full" editable show-clear />
             </div>
           </div>
 
           <!-- Notes -->
           <div class="pt-4 border-t border-appleCore-100">
             <label class="block text-xs font-medium text-blueberry-700 mb-1.5">Notes</label>
-            <Textarea
-              v-model="deploymentNotes"
-              rows="3"
-              placeholder="Any additional deployment notes..."
-              class="w-full"
-            />
+            <Textarea v-model="deploymentNotes" rows="3" placeholder="Any additional deployment notes..."
+              class="w-full" />
           </div>
         </div>
 
         <!-- ─── Footer ────────────────────────────── -->
         <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-appleCore-100 bg-appleCore-50/50">
           <Button label="Cancel" severity="secondary" text @click="onClose" />
-          <Button
-            :label="submitLabel"
-            :icon="mode === 'deploy' ? 'pi pi-send' : 'pi pi-check'"
-            :loading="submitting"
-            class="!bg-green-600 hover:!bg-green-700 !border-green-600"
-            @click="onSubmit"
-          />
+          <Button :label="submitLabel" :icon="mode === 'deploy' ? 'pi pi-send' : 'pi pi-check'" :loading="submitting"
+            class="!bg-green-600 hover:!bg-green-700 !border-green-600" @click="onSubmit" />
         </div>
       </div>
     </template>

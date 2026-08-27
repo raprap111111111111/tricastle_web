@@ -19,6 +19,8 @@ export const useBatchStore = defineStore('batch', () => {
   const loading     = ref(false)
   const submitting  = ref(false)
 
+  let fetchBatchesPromise: Promise<void> | null = null
+
   const filters = ref<BatchFilters>({
     search: '',
     status: '',
@@ -112,29 +114,38 @@ export const useBatchStore = defineStore('batch', () => {
   }
 
   // ─── Fetch ────────────────────────────────────────────
-  async function fetchBatches() {
+  async function fetchBatches(force = false) {
+    // ⚡ FIX: Deduplicate concurrent requests
+    if (fetchBatchesPromise && !force) return fetchBatchesPromise
+    if (loading.value && !force) return
+
     loading.value = true
-    try {
-      const page  = filters.value.page ?? 1
-      const limit = filters.value.limit ?? 10
+    fetchBatchesPromise = (async () => {
+      try {
+        const page  = filters.value.page ?? 1
+        const limit = filters.value.limit ?? 10
 
-      const params = cleanParams({
-        ...filters.value,
-        page,
-        limit,
-        offset: (page - 1) * limit,
-      })
+        const params = cleanParams({
+          ...filters.value,
+          page,
+          limit,
+          offset: (page - 1) * limit,
+        })
 
-      const res: any = await batchApi.list(params)
+        const res: any = await batchApi.list(params)
 
-      batches.value = extractList(res)
-      pagination.value = mapPagination(res, page, limit)
+        batches.value = extractList(res)
+        pagination.value = mapPagination(res, page, limit)
 
-      filters.value.page = pagination.value.current_page
-      filters.value.limit = pagination.value.per_page ?? limit
-    } finally {
-      loading.value = false
-    }
+        filters.value.page = pagination.value.current_page
+        filters.value.limit = pagination.value.per_page ?? limit
+      } finally {
+        loading.value = false
+        fetchBatchesPromise = null
+      }
+    })()
+
+    return fetchBatchesPromise
   }
 
   async function fetchBatch(id: number) {
@@ -241,33 +252,11 @@ export const useBatchStore = defineStore('batch', () => {
   }
 
   return {
-    // state
-    batches,
-    batch,
-    activeBatch,
-    pagination,
-    loading,
-    submitting,
-    filters,
-    // computed
+    batches, batch, activeBatch, pagination, loading, submitting, filters,
     hasActiveBatch,
-    // filter
-    setFilters,
-    setPage,
-    setLimit,
-    resetFilters,
-    clearBatch,
-    // fetch
-    fetchBatches,
-    fetchBatch,
-    fetchActiveBatch,
-    // CRUD
-    createBatch,
-    updateBatch,
-    deleteBatch,
-    updateStatus,
-    // active
-    activateBatch,
-    deactivateBatch,
+    setFilters, setPage, setLimit, resetFilters, clearBatch,
+    fetchBatches, fetchBatch, fetchActiveBatch,
+    createBatch, updateBatch, deleteBatch, updateStatus,
+    activateBatch, deactivateBatch,
   }
 })

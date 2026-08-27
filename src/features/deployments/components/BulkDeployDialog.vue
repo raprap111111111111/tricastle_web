@@ -47,16 +47,35 @@ const errors = ref<Record<string, string>>({})
 
 // ─── Load companies on mount ──────────────────────────
 // ─── Load companies + categories on mount ──────────────
-onMounted(async () => {
-  // Load companies
-  if (companyStore.companies.length === 0) {
-    try {
-      companyStore.setFilters({ limit: 1000, is_active: 1 } as any)
-      await companyStore.fetchCompanies()
-    } catch (err) {
-      console.error('Failed to load companies:', err)
+// ❌ REMOVE onMounted fetch
+
+watch(
+  () => props.visible,
+  async (isOpen) => {
+    if (!isOpen) return
+
+    // reset form (you already do this)
+    country.value = ''
+    companyId.value = null
+    // ... rest of your reset ...
+
+    if (companyStore.companies.length === 0) {
+      try {
+        companyStore.setFilters({ limit: 1000, is_active: true } as any)
+        await companyStore.fetchCompanies()
+      } catch (err) {
+        console.error('Failed to load companies:', err)
+      }
     }
-  }
+
+    if (categoryStore.categories.length === 0) {
+      try {
+        categoryStore.setFilters({ limit: 1000, is_active: true } as any)
+        await categoryStore.fetchCategories()
+      } catch (err) {
+        console.error('Failed to load categories:', err)
+      }
+    }
 
   // Load categories
   if (categoryStore.categories.length === 0) {

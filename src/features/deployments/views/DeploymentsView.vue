@@ -244,22 +244,23 @@ const selectedCompany = computed(() => selectedDeployment.value?.deployment_comp
     </template>
 
     <!-- ─── Edit Dialog ────────────────────────────── -->
-    <DeploymentDialog v-model:visible="editDialog" mode="edit" :deployment="selectedDeployment"
+    <!-- ─── Edit Dialog ────────────────────────────── -->
+    <DeploymentDialog v-if="editDialog" v-model:visible="editDialog" mode="edit" :deployment="selectedDeployment"
       :applicant-name="selectedApplicantName" :applicant-code="selectedApplicantCode" :submitting="store.submitting"
       @submit="onUpdateSubmit" />
 
     <!-- ─── Cancel Dialog ─────────────────────────── -->
-    <CancelDeploymentDialog v-model:visible="cancelDialog" :deployment="selectedDeployment"
+    <CancelDeploymentDialog v-if="cancelDialog" v-model:visible="cancelDialog" :deployment="selectedDeployment"
       :submitting="store.submitting" @confirm="onCancelConfirm" />
 
     <!-- ─── 🏠 Mark Returned Dialog ───────────────── -->
-    <MarkReturnedDialog v-model:visible="returnedDialog" :applicant-name="selectedApplicantName"
+    <MarkReturnedDialog v-if="returnedDialog" v-model:visible="returnedDialog" :applicant-name="selectedApplicantName"
       :applicant-code="selectedApplicantCode" :country="selectedCountry" :company="selectedCompany"
       :submitting="store.submitting" @confirm="onReturnedConfirm" />
 
     <!-- ─── ✅ Mark Completed Dialog ──────────────── -->
-    <MarkCompletedDialog v-model:visible="completedDialog" :applicant-name="selectedApplicantName"
-      :applicant-code="selectedApplicantCode" :country="selectedCountry" :company="selectedCompany"
-      :submitting="store.submitting" @confirm="onCompletedConfirm" />
+    <MarkCompletedDialog v-if="completedDialog" v-model:visible="completedDialog"
+      :applicant-name="selectedApplicantName" :applicant-code="selectedApplicantCode" :country="selectedCountry"
+      :company="selectedCompany" :submitting="store.submitting" @confirm="onCompletedConfirm" />
   </div>
 </template>
