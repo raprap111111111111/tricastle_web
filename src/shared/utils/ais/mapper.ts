@@ -8,6 +8,8 @@ import { calcYears, calcMonths, fmtMonthYear } from './formatters'
  * Extract photo URL from applicant record.
  * Forces https:// on all returned URLs.
  */
+// src/shared/utils/ais/mapper.ts
+
 export function getApplicantPhotoUrl(applicant: any): string | null {
   const docsList =
     applicant.currentDocuments ??
@@ -35,7 +37,7 @@ export function getApplicantPhotoUrl(applicant: any): string | null {
 
     if (photoDoc) {
       if (photoDoc.id) {
-        return `https://tricastle-api.onrender.com/api/v1/applicant-documents/${photoDoc.id}/file`
+        return `https://tricastle-api.onrender.com/api/v1/applicant-documents/${photoDoc.id}/preview`
       }
       const rawUrl = photoDoc.file_url ?? photoDoc.public_url ?? photoDoc.url ?? null
       if (rawUrl) return rawUrl.replace(/^http:\/\//i, 'https://')
