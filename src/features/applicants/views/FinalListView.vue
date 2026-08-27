@@ -30,6 +30,7 @@ import FinalListBulkActionsBar from '../components/final-list/FinalListBulkActio
 import AdvancedFiltersDialog from '../components/final-list/AdvancedFiltersDialog.vue'
 import ExcelExportDialog from '../components/final-list/ExcelExportDialog.vue'
 import BulkAISDialog from '../components/final-list/BulkAISDialog.vue'
+import { useToast } from 'primevue/usetoast'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SETUP
@@ -40,6 +41,8 @@ const store = useApplicantStore()
 const batchStore = useBatchStore()
 const deploymentStore = useDeploymentStore()
 const { handleBulkDeploy } = useDeployments()
+const toast = useToast()
+
 
 // ─── Filters composable ─────────────────────────────────────────────────────
 const filters = useFinalListFilters()
@@ -265,6 +268,39 @@ async function onBulkDeploySubmit(payload: DeployApplicantPayload): Promise<void
   }
 }
 
+
+async function onDelete(id: number): Promise<void> {
+  try {
+    // 1. Delete on the server & locally in store
+    await store.deleteApplicant(id)
+
+    // 2. Remove ID from selectedIds if selected
+    selectedIds.value = selectedIds.value.filter((selectedId) => selectedId !== id)
+
+    // 3. Handle last-page empty edge case
+    const currentPage = store.pagination?.current_page ?? store.filters.page ?? 1
+    const isNowEmptyPage = store.applicants.length === 0 && currentPage > 1
+    const targetPage = isNowEmptyPage ? currentPage - 1 : currentPage
+
+    // 4. Refetch to keep server-side counts & limit in sync
+    await fetchFinalList(targetPage)
+
+    toast.add({
+      severity: 'success',
+      summary: 'Applicant Deleted',
+      detail: 'Applicant was successfully removed.',
+      life: 3000,
+    })
+  } catch (e: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Delete Failed',
+      detail: store.error ?? e?.response?.data?.message ?? 'Failed to delete applicant',
+      life: 4000,
+    })
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // EXCEL EXPORT + BULK AIS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -317,7 +353,7 @@ const bulkAIS = useBulkAISDialog(
     <AppCard v-else :padding="'none'" :shadow="'soft'">
       <ApplicantTable :applicants="store.applicants" :pagination="store.pagination" :loading="store.loading"
         :submitting="false" :selectable="true" v-model:selectedIds="selectedIds" @page-change="onPageChange"
-        @limit-change="onLimitChange" @delete="() => { }" />
+        @limit-change="onLimitChange" @delete="onDelete" />
     </AppCard>
 
     <!-- ─── Empty state ───────────────────────────────────────────────────── -->
