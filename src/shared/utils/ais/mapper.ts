@@ -6,7 +6,7 @@ import { calcYears, calcMonths, fmtMonthYear } from './formatters'
 
 /**
  * Extract photo URL from applicant record.
- * Prefers secure API streaming endpoint /api/v1/applicant-documents/{id}/file over /storage/
+ * Forces https:// on all returned URLs.
  */
 export function getApplicantPhotoUrl(applicant: any): string | null {
   const docsList =
@@ -34,17 +34,14 @@ export function getApplicantPhotoUrl(applicant: any): string | null {
     })
 
     if (photoDoc) {
-      // 🎯 PREFER STREAM ENDPOINT (Guaranteed HTTPS & bypasses symlink /storage/ bugs)
       if (photoDoc.id) {
         return `https://tricastle-api.onrender.com/api/v1/applicant-documents/${photoDoc.id}/file`
       }
-
       const rawUrl = photoDoc.file_url ?? photoDoc.public_url ?? photoDoc.url ?? null
       if (rawUrl) return rawUrl.replace(/^http:\/\//i, 'https://')
     }
   }
 
-  // Check flat photo properties
   const flat = applicant.photo_url ?? applicant.profile_photo_url ?? applicant.avatar_url ?? null
   return flat ? flat.replace(/^http:\/\//i, 'https://') : null
 }

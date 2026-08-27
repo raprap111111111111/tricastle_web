@@ -5,13 +5,11 @@ let cachedWordmarkBase64: string | null = null
 
 /**
  * Fetch a URL and return its base64-encoded data URL.
- * Automatically converts insecure http:// -> https:// to prevent Mixed Content errors.
+ * Automatically upgrades http:// -> https:// to prevent Chrome Mixed Content blocks.
  */
 export async function fetchAsBase64(url: string): Promise<string | null> {
   try {
-    // 🎯 Auto-upgrade http:// to https://
     const secureUrl = url.replace(/^http:\/\//i, 'https://')
-
     const response = await fetch(secureUrl, { mode: 'cors' })
     if (!response.ok) return null
 
@@ -23,7 +21,7 @@ export async function fetchAsBase64(url: string): Promise<string | null> {
       reader.readAsDataURL(blob)
     })
   } catch (err) {
-    console.warn(`[AIS] Could not load ${url}:`, err)
+    console.warn(`[AIS] Could not load photo from ${url}:`, err)
     return null
   }
 }
