@@ -49,8 +49,9 @@ const previewPhotoApplicant = ref<Applicant | null>(null)
 const previewPos = ref({ x: 0, y: 0 })
 let photoHideTimer: ReturnType<typeof setTimeout> | null = null
 
-function getFullName(a: Applicant) {
-  return [a.first_name, a.middle_name, a.last_name, a.suffix].filter(Boolean).join(' ')
+function getFullName(a: Applicant | null | undefined): string {
+  if (!a) return 'Applicant'
+  return [a.first_name, a.middle_name, a.last_name, a.suffix].filter(Boolean).join(' ') || 'Applicant'
 }
 
 function onNameEnter(event: MouseEvent, applicant: Applicant) {
