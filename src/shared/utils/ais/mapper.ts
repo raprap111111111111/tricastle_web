@@ -6,15 +6,9 @@ import { calcYears, calcMonths, fmtMonthYear } from './formatters'
 
 /**
  * Extract photo URL from applicant record.
- * Checks flat photo properties AND nested documents array (2x2 Photo / ID Photo).
+ * Prefers secure API streaming endpoint /api/v1/applicant-documents/{id}/file over /storage/
  */
 export function getApplicantPhotoUrl(applicant: any): string | null {
-  // 1. Direct photo properties check
-  if (applicant.photo_url) return applicant.photo_url
-  if (applicant.profile_photo_url) return applicant.profile_photo_url
-  if (applicant.avatar_url) return applicant.avatar_url
-
-  // 2. Scan documents / currentDocuments / applicant_documents array for 2x2 Photo
   const docsList =
     applicant.currentDocuments ??
     applicant.documents ??
@@ -26,33 +20,36 @@ export function getApplicantPhotoUrl(applicant: any): string | null {
     const photoDoc = docsList.find((doc: any) => {
       const code = String(doc?.document_type?.code ?? doc?.documentType?.code ?? doc?.code ?? '').toUpperCase()
       const name = String(doc?.document_type?.name ?? doc?.documentType?.name ?? doc?.name ?? '').toUpperCase()
-      
+      const notes = String(doc?.notes ?? '').toUpperCase()
+
       return (
+        code === 'ID_PHOTO' ||
         code.includes('PHOTO') ||
         code.includes('2X2') ||
-        name.includes('PHOTO') ||
+        name.includes('ID PHOTO') ||
         name.includes('2X2') ||
-        name.includes('ID PHOTO')
+        name.includes('PHOTO') ||
+        notes.includes('2X2')
       )
     })
 
     if (photoDoc) {
-      // Return file_url, public_url, path, or url
-      return (
-        photoDoc.file_url ??
-        photoDoc.public_url ??
-        photoDoc.url ??
-        photoDoc.file_path ??
-        photoDoc.path ??
-        null
-      )
+      // 🎯 PREFER STREAM ENDPOINT (Guaranteed HTTPS & bypasses symlink /storage/ bugs)
+      if (photoDoc.id) {
+        return `https://tricastle-api.onrender.com/api/v1/applicant-documents/${photoDoc.id}/file`
+      }
+
+      const rawUrl = photoDoc.file_url ?? photoDoc.public_url ?? photoDoc.url ?? null
+      if (rawUrl) return rawUrl.replace(/^http:\/\//i, 'https://')
     }
   }
 
-  return null
+  // Check flat photo properties
+  const flat = applicant.photo_url ?? applicant.profile_photo_url ?? applicant.avatar_url ?? null
+  return flat ? flat.replace(/^http:\/\//i, 'https://') : null
 }
 
-/** Attach applicant's photo as base64 to the AISData (skips on error). */
+/** Attach applicant's photo as base64 to the AISData */
 export async function attachPhoto(applicant: any, aisData: AISData): Promise<void> {
   const url = getApplicantPhotoUrl(applicant)
   if (!url) return
@@ -81,7 +78,6 @@ export function mapApplicantToAIS(applicant: any, staffName?: string): AISData {
     ? `P ${Number(spouseSalaryVal).toLocaleString()} ${formatSalaryUnit(spouseUnit)}`
     : ''
 
-  // Work — total experience across all jobs, prefer primary job title
   const jobTitle = employment?.position
     || applicant.applied_position
     || applicant.trade_or_occupation
@@ -104,13 +100,11 @@ export function mapApplicantToAIS(applicant: any, staffName?: string): AISData {
     : { years: 0, months: 0 }
 
   return {
-    // Header
     position:        applicant.applied_position || applicant.trade_or_occupation || '',
     trade_test_try:  applicant.trade_test_try || '1st',
     trade_test_date: applicant.trade_test_date ? formatDateDots(applicant.trade_test_date) : '',
     applicant_code:  applicant.applicant_code,
 
-    // Personal
     last_name:          applicant.last_name || '',
     first_name:         applicant.first_name || '',
     middle_name:        applicant.middle_name || 'NMN',
@@ -129,7 +123,6 @@ export function mapApplicantToAIS(applicant: any, staffName?: string): AISData {
     religion:           applicant.religion || '',
     dominant_hand:      formatDominantHand(applicant.dominant_hand),
 
-    // Lifestyle
     is_smoking:         applicant.lifestyle?.is_smoking,
     smoking_frequency:  applicant.lifestyle?.is_smoking
       ? (applicant.lifestyle?.smoking_frequency ?? '')
@@ -139,13 +132,11 @@ export function mapApplicantToAIS(applicant: any, staffName?: string): AISData {
       ? (applicant.lifestyle?.drinking_frequency ?? '')
       : '',
 
-    // Family sentences + spouse
     family_background_notes: familyNotes,
     spouse_name:   spouseName,
     spouse_work:   spouseWork,
     spouse_salary: spouseSalaryFmt,
 
-    // Education
     vocational:        education.vocational?.school_name || '',
     high_school:       education.highSchool?.school_name || '',
     education_remarks: education.primary?.remarks || 'Completed without stopping',
@@ -156,7 +147,6 @@ export function mapApplicantToAIS(applicant: any, staffName?: string): AISData {
       education.primary?.year_ended ? `${education.primary.year_ended}-03-01` : '',
     ),
 
-    // Work Experience
     present_job_title:       jobTitle,
     present_job_role:        jobRole,
     present_job_description: jobDesc,
@@ -168,7 +158,6 @@ export function mapApplicantToAIS(applicant: any, staffName?: string): AISData {
     overseas_duration_years:  overseasYears,
     overseas_duration_months: overseasMonths,
 
-    // Japan contacts
     marucon_name:         marucon?.name || '',
     marucon_batch:        marucon?.batch_no || '',
     marucon_company:      marucon?.company_name || '',
@@ -179,7 +168,6 @@ export function mapApplicantToAIS(applicant: any, staffName?: string): AISData {
     non_marucon_company:  nonMarucon?.company_name || '',
     non_marucon_relation: nonMarucon?.relation || '',
 
-    // Footer
     ais_by: staffName ?? applicant.assigned_staff?.full_name ?? '',
     signature_date: new Date().toLocaleDateString('en-US', {
       year: 'numeric',

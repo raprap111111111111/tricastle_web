@@ -5,12 +5,16 @@ let cachedWordmarkBase64: string | null = null
 
 /**
  * Fetch a URL and return its base64-encoded data URL.
- * Returns null on any error (CORS, 404, network).
+ * Automatically converts insecure http:// -> https:// to prevent Mixed Content errors.
  */
 export async function fetchAsBase64(url: string): Promise<string | null> {
   try {
-    const response = await fetch(url)
+    // 🎯 Auto-upgrade http:// to https://
+    const secureUrl = url.replace(/^http:\/\//i, 'https://')
+
+    const response = await fetch(secureUrl, { mode: 'cors' })
     if (!response.ok) return null
+
     const blob = await response.blob()
     return await new Promise<string>((resolve, reject) => {
       const reader = new FileReader()
