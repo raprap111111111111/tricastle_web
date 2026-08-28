@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { AppButton, AppCard } from '@shared/ui'
@@ -16,6 +16,13 @@ interface ProfileField {
 const router = useRouter()
 const auth = useAuthStore()
 const { user } = storeToRefs(auth)
+
+// Track image loading errors
+const imageError = ref(false)
+
+const handleAvatarError = () => {
+  imageError.value = true
+}
 
 const {
   fullName,
@@ -161,7 +168,7 @@ const activityStats = computed(() => {
             <div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <!-- Identity -->
               <div class="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-center">
-                <!-- Avatar -->
+                <!-- Avatar with Error Fallback -->
                 <div class="relative shrink-0 self-start sm:self-center">
                   <div
                     class="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full
@@ -169,10 +176,11 @@ const activityStats = computed(() => {
                            ring-4 ring-white ring-offset-2 ring-offset-apricot-100"
                   >
                     <img
-                      v-if="avatarUrl"
+                      v-if="avatarUrl && !imageError"
                       :src="avatarUrl"
-                      alt=""
+                      alt="Avatar"
                       class="h-full w-full object-cover"
+                      @error="handleAvatarError"
                     />
                     <span v-else>{{ initials }}</span>
                   </div>
