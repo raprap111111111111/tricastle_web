@@ -1,4 +1,3 @@
-// src/app/router/routes/profile.routes.ts
 import type { RouteRecordRaw } from 'vue-router'
 
 export const profileRoutes: RouteRecordRaw[] = [
@@ -14,7 +13,24 @@ export const profileRoutes: RouteRecordRaw[] = [
         meta: {
           title: 'My Profile',
           requiresAuth: true,
-          // no permissions — every authenticated user can open their own profile
+        },
+      },
+      {
+        path: 'edit',
+        name: 'profile.edit',
+        component: () => import('@features/profile/views/ProfileEditView.vue'),
+        meta: {
+          title: 'Edit Profile',
+          requiresAuth: true,
+        },
+      },
+      {
+        path: 'password',
+        name: 'profile.password',
+        component: () => import('@features/profile/views/ChangePasswordView.vue'),
+        meta: {
+          title: 'Change Password',
+          requiresAuth: true,
         },
       },
     ],

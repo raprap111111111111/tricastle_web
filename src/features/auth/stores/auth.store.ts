@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { User } from '../types'
+import type { User } from '@/features/users/schemas/user.schema' // <-- Point directly to full User type
 import { authApi } from '../api/auth.api'
 import { parseApiError } from '@shared/api/errors'
 import type { LoginInput, RegisterInput } from '../schemas/auth.schema'
@@ -14,9 +14,11 @@ export const useAuthStore = defineStore('auth', () => {
   const error     = ref<string | null>(null)
 
   const isAuthenticated = computed(() => !!token.value)
+  
   const fullName = computed(() => {
     if (!user.value) return ''
-    return `${user.value.first_name} ${user.value.last_name}`.trim()
+    return user.value.full_name 
+      || `${user.value.first_name} ${user.value.last_name}`.trim()
   })
 
   function setToken(newToken: string) {

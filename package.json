@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"vite\" \"node scanner-helper.js\"",
+    "dev": "concurrently \"vite\" \"node scanner-helper.cjs\"",
     "dev:vite-only": "vite",
     "dev:force": "lsof -ti:5173 | xargs kill -9 2>/dev/null; concurrently \"vite\" \"node scanner-helper.js\"",
     "dev:clean": "rm -rf node_modules/.vite && lsof -ti:5173 | xargs kill -9 2>/dev/null; vite",

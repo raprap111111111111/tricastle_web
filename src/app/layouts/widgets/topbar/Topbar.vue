@@ -56,15 +56,26 @@
         @click="goToProfile"
       >
         <div class="text-right hidden sm:block">
-          <p class="text-sm font-medium text-blueberry-800">{{ authStore.fullName }}</p>
-          <p class="text-xs text-blueberry-500 capitalize">{{ role.replace('_', ' ') }}</p>
+          <p class="text-sm font-medium text-blueberry-800 leading-tight">
+            {{ fullName || authStore.fullName }}
+          </p>
+          <p class="text-xs text-blueberry-500 capitalize">
+            {{ primaryRole || role.replace(/_/g, ' ') }}
+          </p>
         </div>
 
+        <!-- Avatar picture with fallback to initials -->
         <div
           class="w-10 h-10 bg-apricot-500 text-white rounded-full
-                 flex items-center justify-center font-bold"
+                 flex items-center justify-center font-bold overflow-hidden shrink-0 shadow-sm"
         >
-          {{ initials }}
+          <img
+            v-if="avatarUrl"
+            :src="avatarUrl"
+            alt=""
+            class="w-full h-full object-cover"
+          />
+          <span v-else>{{ initials }}</span>
         </div>
       </button>
 
@@ -86,11 +97,13 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Menu from 'primevue/menu'
 import { useAuthStore } from '@features/auth/stores/auth.store'
 import { usePermissions } from '@shared/composables/usePermissions'
+import { useUserFormatters } from '@/features/users/composables/useUserFormatters'
 import NotificationBell from '@features/notifications/components/NotificationBell.vue'
 import { useSidebar } from '../../composables/useSidebar'
 
@@ -98,19 +111,17 @@ const route          = useRoute()
 const router         = useRouter()
 const toast          = useToast()
 const authStore      = useAuthStore()
-const { role }       = usePermissions()
+const { user }       = storeToRefs(authStore)
+
+// Destructure formatters so avatarUrl, initials, fullName & primaryRole update live
+const { fullName, initials, primaryRole, avatarUrl } = useUserFormatters(user)
+
+const { role }         = usePermissions()
 const { toggleMobile } = useSidebar()
 
 const loggingOut   = ref(false)
 const settingsMenu = ref()
 const pageTitle    = computed(() => (route.meta?.title as string) ?? 'Dashboard')
-
-const initials = computed(() => {
-  if (!authStore.user) return '?'
-  const first = authStore.user.first_name?.[0] ?? ''
-  const last  = authStore.user.last_name?.[0] ?? ''
-  return (first + last).toUpperCase() || '?'
-})
 
 // ─── Settings dropdown items ─────────────────────────────
 const settingsMenuItems = ref([
