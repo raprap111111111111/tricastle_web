@@ -29,7 +29,7 @@ export function useMoaDownload() {
   }
 
   /** Force browser download bypassing popup blockers */
-  function triggerBrowserDownload(url: string, filename = 'MOA_Document.pdf') {
+  function triggerBrowserDownload(url: string, filename = 'MOA_Document.docx') {
     const fullUrl = url.startsWith('http')
       ? url
       : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`
@@ -56,14 +56,14 @@ export function useMoaDownload() {
         throw new Error('Server generated MOA but did not return a valid download URL.')
       }
 
-      // 🎯 FIXED: Set file extension to .pdf
+      // Correct extension → .docx
       const docNo = body?.document_no ?? `MOA_${internshipId}`
-      triggerBrowserDownload(url, `${docNo}.pdf`)
+      triggerBrowserDownload(url, `${docNo}.docx`)
 
       toast.add({
         severity: 'success',
-        summary: 'MOA PDF Generated',
-        detail: `MOA PDF Document download started (${docNo}).`,
+        summary: 'MOA Generated',
+        detail: `MOA Word document download started (${docNo}).`,
         life: 3500,
       })
 
@@ -73,7 +73,7 @@ export function useMoaDownload() {
       toast.add({
         severity: 'error',
         summary: 'MOA Generation Failed',
-        detail: err?.response?.data?.message ?? err?.message ?? 'Could not generate MOA PDF Document.',
+        detail: err?.response?.data?.message ?? err?.message ?? 'Could not generate MOA document.',
         life: 5000,
       })
       throw err
@@ -93,8 +93,9 @@ export function useMoaDownload() {
         throw new Error('Server generated bulk MOAs but did not return a download URL.')
       }
 
-      // 🎯 FIXED: Zip fallback to .pdf
-      triggerBrowserDownload(url, body?.type === 'zip' ? 'Bulk_MOAs.zip' : 'MOA_Documents.pdf')
+      // Correct extensions
+      const filename = body?.type === 'zip' ? 'Bulk_MOAs.zip' : 'MOA_Document.docx'
+      triggerBrowserDownload(url, filename)
 
       toast.add({
         severity: 'success',
