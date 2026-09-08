@@ -167,7 +167,16 @@ export const Perm = {
   accessControlViewAny: 'access_control.viewAny',
   socialAccountViewAny: 'social_account.viewAny',
 
-
+  // Append inside your Perm object
+  internshipViewAny: 'internship.viewAny',
+  internshipView: 'internship.view',
+  internshipCreate: 'internship.create',
+  internshipUpdate: 'internship.update',
+  internshipDelete: 'internship.delete',
+  internshipGenerateMoa: 'internship.generateMoa',
+  internshipChangeCompany: 'internship.changeCompany',
+  internshipBulkGenerateMoa: 'internship.bulkGenerateMoa',
+  guarantorManage: 'guarantor.manage',
 
 
 

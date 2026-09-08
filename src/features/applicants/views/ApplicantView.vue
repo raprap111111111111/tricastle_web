@@ -5,86 +5,138 @@ import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Skeleton from 'primevue/skeleton'
+
+// Stores & Composables
 import { useApplicantStore } from '../stores/applicant.store'
+import { useMoaDownload } from '@features/internships/composables/useMoaDownload'
+
+// Components
 import ApplicantStatusBadge from '../components/ApplicantStatusBadge.vue'
 import AppAddressMap from '@shared/ui/map/AppAddressMap.vue'
 import DeploymentHistorySection from '@features/deployments/components/DeploymentHistorySection.vue'
+import InternshipHistorySection from '@features/internships/components/InternshipHistorySection.vue'
+import MoaWizardDialog from '@features/internships/components/MoaWizardDialog.vue'
 
-// ✅ NEW — barrel import (short and clean)
-import {
-  generateAIS,
-  generateBulkAIS,
-  mapApplicantToAIS,
-  type AISData,
-  type BulkProgress,
-} from '@shared/utils/ais'
+// APIs & Types
+import { internshipApi } from '@features/internships/api/internship.api'
+import { guarantorApi } from '@features/internships/api/guarantor.api'
+import type { Internship } from '@features/internships/types'
 
-// ✅ NEW — Photo utilities
+// Utilities
+import { generateAIS, mapApplicantToAIS } from '@shared/utils/ais'
 import { getApplicantPhoto, getDefaultAvatar } from '@shared/utils/applicant-photo'
 
+// ═══════════════════════════════════════════════════════════════════════════
+// PROPS & STORE
+// ═══════════════════════════════════════════════════════════════════════════
 const props = defineProps<{ id: number }>()
 
 const router = useRouter()
-const store  = useApplicantStore()
-const toast  = useToast()
+const store = useApplicantStore()
+const toast = useToast()
 
-// ─── Map visibility (persists across sessions) ────────────────────────────────
+const a = computed(() => store.applicant)
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAP TOGGLE
+// ═══════════════════════════════════════════════════════════════════════════
 const MAP_STORAGE_KEY = 'applicant_map_visible'
 const showMap = ref<boolean>(localStorage.getItem(MAP_STORAGE_KEY) !== 'false')
 
 watch(showMap, (v) => localStorage.setItem(MAP_STORAGE_KEY, String(v)))
 function toggleMap() { showMap.value = !showMap.value }
 
-onMounted(async () => {
-  store.clearApplicant()
-  await store.fetchApplicant(props.id)
-})
-
-const a = computed(() => store.applicant)
-
-// ─── Extract deployments from applicant_batches ────────────────────────────────
-const applicantDeployments = computed(() => {
-  if (!a.value?.applicant_batches) return []
-  return a.value.applicant_batches
-    .filter((ab: any) => ab.deployment_country || ab.deployed_at)
-    .map((ab: any) => ({
-      id:                       ab.id,
-      status:                   ab.cancelled_at ? 'cancelled'
-                                : ab.completed_at ? 'completed'
-                                : ab.returned_at  ? 'returned'
-                                : ab.status === 'deployed' ? 'deployed' : 'active',
-      deployment_country:       ab.deployment_country,
-      deployment_company:       ab.deployment_company,
-      deployment_position:      ab.deployment_position,
-      deployed_at:              ab.deployed_at,
-      contract_duration_months: ab.contract_duration_months,
-      contract_start_date:      ab.contract_start_date,
-      contract_end_date:        ab.contract_end_date,
-      monthly_salary:           ab.monthly_salary,
-      salary_currency:          ab.salary_currency,
-      flight_date:              ab.flight_date,
-      visa_type:                ab.visa_type,
-      deployment_notes:         ab.deployment_notes,
-      cancellation_reason:      ab.cancellation_reason,
-      cancelled_at:             ab.cancelled_at,
-      returned_at:              ab.returned_at,
-      return_reason:            ab.return_reason,
-      completed_at:             ab.completed_at,
-      completion_notes:         ab.completion_notes,
-      batch:                    ab.batch,
-    }))
+const fullAddress = computed(() => {
+  if (!a.value) return ''
+  return [a.value.current_address, a.value.city, a.value.province, a.value.postal_code]
+    .filter(Boolean)
+    .join(', ')
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 📄 AIS PDF GENERATION
+// MOA FLOW STATE
 // ═══════════════════════════════════════════════════════════════════════════
+const { generating: isDownloadingMoa, generateSingle: downloadSingleMoa } = useMoaDownload()
 
+const showMoaWizard = ref(false)
+const guarantorCount = ref(0)
+const currentInternship = ref<Internship | null>(null)
+const checkingFlowState = ref(false)
+
+const isGuarantorsComplete = computed(() => guarantorCount.value >= 2)
+const isInternshipComplete = computed(() => !!currentInternship.value)
+const isMoaReady = computed(() => isGuarantorsComplete.value && isInternshipComplete.value)
+
+const flowStep = computed(() => {
+  if (!isGuarantorsComplete.value) return 1
+  if (!isInternshipComplete.value) return 2
+  return 3
+})
+
+const flowProgress = computed(() => {
+  if (isMoaReady.value) return 100
+  if (isInternshipComplete.value) return 66
+  if (isGuarantorsComplete.value) return 33
+  return Math.min(33, Math.round((guarantorCount.value / 2) * 33))
+})
+
+const primaryFlowAction = computed(() => {
+  const label = !isGuarantorsComplete.value
+    ? 'Start MOA Wizard'
+    : !isInternshipComplete.value
+      ? 'Continue MOA Wizard'
+      : 'Generate MOA'
+
+  return {
+    label,
+    icon: 'pi pi-file-word',
+    class: '!bg-apricot-500 hover:!bg-apricot-600 !border-apricot-500 !text-white',
+    run: () => { showMoaWizard.value = true },
+  }
+})
+
+function unwrapList(res: any): any[] {
+  const body = res?.data?.data ?? res?.data ?? res
+  if (Array.isArray(body)) return body
+  if (Array.isArray(body?.data)) return body.data
+  if (Array.isArray(body?.records)) return body.records
+  return []
+}
+
+async function loadMoaFlowState() {
+  if (!store.applicant) return
+  checkingFlowState.value = true
+  try {
+    const [gRes, iRes] = await Promise.all([
+      guarantorApi.list(store.applicant.id),
+      internshipApi.byApplicant(store.applicant.id),
+    ])
+
+    guarantorCount.value = unwrapList(gRes).length
+
+    const iList = unwrapList(iRes) as Internship[]
+    currentInternship.value = iList.find((i) => i.is_current) ?? iList[0] ?? null
+  } catch (err) {
+    console.error('[Flow State] Failed to load MOA status', err)
+  } finally {
+    checkingFlowState.value = false
+  }
+}
+
+async function handleDirectDownloadMoa() {
+  if (!currentInternship.value || isDownloadingMoa.value) return
+  try {
+    await downloadSingleMoa(currentInternship.value.id)
+  } catch (err) {
+    console.error('[MOA] Download failed:', err)
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AIS PDF GENERATION
+// ═══════════════════════════════════════════════════════════════════════════
 const generatingAIS = ref(false)
 
-/**
- * Convert a remote image URL to base64 so jsPDF can embed it.
- * Returns null on failure (e.g. CORS or 404) — AIS still generates without photo.
- */
 async function urlToBase64(url: string): Promise<string | null> {
   try {
     const response = await fetch(url)
@@ -93,7 +145,7 @@ async function urlToBase64(url: string): Promise<string | null> {
     return await new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onloadend = () => resolve(reader.result as string)
-      reader.onerror   = reject
+      reader.onerror = reject
       reader.readAsDataURL(blob)
     })
   } catch {
@@ -101,45 +153,74 @@ async function urlToBase64(url: string): Promise<string | null> {
   }
 }
 
-async function handleGenerateAIS(): Promise<void> {
+async function handleGenerateAIS() {
   if (!a.value || generatingAIS.value) return
-
   generatingAIS.value = true
   try {
-    const aisData = mapApplicantToAIS(
-      a.value,
-      a.value.assigned_staff?.full_name,
-    )
-
-    // ✅ Embed real photo into PDF if available (ignoring ui-avatars fallback)
+    const aisData = mapApplicantToAIS(a.value, a.value.assigned_staff?.full_name)
     const photoUrl = getApplicantPhoto(a.value)
     if (photoUrl && !photoUrl.includes('ui-avatars.com')) {
       const base64 = await urlToBase64(photoUrl)
       if (base64) aisData.photo = base64
     }
-
     await generateAIS(aisData)
-
     toast.add({
       severity: 'success',
-      summary:  'AIS Generated',
-      detail:   `${a.value.applicant_code} information sheet downloaded`,
-      life:     3000,
+      summary: 'AIS Generated',
+      detail: `${a.value.applicant_code} information sheet downloaded`,
+      life: 3000,
     })
   } catch (err) {
     console.error('[AIS] Generation failed:', err)
     toast.add({
       severity: 'error',
-      summary:  'AIS Failed',
-      detail:   'Could not generate the information sheet. Please try again.',
-      life:     4000,
+      summary: 'AIS Failed',
+      detail: 'Could not generate information sheet.',
+      life: 4000,
     })
   } finally {
     generatingAIS.value = false
   }
 }
 
-// ─── Formatters ───────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// DEPLOYMENTS (derived from applicant_batches)
+// ═══════════════════════════════════════════════════════════════════════════
+const applicantDeployments = computed(() => {
+  if (!a.value?.applicant_batches) return []
+  return a.value.applicant_batches
+    .filter((ab: any) => ab.deployment_country || ab.deployed_at)
+    .map((ab: any) => ({
+      id: ab.id,
+      status: ab.cancelled_at ? 'cancelled'
+        : ab.completed_at ? 'completed'
+          : ab.returned_at ? 'returned'
+            : ab.status === 'deployed' ? 'deployed' : 'active',
+      deployment_country: ab.deployment_country,
+      deployment_company: ab.deployment_company,
+      deployment_position: ab.deployment_position,
+      deployed_at: ab.deployed_at,
+      contract_duration_months: ab.contract_duration_months,
+      contract_start_date: ab.contract_start_date,
+      contract_end_date: ab.contract_end_date,
+      monthly_salary: ab.monthly_salary,
+      salary_currency: ab.salary_currency,
+      flight_date: ab.flight_date,
+      visa_type: ab.visa_type,
+      deployment_notes: ab.deployment_notes,
+      cancellation_reason: ab.cancellation_reason,
+      cancelled_at: ab.cancelled_at,
+      returned_at: ab.returned_at,
+      return_reason: ab.return_reason,
+      completed_at: ab.completed_at,
+      completion_notes: ab.completion_notes,
+      batch: ab.batch,
+    }))
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FORMATTERS
+// ═══════════════════════════════════════════════════════════════════════════
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—'
   try {
@@ -154,7 +235,13 @@ function formatDateTime(dateStr: string | null | undefined): string {
   try {
     const d = new Date(dateStr)
     if (isNaN(d.getTime())) return '—'
-    return d.toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    return d.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
   } catch { return '—' }
 }
 
@@ -181,45 +268,48 @@ function gradeColor(grade: string): string {
 
 function skillCategoryColor(cat: string): string {
   const map: Record<string, string> = {
-    skilled:      'bg-green-50 text-green-700 ring-green-200',
+    skilled: 'bg-green-50 text-green-700 ring-green-200',
     semi_skilled: 'bg-blue-50 text-blue-700 ring-blue-200',
-    unskilled:    'bg-gray-50 text-gray-700 ring-gray-200',
+    unskilled: 'bg-gray-50 text-gray-700 ring-gray-200',
   }
   return map[cat] ?? 'bg-gray-50 text-gray-700 ring-gray-200'
 }
 
-const fullAddress = computed(() => {
-  if (!a.value) return ''
-  return [a.value.current_address, a.value.city, a.value.province, a.value.postal_code]
-    .filter(Boolean).join(', ')
-})
-
 function batchStatusColor(status?: string): string {
   const map: Record<string, string> = {
-    assigned:             'bg-blue-50 text-blue-700 ring-blue-200',
-    interview_scheduled:  'bg-cyan-50 text-cyan-700 ring-cyan-200',
-    interview_passed:     'bg-teal-50 text-teal-700 ring-teal-200',
-    interview_failed:     'bg-red-50 text-red-700 ring-red-200',
-    medical_pending:      'bg-yellow-50 text-yellow-700 ring-yellow-200',
-    medical_passed:       'bg-teal-50 text-teal-700 ring-teal-200',
-    medical_failed:       'bg-red-50 text-red-700 ring-red-200',
-    exam_pending:         'bg-yellow-50 text-yellow-700 ring-yellow-200',
-    exam_passed:          'bg-teal-50 text-teal-700 ring-teal-200',
-    exam_failed:          'bg-red-50 text-red-700 ring-red-200',
-    accepted:             'bg-emerald-50 text-emerald-700 ring-emerald-200',
-    rejected:             'bg-red-50 text-red-700 ring-red-200',
-    withdrawn:            'bg-gray-50 text-gray-700 ring-gray-200',
-    deployed:             'bg-indigo-50 text-indigo-700 ring-indigo-200',
+    assigned: 'bg-blue-50 text-blue-700 ring-blue-200',
+    interview_scheduled: 'bg-cyan-50 text-cyan-700 ring-cyan-200',
+    interview_passed: 'bg-teal-50 text-teal-700 ring-teal-200',
+    interview_failed: 'bg-red-50 text-red-700 ring-red-200',
+    medical_pending: 'bg-yellow-50 text-yellow-700 ring-yellow-200',
+    medical_passed: 'bg-teal-50 text-teal-700 ring-teal-200',
+    medical_failed: 'bg-red-50 text-red-700 ring-red-200',
+    exam_pending: 'bg-yellow-50 text-yellow-700 ring-yellow-200',
+    exam_passed: 'bg-teal-50 text-teal-700 ring-teal-200',
+    exam_failed: 'bg-red-50 text-red-700 ring-red-200',
+    accepted: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    rejected: 'bg-red-50 text-red-700 ring-red-200',
+    withdrawn: 'bg-gray-50 text-gray-700 ring-gray-200',
+    deployed: 'bg-indigo-50 text-indigo-700 ring-indigo-200',
   }
   return map[status ?? ''] ?? 'bg-gray-50 text-gray-700 ring-gray-200'
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LIFECYCLE
+// ═══════════════════════════════════════════════════════════════════════════
+onMounted(async () => {
+  store.clearApplicant()
+  await store.fetchApplicant(props.id)
+  await loadMoaFlowState()
+})
 </script>
 
 <template>
   <div class="flex flex-col gap-6 p-6 max-w-6xl mx-auto">
 
-    <!-- ─── Header ──────────────────────────────────────────────────────────── -->
-    <div class="flex items-center justify-between gap-3">
+    <!-- ═══════════════════════ HEADER ═══════════════════════ -->
+    <div class="flex items-center justify-between gap-3 flex-wrap">
       <div class="flex items-center gap-3">
         <Button icon="pi pi-arrow-left" text rounded @click="router.push({ name: 'applicants.index' })" />
         <div>
@@ -227,7 +317,8 @@ function batchStatusColor(status?: string): string {
           <p v-if="a" class="text-sm text-blueberry-500">View complete applicant information</p>
         </div>
       </div>
-      <div v-if="a" class="flex items-center gap-2">
+
+      <div v-if="a" class="flex flex-wrap items-center gap-2">
         <Button
           v-if="a.city || a.current_address"
           :label="showMap ? 'Hide Map' : 'Show Map'"
@@ -244,7 +335,7 @@ function batchStatusColor(status?: string): string {
           outlined
           :loading="generatingAIS"
           class="!text-red-600 !border-red-300 hover:!bg-red-50"
-          v-tooltip.top="'Download Applicant Information Sheet (PDF)'"
+          v-tooltip.top="'Download Information Sheet (PDF)'"
           @click="handleGenerateAIS"
         />
 
@@ -258,14 +349,14 @@ function batchStatusColor(status?: string): string {
       </div>
     </div>
 
-    <!-- ─── Loading ──────────────────────────────────────────────────────────── -->
+    <!-- ═══════════════════════ LOADING ═══════════════════════ -->
     <template v-if="store.loading">
+      <Skeleton height="100px" border-radius="16px" class="mb-4" />
       <Skeleton height="200px" border-radius="16px" />
-      <Skeleton height="300px" border-radius="16px" />
       <Skeleton height="300px" border-radius="16px" />
     </template>
 
-    <!-- ─── Not Found ─────────────────────────────────────────────────────────── -->
+    <!-- ═══════════════════════ NOT FOUND ═══════════════════════ -->
     <template v-else-if="!a">
       <div class="text-center py-16 text-blueberry-400">
         <i class="pi pi-exclamation-circle text-4xl mb-3" />
@@ -273,10 +364,200 @@ function batchStatusColor(status?: string): string {
       </div>
     </template>
 
-    <!-- ─── Full Details ──────────────────────────────────────────────────────── -->
+    <!-- ═══════════════════════ DETAILS ═══════════════════════ -->
     <template v-else>
 
-      <!-- Map -->
+      <!-- ─── MOA PROGRESS BAR WORKFLOW ─── -->
+      <section class="bg-white rounded-2xl border border-appleCore-200 p-5 shadow-sm">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+          <div class="flex items-center gap-2">
+            <i class="pi pi-file-word text-apricot-600 text-lg" />
+            <div>
+              <h3 class="text-sm font-bold text-blueberry-800 uppercase tracking-wider">
+                MOA Generation Progress
+              </h3>
+              <p class="text-xs text-blueberry-500">
+                Step {{ flowStep }} of 3 · Complete all steps to generate MOA
+              </p>
+            </div>
+            <Button
+              icon="pi pi-refresh"
+              text
+              rounded
+              size="small"
+              class="!w-6 !h-6 !p-0 text-blueberry-400"
+              :loading="checkingFlowState"
+              v-tooltip.top="'Refresh progress'"
+              @click="loadMoaFlowState"
+            />
+          </div>
+
+          <div class="flex items-center gap-2">
+            <Button
+              :label="primaryFlowAction.label"
+              :icon="primaryFlowAction.icon"
+              :class="primaryFlowAction.class"
+              class="!text-sm font-semibold"
+              @click="primaryFlowAction.run()"
+            />
+            <Button
+              v-if="isMoaReady"
+              label="Download"
+              icon="pi pi-download"
+              class="!text-sm !bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600 !text-white"
+              :loading="isDownloadingMoa"
+              @click="handleDirectDownloadMoa"
+            />
+          </div>
+        </div>
+
+        <!-- Overall Progress Bar -->
+        <div class="mb-5">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-[11px] font-semibold text-blueberry-600 uppercase tracking-wider">
+              Overall Progress
+            </span>
+            <span class="text-xs font-bold text-blueberry-800">{{ flowProgress }}%</span>
+          </div>
+          <div class="h-2.5 w-full rounded-full bg-gray-100 overflow-hidden">
+            <div
+              class="h-full rounded-full transition-all duration-500 ease-out"
+              :class="flowProgress === 100 ? 'bg-emerald-500' : 'bg-apricot-500'"
+              :style="{ width: flowProgress + '%' }"
+            />
+          </div>
+        </div>
+
+        <!-- 3 Step Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+
+          <!-- Step 1: Guarantors -->
+          <button
+            type="button"
+            class="text-left p-4 rounded-xl border-2 transition-all"
+            :class="isGuarantorsComplete
+              ? 'bg-emerald-50 border-emerald-200'
+              : flowStep === 1
+                ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-200'
+                : 'bg-gray-50 border-gray-200'"
+            @click="showMoaWizard = true"
+          >
+            <div class="flex items-center gap-3 mb-2">
+              <div
+                class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+                :class="isGuarantorsComplete ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'"
+              >
+                <i v-if="isGuarantorsComplete" class="pi pi-check text-[11px]" />
+                <span v-else>1</span>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-blueberry-800">Guarantors</p>
+                <p class="text-[11px]" :class="isGuarantorsComplete ? 'text-emerald-700' : 'text-amber-700'">
+                  {{ guarantorCount }}/2 added
+                </p>
+              </div>
+            </div>
+            <div class="h-1.5 w-full rounded-full bg-white/70 overflow-hidden">
+              <div
+                class="h-full rounded-full transition-all duration-300"
+                :class="isGuarantorsComplete ? 'bg-emerald-500' : 'bg-amber-500'"
+                :style="{ width: Math.min(100, (guarantorCount / 2) * 100) + '%' }"
+              />
+            </div>
+          </button>
+
+          <!-- Step 2: Internship -->
+          <button
+            type="button"
+            class="text-left p-4 rounded-xl border-2 transition-all"
+            :class="isInternshipComplete
+              ? 'bg-emerald-50 border-emerald-200'
+              : flowStep === 2
+                ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-200'
+                : 'bg-gray-50 border-gray-200 opacity-70'"
+            :disabled="!isGuarantorsComplete"
+            @click="isGuarantorsComplete && (showMoaWizard = true)"
+          >
+            <div class="flex items-center gap-3 mb-2">
+              <div
+                class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+                :class="isInternshipComplete
+                  ? 'bg-emerald-500 text-white'
+                  : isGuarantorsComplete
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-300 text-gray-500'"
+              >
+                <i v-if="isInternshipComplete" class="pi pi-check text-[11px]" />
+                <span v-else>2</span>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-blueberry-800">Internship</p>
+                <p class="text-[11px]" :class="isInternshipComplete ? 'text-emerald-700' : 'text-blue-700'">
+                  {{ isInternshipComplete ? 'Created' : (isGuarantorsComplete ? 'Ready to create' : 'Locked') }}
+                </p>
+              </div>
+            </div>
+            <div class="h-1.5 w-full rounded-full bg-white/70 overflow-hidden">
+              <div
+                class="h-full rounded-full transition-all duration-300"
+                :class="isInternshipComplete ? 'bg-emerald-500' : 'bg-blue-500'"
+                :style="{ width: isInternshipComplete ? '100%' : '0%' }"
+              />
+            </div>
+          </button>
+
+          <!-- Step 3: MOA Document -->
+          <div
+            class="p-4 rounded-xl border-2 transition-all"
+            :class="isMoaReady
+              ? 'bg-apricot-50 border-apricot-300 ring-2 ring-apricot-200'
+              : 'bg-gray-50 border-gray-200 opacity-70'"
+          >
+            <div class="flex items-center gap-3 mb-2">
+              <div
+                class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+                :class="isMoaReady ? 'bg-apricot-500 text-white' : 'bg-gray-300 text-gray-500'"
+              >
+                <i v-if="isMoaReady" class="pi pi-file-word text-[11px]" />
+                <span v-else>3</span>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-blueberry-800">MOA Document</p>
+                <p class="text-[11px]" :class="isMoaReady ? 'text-apricot-800' : 'text-gray-500'">
+                  {{ isMoaReady ? 'Ready to generate' : 'Locked' }}
+                </p>
+              </div>
+            </div>
+            <div class="h-1.5 w-full rounded-full bg-white/70 overflow-hidden mb-3">
+              <div
+                class="h-full rounded-full transition-all duration-300 bg-apricot-500"
+                :style="{ width: isMoaReady ? '100%' : '0%' }"
+              />
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <Button
+                label="Generate"
+                icon="pi pi-file-word"
+                size="small"
+                class="!text-xs !bg-teal-600 hover:!bg-teal-700 !border-teal-600 !text-white"
+                :disabled="!isMoaReady"
+                @click="showMoaWizard = true"
+              />
+              <Button
+                label="Download"
+                icon="pi pi-download"
+                size="small"
+                class="!text-xs !bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600 !text-white"
+                :disabled="!isMoaReady"
+                :loading="isDownloadingMoa"
+                @click="handleDirectDownloadMoa"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── MAP SECTION ─── -->
       <Transition
         enter-active-class="transition-all duration-300 ease-out"
         enter-from-class="opacity-0 -translate-y-4 max-h-0"
@@ -296,10 +577,20 @@ function batchStatusColor(status?: string): string {
               </div>
               <div>
                 <p class="text-sm font-semibold text-blueberry-800">Applicant Location</p>
-                <p class="text-xs text-blueberry-500 truncate max-w-md">{{ fullAddress || 'No address' }}</p>
+                <p class="text-xs text-blueberry-500 truncate max-w-md">
+                  {{ fullAddress || 'No address' }}
+                </p>
               </div>
             </div>
-            <Button icon="pi pi-times" severity="secondary" text rounded size="small" @click="showMap = false" v-tooltip.top="'Hide map'" />
+            <Button
+              icon="pi pi-times"
+              severity="secondary"
+              text
+              rounded
+              size="small"
+              @click="showMap = false"
+              v-tooltip.top="'Hide map'"
+            />
           </div>
           <div class="h-[320px] w-full">
             <AppAddressMap
@@ -331,10 +622,9 @@ function batchStatusColor(status?: string): string {
         <i class="pi pi-chevron-down text-xs" />
       </button>
 
-      <!-- ─── Profile Header ─────────────────────────────────────────────────── -->
+      <!-- ─── PROFILE HEADER ─── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
         <div class="flex items-start gap-5">
-          <!-- 🖼️ APPLICANT PHOTO AVATAR -->
           <div class="w-24 h-24 rounded-full bg-appleCore-50 border border-appleCore-200 flex-shrink-0 shadow-sm overflow-hidden flex items-center justify-center">
             <img
               :src="getApplicantPhoto(a)"
@@ -352,11 +642,9 @@ function batchStatusColor(status?: string): string {
               <ApplicantStatusBadge :status="a.status" />
               <span
                 v-if="a.deployment?.japan_deployment_ready"
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
-                       font-semibold bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200"
               >
-                <i class="pi pi-send text-[10px]" />
-                JP Ready
+                <i class="pi pi-send text-[10px]" /> JP Ready
               </span>
             </div>
             <h2 class="text-2xl font-serif font-semibold text-blueberry-800">
@@ -367,16 +655,13 @@ function batchStatusColor(status?: string): string {
             </h2>
             <div class="flex flex-wrap gap-4 mt-2 text-sm text-blueberry-500">
               <span class="flex items-center gap-1.5">
-                <i class="pi pi-envelope text-xs" />
-                {{ a.email }}
+                <i class="pi pi-envelope text-xs" /> {{ a.email }}
               </span>
               <span v-if="a.phone" class="flex items-center gap-1.5">
-                <i class="pi pi-phone text-xs" />
-                {{ a.phone }}
+                <i class="pi pi-phone text-xs" /> {{ a.phone }}
               </span>
               <span v-if="a.nationality" class="flex items-center gap-1.5">
-                <i class="pi pi-globe text-xs" />
-                {{ a.nationality }}
+                <i class="pi pi-globe text-xs" /> {{ a.nationality }}
               </span>
               <span
                 v-if="a.city"
@@ -387,11 +672,11 @@ function batchStatusColor(status?: string): string {
                 {{ [a.city, a.province].filter(Boolean).join(', ') }}
               </span>
               <span v-if="a.trade_or_occupation" class="flex items-center gap-1.5">
-                <i class="pi pi-briefcase text-xs text-apricot-500" />
-                {{ a.trade_or_occupation }}
+                <i class="pi pi-briefcase text-xs text-apricot-500" /> {{ a.trade_or_occupation }}
               </span>
             </div>
           </div>
+
           <div class="text-right flex-shrink-0">
             <p class="text-xs text-blueberry-400 uppercase font-medium tracking-wider">Quality Score</p>
             <p class="text-3xl font-serif font-bold text-blueberry-800 mt-1">{{ a.quality_score }}%</p>
@@ -440,7 +725,7 @@ function batchStatusColor(status?: string): string {
         </div>
       </section>
 
-      <!-- ─── Personal Information ───────────────────────────────────────────── -->
+      <!-- ─── PERSONAL INFORMATION ─── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
         <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
           <i class="pi pi-user text-apricot-500" />
@@ -468,7 +753,7 @@ function batchStatusColor(status?: string): string {
         </dl>
       </section>
 
-      <!-- ─── Physical Information ───────────────────────────────────────────── -->
+      <!-- ─── PHYSICAL INFORMATION ─── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
         <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
           <i class="pi pi-heart text-apricot-500" />
@@ -482,7 +767,7 @@ function batchStatusColor(status?: string): string {
         </dl>
       </section>
 
-      <!-- ─── Address ──────────────────────────────────────────────────────────── -->
+      <!-- ─── ADDRESS ─── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-base font-serif font-semibold text-blueberry-800 flex items-center gap-2">
@@ -508,7 +793,7 @@ function batchStatusColor(status?: string): string {
         </dl>
       </section>
 
-      <!-- ─── Documents & Government IDs ────────────────────────────────────── -->
+      <!-- ─── DOCUMENTS & GOVERNMENT IDs ─── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
         <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
           <i class="pi pi-id-card text-apricot-500" />
@@ -524,7 +809,7 @@ function batchStatusColor(status?: string): string {
         </dl>
       </section>
 
-      <!-- ─── Japan Deployment Profile (Phase 1) ───────────────────────────── -->
+      <!-- ─── JAPAN DEPLOYMENT PROFILE ─── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
         <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-5 flex items-center gap-2">
           <i class="pi pi-send text-apricot-500" />
@@ -576,8 +861,7 @@ function batchStatusColor(status?: string): string {
               <dd class="mt-1">
                 <span
                   v-if="a.language?.jlpt_level"
-                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold
-                         bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200"
+                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200"
                 >
                   {{ a.language.jlpt_level }}
                 </span>
@@ -666,7 +950,7 @@ function batchStatusColor(status?: string): string {
         </div>
       </section>
 
-      <!-- ─── Family & Emergency Contact (Phase 1) ──────────────────────────── -->
+      <!-- ─── FAMILY & EMERGENCY CONTACT ─── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
         <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
           <i class="pi pi-users text-apricot-500" />
@@ -735,7 +1019,7 @@ function batchStatusColor(status?: string): string {
         <p v-else class="text-blueberry-400 italic text-sm">No family information recorded</p>
       </section>
 
-      <!-- ─── Lifestyle ─────────────────────────────────────────────────────── -->
+      <!-- ─── LIFESTYLE & HEALTH ─── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
         <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
           <i class="pi pi-shield text-apricot-500" />
@@ -790,7 +1074,7 @@ function batchStatusColor(status?: string): string {
         <p v-else class="text-blueberry-400 italic text-sm">No lifestyle information recorded</p>
       </section>
 
-      <!-- ─── Education ─────────────────────────────────────────────────────── -->
+      <!-- ─── EDUCATION ─── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
         <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
           <i class="pi pi-book text-apricot-500" />
@@ -817,7 +1101,7 @@ function batchStatusColor(status?: string): string {
         <p v-else class="text-blueberry-400 italic text-sm">No education records</p>
       </section>
 
-      <!-- ─── Employment ────────────────────────────────────────────────────── -->
+      <!-- ─── EMPLOYMENT HISTORY ─── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
         <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
           <i class="pi pi-briefcase text-apricot-500" />
@@ -855,7 +1139,7 @@ function batchStatusColor(status?: string): string {
         <p v-else class="text-blueberry-400 italic text-sm">No employment history</p>
       </section>
 
-      <!-- ─── Tattoos ───────────────────────────────────────────────────────── -->
+      <!-- ─── TATTOOS ─── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
         <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
           <i class="pi pi-palette text-apricot-500" />
@@ -881,7 +1165,7 @@ function batchStatusColor(status?: string): string {
         <p v-else class="text-blueberry-400 italic text-sm">No tattoo records</p>
       </section>
 
-      <!-- ─── Batch Assignments ─────────────────────────────────────────────── -->
+      <!-- ─── BATCH ASSIGNMENTS ─── -->
       <section
         v-if="a.applicant_batches && a.applicant_batches.length > 0"
         class="bg-white rounded-2xl border border-appleCore-100 p-6"
@@ -930,10 +1214,10 @@ function batchStatusColor(status?: string): string {
             </div>
 
             <p v-if="ab.interview_notes" class="text-sm text-blueberry-600 mt-2 italic"><strong>Interview notes:</strong> {{ ab.interview_notes }}</p>
-            <p v-if="ab.medical_notes"   class="text-sm text-blueberry-600 mt-1 italic"><strong>Medical notes:</strong> {{ ab.medical_notes }}</p>
-            <p v-if="ab.remarks"         class="text-sm text-blueberry-600 mt-1 italic"><strong>Remarks:</strong> {{ ab.remarks }}</p>
+            <p v-if="ab.medical_notes" class="text-sm text-blueberry-600 mt-1 italic"><strong>Medical notes:</strong> {{ ab.medical_notes }}</p>
+            <p v-if="ab.remarks" class="text-sm text-blueberry-600 mt-1 italic"><strong>Remarks:</strong> {{ ab.remarks }}</p>
             <p v-if="ab.rejection_reason" class="text-sm text-red-600 mt-2"><strong>Rejection reason:</strong> {{ ab.rejection_reason }}</p>
-            <p v-if="ab.processed_by"    class="text-xs text-blueberry-400 mt-2">Processed by: {{ ab.processed_by?.full_name }}</p>
+            <p v-if="ab.processed_by" class="text-xs text-blueberry-400 mt-2">Processed by: {{ ab.processed_by?.full_name }}</p>
           </div>
         </div>
       </section>
@@ -951,9 +1235,21 @@ function batchStatusColor(status?: string): string {
         </p>
       </section>
 
-      <!-- 🚀 Deployment History -->
+      <!-- ─── INTERNSHIP HISTORY (kept – not in modal) ─── -->
+      <InternshipHistorySection :applicant-id="a.id" />
+
+      <!-- ─── DEPLOYMENT HISTORY ─── -->
       <DeploymentHistorySection :deployments="applicantDeployments" />
 
     </template>
+
+    <!-- ═══════════════════════ MOA WIZARD DIALOG ═══════════════════════ -->
+    <MoaWizardDialog
+      v-if="showMoaWizard && a"
+      v-model:visible="showMoaWizard"
+      :applicant-id="a.id"
+      @completed="loadMoaFlowState"
+    />
+
   </div>
 </template>

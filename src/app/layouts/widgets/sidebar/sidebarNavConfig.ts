@@ -76,6 +76,12 @@ export function buildNavSections(_ctx: PermissionContext): NavSection[] {
           to: '/document-expiry-alerts',
           permissions: [Perm.documentExpiryAlertViewAny],
         },
+        {
+          icon: 'pi pi-briefcase',
+          title: 'Internships',
+          to: '/internships',
+          permissions: [Perm.internshipViewAny],
+        },
       ],
     },
 

@@ -25,6 +25,7 @@ import { verificationMismatchRoutes } from './routes/verification-mismatch.route
 import { activityLogRoutes } from './routes/activity-log.routes'
 import { notificationsRoutes } from './routes/notifications.routes'
 import { deploymentRoutes } from './routes/deployment.routes'
+import { internshipRoutes } from './routes/internship.routes'
 
 
 
@@ -55,7 +56,7 @@ const router = createRouter({
     ...activityLogRoutes,
     ...notificationsRoutes,
     ...deploymentRoutes,
-
+    ...internshipRoutes, 
 
     { path: '/:pathMatch(.*)*', name: 'NotFound', redirect: '/dashboard' },
   ],
