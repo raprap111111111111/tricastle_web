@@ -1,16 +1,18 @@
 /**
- * Resolve avatar to a browser-loadable URL (local storage, S3, R2, blob).
+ * Resolve avatar to a browser-loadable URL.
+ * Backend always returns either:
+ *   - full external URL (Google / OAuth)
+ *   - API stream URL   /api/v1/users/{id}/avatar
+ *   - or null
  */
 export function resolveAvatarUrl(
   avatar?: string | null,
-  apiBase = import.meta.env.VITE_API_BASE_URL as string | undefined
 ): string | null {
   if (!avatar) return null
 
-  // Normalize Windows backslashes (avatars\abc.jpg -> avatars/abc.jpg)
   const normalized = avatar.replace(/\\/g, '/')
 
-  // Already absolute or local blob preview
+  // Already a full URL, blob, or data URI → use as-is
   if (
     normalized.startsWith('http://') ||
     normalized.startsWith('https://') ||
@@ -20,22 +22,24 @@ export function resolveAvatarUrl(
     return normalized
   }
 
-  // Determine backend origin (e.g. http://localhost:8086)
-  const base = apiBase || 'http://localhost:8086'
-  let origin = 'http://localhost:8086'
-  try {
-    origin = new URL(base).origin
-  } catch {
-    if (typeof window !== 'undefined') {
-      origin = window.location.origin
+  // Backend already gave us the stream path (starts with /api/...)
+  if (normalized.startsWith('/api/')) {
+    const base = import.meta.env.VITE_API_BASE_URL || window.location.origin
+    try {
+      return new URL(normalized, base).toString()
+    } catch {
+      return normalized
     }
   }
 
-  const cleanPath = normalized.startsWith('/') ? normalized : `/${normalized}`
-
-  if (cleanPath.startsWith('/storage/')) {
-    return `${origin}${cleanPath}`
+  // Fallback (should almost never happen now)
+  const base = import.meta.env.VITE_API_BASE_URL || window.location.origin
+  try {
+    return new URL(
+      normalized.startsWith('/') ? normalized : `/${normalized}`,
+      base,
+    ).toString()
+  } catch {
+    return null
   }
-
-  return `${origin}/storage${cleanPath}`
 }
