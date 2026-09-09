@@ -1,7 +1,6 @@
 <!-- src/features/applicants/views/FinalListView.vue -->
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+
 import Skeleton from 'primevue/skeleton'
 import Button from 'primevue/button'
 import { AppCard } from '@shared/ui'
@@ -9,6 +8,9 @@ import { useApplicantStore } from '../stores/applicant.store'
 import { useBatchStore } from '@features/batches/stores/batch.store'
 import ApplicantTable from '../components/ApplicantTable.vue'
 import type { BatchSummary } from '../types'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router' // 👈 Added useRoute
+
 
 // 🚀 Deployment
 import BulkDeployDialog from '@features/deployments/components/BulkDeployDialog.vue'
@@ -36,12 +38,13 @@ import { useToast } from 'primevue/usetoast'
 // SETUP
 // ═══════════════════════════════════════════════════════════════════════════
 
-const router = useRouter()
 const store = useApplicantStore()
 const batchStore = useBatchStore()
 const deploymentStore = useDeploymentStore()
 const { handleBulkDeploy } = useDeployments()
 const toast = useToast()
+const router = useRouter()
+const route = useRoute() // 👈 Added route instance
 
 // ─── Filters composable ─────────────────────────────────────────────────────
 const filters = useFinalListFilters()
@@ -99,6 +102,21 @@ async function loadAllBatches(): Promise<void> {
 }
 
 onMounted(async () => {
+  // 1. Read saved filters from URL when page is loaded or refreshed
+  if (route.query.search) {
+    filters.searchQuery.value = String(route.query.search)
+  }
+  if (route.query.batch_id) {
+    filters.selectedBatchId.value = Number(route.query.batch_id)
+  }
+  if (route.query.gender) {
+    filters.appliedAdvanced.value.gender = String(route.query.gender)
+  }
+  if (route.query.province) {
+    filters.appliedAdvanced.value.province = String(route.query.province)
+  }
+
+  // 2. Fetch list with restored filters
   await Promise.all([
     fetchFinalList(1),
     filters.fetchAllProvinces(),
@@ -112,6 +130,18 @@ watch(
   () => {
     selectedIds.value = []
     store.setPage(1)
+
+    // 🟢 Keep URL in sync with filters so page refreshes don't lose filters
+    router.replace({
+      query: {
+        ...route.query,
+        search: filters.searchQuery.value.trim() || undefined,
+        batch_id: filters.selectedBatchId.value ?? undefined,
+        gender: filters.appliedAdvanced.value.gender || undefined,
+        province: filters.appliedAdvanced.value.province || undefined,
+      },
+    })
+
     fetchFinalList(1)
   },
   { deep: true },
@@ -235,7 +265,13 @@ function resetFilters(): void {
   fetchFinalList(1)
 }
 
-function goBack(): void { router.push({ name: 'applicants.index' }) }
+function goBack(): void {
+  if (window.history.state?.back) {
+    router.back()
+  } else {
+    router.push({ name: 'applicants.index' }) // fallback if opened from direct link
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BULK DEPLOY

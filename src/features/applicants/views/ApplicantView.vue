@@ -230,6 +230,17 @@ function formatDate(dateStr: string | null | undefined): string {
   } catch { return '—' }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SMART BACK NAVIGATION
+// ═══════════════════════════════════════════════════════════════════════════
+function goBack(): void {
+  if (window.history.state?.back) {
+    router.back()
+  } else {
+    router.push({ name: 'applicants.index' })
+  }
+}
+
 function formatDateTime(dateStr: string | null | undefined): string {
   if (!dateStr) return '—'
   try {
@@ -311,7 +322,7 @@ onMounted(async () => {
     <!-- ═══════════════════════ HEADER ═══════════════════════ -->
     <div class="flex items-center justify-between gap-3 flex-wrap">
       <div class="flex items-center gap-3">
-        <Button icon="pi pi-arrow-left" text rounded @click="router.push({ name: 'applicants.index' })" />
+        <Button icon="pi pi-arrow-left" text rounded @click="goBack" />
         <div>
           <h1 class="text-2xl font-serif font-bold text-blueberry-800">Applicant Details</h1>
           <p v-if="a" class="text-sm text-blueberry-500">View complete applicant information</p>
