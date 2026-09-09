@@ -34,16 +34,16 @@ export const Perm = {
   documentVerificationApprove: 'document-verification.approve',
   documentVerificationReject: 'document-verification.reject',
 
-  // Correction
-  correctionViewAny: 'correction.viewAny',
-  correctionView: 'correction.view',
-  correctionCreate: 'correction.create',
-  correctionUpdate: 'correction.update',
-  correctionDelete: 'correction.delete',
-  correctionApprove: 'correction.approve',
-  correctionReject: 'correction.reject',
-  correctionComplete: 'correction.complete',
-  correctionCancel: 'correction.cancel',
+  // Correction Request (Fixed: added -request)
+  correctionRequestViewAny: 'correction-request.viewAny',
+  correctionRequestView: 'correction-request.view',
+  correctionRequestCreate: 'correction-request.create',
+  correctionRequestUpdate: 'correction-request.update',
+  correctionRequestDelete: 'correction-request.delete',
+  correctionRequestApprove: 'correction-request.approve',
+  correctionRequestReject: 'correction-request.reject',
+  correctionRequestComplete: 'correction-request.complete',
+  correctionRequestCancel: 'correction-request.cancel',
 
   // Correction Approval
   correctionApprovalViewAny: 'correction-approval.viewAny',
@@ -137,37 +137,36 @@ export const Perm = {
   batchUpdate: 'batch.update',
   batchDelete: 'batch.delete',
 
-  // ── Companies ─────────────────────────────────
+  // ── Companies & Categories (Fixed) ─────────────
   companyViewAny: 'company.viewAny',
   companyView: 'company.view',
   companyCreate: 'company.create',
   companyUpdate: 'company.update',
   companyDelete: 'company.delete',
-  companyCategoryViewAny: 'company_category.viewAny',
+  companyToggleStatus: 'company.toggleStatus',
+  companyCategoryViewAny: 'company-category.viewAny', 
   companyCategoryView: 'company-category.view',
   companyCategoryCreate: 'company-category.create',
   companyCategoryUpdate: 'company-category.update',
   companyCategoryDelete: 'company-category.delete',
+  companyCategoryToggleStatus: 'company-category.toggleStatus',
 
-  // ── Document Versions & Alerts ────────────────
-  documentVersionViewAny: 'document_version.viewAny',
-  documentExpiryAlertViewAny: 'document_expiry_alert.viewAny',
+  // ── Document Versions & Alerts (Fixed) ─────────
+  documentVersionViewAny: 'document-version.viewAny', // Fixed _ to -
+  documentExpiryAlertViewAny: 'document-expiry-alert.viewAny', // Fixed _ to -
 
-  // ── OCR ───────────────────────────────────────
-  ocrJobViewAny: 'ocr_job.viewAny',
-  ocrTemplateViewAny: 'ocr_template.viewAny',
-  ocrFieldExtractionViewAny: 'ocr_field_extraction.viewAny',
-  ocrManualCorrectionViewAny: 'ocr_manual_correction.viewAny',
+  // ── OCR (Fixed) ────────────────────────────────
+  ocrJobViewAny: 'ocr-job.viewAny', // Fixed _ to -
+  ocrTemplateViewAny: 'ocr-templates.viewAny', // Fixed _ to - and template to templates
 
   // ── Communication ─────────────────────────────
   notificationView: 'notification.view',
   commentViewAny: 'comment.viewAny',
 
   // ── System ────────────────────────────────────
-  accessControlViewAny: 'access_control.viewAny',
-  socialAccountViewAny: 'social_account.viewAny',
+  socialAccountViewAny: 'social-account.viewAny', // Fixed _ to -
 
-  // Append inside your Perm object
+  // ── Custom Extensions ──────────────────────────
   internshipViewAny: 'internship.viewAny',
   internshipView: 'internship.view',
   internshipCreate: 'internship.create',
@@ -177,10 +176,6 @@ export const Perm = {
   internshipChangeCompany: 'internship.changeCompany',
   internshipBulkGenerateMoa: 'internship.bulkGenerateMoa',
   guarantorManage: 'guarantor.manage',
+} as const;
 
-
-
-  // ... rest
-} as const
-
-export type Permission = typeof Perm[keyof typeof Perm]
+export type Permission = typeof Perm[keyof typeof Perm];
