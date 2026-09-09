@@ -76,33 +76,33 @@ export function buildNavSections(_ctx: PermissionContext): NavSection[] {
           to: '/document-expiry-alerts',
           permissions: [Perm.documentExpiryAlertViewAny],
         },
-        {
-          icon: 'pi pi-briefcase',
-          title: 'Internships',
-          to: '/internships',
-          permissions: [Perm.internshipViewAny],
-        },
+        // {
+        //   icon: 'pi pi-briefcase',
+        //   title: 'Internships',
+        //   to: '/internships',
+        //   permissions: [Perm.internshipViewAny],
+        // },
       ],
     },
 
-    // ─── REPORTS ───────────────────────────────────────────
-    {
-      title: 'REPORTS',
-      items: [
-        {
-          icon: 'pi pi-chart-line',
-          title: 'Analytics',
-          to: '/analytics',
-          permissions: [Perm.analyticsView],
-        },
-        {
-          icon: 'pi pi-file-pdf',
-          title: 'Reports',
-          to: '/reports',
-          permissions: [Perm.reportView],
-        },
-      ],
-    },
+    // // ─── REPORTS ───────────────────────────────────────────
+    // {
+    //   title: 'REPORTS',
+    //   items: [
+    //     {
+    //       icon: 'pi pi-chart-line',
+    //       title: 'Analytics',
+    //       to: '/analytics',
+    //       permissions: [Perm.analyticsView],
+    //     },
+    //     {
+    //       icon: 'pi pi-file-pdf',
+    //       title: 'Reports',
+    //       to: '/reports',
+    //       permissions: [Perm.reportView],
+    //     },
+    //   ],
+    // },
 
     // ─── CONFIGURATION ─────────────────────────────────────
     {
