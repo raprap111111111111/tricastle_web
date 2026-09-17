@@ -13,20 +13,21 @@ const emit = defineEmits<{ (e: 'saved', list: ApplicantGuarantor[]): void }>()
 const toast = useToast()
 const { fetch, sync, loading, saving } = useGuarantors()
 
+// ✅ Default values use lowercase civil_status to match Select options
 const guarantors = ref<ApplicantGuarantor[]>([
   {
     sequence: 1,
     full_name: '',
     date_of_birth: null,
     nationality: 'Filipino',
-    civil_status: 'Single',
+    civil_status: 'single',
   },
   {
     sequence: 2,
     full_name: '',
     date_of_birth: null,
     nationality: 'Filipino',
-    civil_status: 'Single',
+    civil_status: 'single',
   },
 ])
 
@@ -43,7 +44,7 @@ onMounted(async () => {
             full_name: item.full_name ?? '',
             date_of_birth: item.date_of_birth ?? null,
             age: item.age ?? null,
-            civil_status: item.civil_status ?? 'Single',
+            civil_status: item.civil_status ? item.civil_status.toLowerCase() : 'single',
             nationality: item.nationality ?? 'Filipino',
             address: item.address ?? '',
             residence_cert_no: item.residence_cert_no ?? '',
@@ -87,7 +88,7 @@ async function save() {
     sequence: idx + 1,
     full_name: g.full_name.trim(),
     date_of_birth: g.date_of_birth || null,
-    civil_status: g.civil_status || 'Single',
+    civil_status: g.civil_status ? g.civil_status.toLowerCase() : 'single',
     nationality: g.nationality || 'Filipino',
     address: g.address || null,
     residence_cert_no: g.residence_cert_no || null,
@@ -105,6 +106,7 @@ async function save() {
           guarantors.value[idx] = {
             ...guarantors.value[idx],
             ...item,
+            civil_status: item.civil_status ? item.civil_status.toLowerCase() : 'single',
             date_of_birth: item.date_of_birth ?? guarantors.value[idx].date_of_birth ?? null,
           }
         }

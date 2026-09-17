@@ -17,20 +17,34 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: ApplicantGuarantor): void
 }>()
 
+// ─── Date Formatting Helper (Timezone-Safe) ───────────────────────────────────
+function formatLocalDate(d: Date | null): string | null {
+  if (!d || !(d instanceof Date) || isNaN(d.getTime())) return null
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function parseLocalDate(str?: string | null): Date | null {
+  if (!str) return null
+  const [y, m, d] = str.split('-').map(Number)
+  if (!y || !m || !d) return null
+  return new Date(y, m - 1, d)
+}
+
 // ─── 1. Local Reactive State ──────────────────────────────────────────────────
-// We clone the prop into a local ref so v-model works smoothly on inputs
 const form = ref<ApplicantGuarantor>({ ...props.modelValue })
 
 // ─── 2. Sync External API Data -> Local Form ──────────────────────────────────
-// 🎯 THIS FIXES THE BUG: When the API finishes loading in the parent,
-// this watcher catches the new data and updates the blank inputs.
 watch(
   () => props.modelValue,
   (newVal) => {
-    // Only update if they are actually different to prevent infinite loops
     if (JSON.stringify(form.value) !== JSON.stringify(newVal)) {
-      form.value = { ...newVal }
-      // Also pre-fill the local street field if address came from the DB
+      form.value = {
+        ...newVal,
+        civil_status: newVal.civil_status ? newVal.civil_status.toLowerCase() : 'single',
+      }
       if (newVal.address && !localStreet.value) {
         localStreet.value = newVal.address
       }
@@ -58,24 +72,29 @@ const civilOptions = [
   { label: 'Live-in Partner', value: 'live_in_partner' },
 ]
 
+// ✅ Timezone-safe date bindings
 const birthDateValue = computed<Date | null>({
-  get: () => form.value.date_of_birth ? new Date(form.value.date_of_birth) : null,
-  set: (v) => { form.value.date_of_birth = v ? v.toISOString().split('T')[0] : null }
+  get: () => parseLocalDate(form.value.date_of_birth),
+  set: (v) => { form.value.date_of_birth = formatLocalDate(v) }
 })
 
 const certDateValue = computed<Date | null>({
-  get: () => form.value.residence_cert_issued_at ? new Date(form.value.residence_cert_issued_at) : null,
-  set: (v) => { form.value.residence_cert_issued_at = v ? v.toISOString().split('T')[0] : null }
+  get: () => parseLocalDate(form.value.residence_cert_issued_at),
+  set: (v) => { form.value.residence_cert_issued_at = formatLocalDate(v) }
 })
 
+// ✅ Accurate live age calculation
 const computedAge = computed<number | null>(() => {
   if (!form.value.date_of_birth) return null
-  const dob = new Date(form.value.date_of_birth)
-  if (Number.isNaN(dob.getTime())) return null
+  const dob = parseLocalDate(form.value.date_of_birth)
+  if (!dob) return null
+
   const today = new Date()
   let age = today.getFullYear() - dob.getFullYear()
   const m = today.getMonth() - dob.getMonth()
-  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+    age--
+  }
   return age >= 0 && age < 150 ? age : null
 })
 
@@ -117,9 +136,10 @@ watch(localProvince, async (newVal?: string) => {
   }
 })
 
-// Update the main form address whenever the local address fields change
 watch([localStreet, localCity, localProvince], () => {
-  form.value.address = fullAddressPreview.value
+  if (localProvince.value || localCity.value || localStreet.value) {
+    form.value.address = fullAddressPreview.value
+  }
 })
 
 onMounted(async () => {
