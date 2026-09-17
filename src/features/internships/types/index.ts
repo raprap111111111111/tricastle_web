@@ -118,6 +118,8 @@ export interface Internship {
 
 // ─── Payloads ─────────────────────────────────────────────────────────────
 
+// src/features/internships/types.ts (or your types file)
+
 export interface CreateInternshipPayload {
   applicant_id: number
   batch_id?: number | null
@@ -144,6 +146,7 @@ export interface CreateInternshipPayload {
   // ── Passport (for MOA) ──────────────────────────────
   passport_number?: string | null
   passport_issuing_office_id?: number | null
+  passport_issue_date?: string | null // 👈 ADD THIS LINE
 }
 
 export type UpdateInternshipPayload = Partial<

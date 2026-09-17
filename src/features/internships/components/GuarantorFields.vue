@@ -17,7 +17,7 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: ApplicantGuarantor): void
 }>()
 
-// ─── Date Formatting Helper (Timezone-Safe) ───────────────────────────────────
+// ─── Date Formatting Helpers (Timezone-Safe & ISO-Defensive) ──────────────────
 function formatLocalDate(d: Date | null): string | null {
   if (!d || !(d instanceof Date) || isNaN(d.getTime())) return null
   const year = d.getFullYear()
@@ -28,7 +28,8 @@ function formatLocalDate(d: Date | null): string | null {
 
 function parseLocalDate(str?: string | null): Date | null {
   if (!str) return null
-  const [y, m, d] = str.split('-').map(Number)
+  const cleanStr = str.split('T')[0] // Safely handle ISO dates like "1990-05-15T00:00:00Z"
+  const [y, m, d] = cleanStr.split('-').map(Number)
   if (!y || !m || !d) return null
   return new Date(y, m - 1, d)
 }
@@ -72,7 +73,6 @@ const civilOptions = [
   { label: 'Live-in Partner', value: 'live_in_partner' },
 ]
 
-// ✅ Timezone-safe date bindings
 const birthDateValue = computed<Date | null>({
   get: () => parseLocalDate(form.value.date_of_birth),
   set: (v) => { form.value.date_of_birth = formatLocalDate(v) }
@@ -83,7 +83,6 @@ const certDateValue = computed<Date | null>({
   set: (v) => { form.value.residence_cert_issued_at = formatLocalDate(v) }
 })
 
-// ✅ Accurate live age calculation
 const computedAge = computed<number | null>(() => {
   if (!form.value.date_of_birth) return null
   const dob = parseLocalDate(form.value.date_of_birth)
@@ -137,9 +136,7 @@ watch(localProvince, async (newVal?: string) => {
 })
 
 watch([localStreet, localCity, localProvince], () => {
-  if (localProvince.value || localCity.value || localStreet.value) {
-    form.value.address = fullAddressPreview.value
-  }
+  form.value.address = fullAddressPreview.value
 })
 
 onMounted(async () => {

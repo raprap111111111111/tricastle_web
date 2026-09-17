@@ -30,6 +30,7 @@ const props = defineProps<{
   applicant?: {
     passport_number?: string | null
     passport_issuing_office_id?: number | null
+    passport_issue_date?: string | null // ✅ Added
   } | null
 }>()
 
@@ -49,6 +50,23 @@ const { passportOffices, loadingOffices } = storeToRefs(applicantStore)
 
 const { generating: isDownloading, generateSingle: downloadMoa } = useMoaDownload()
 
+// ─── Date Formatting Helper (Timezone-Safe) ───────────────────────────────────
+function formatLocalDate(d: Date | null): string | null {
+  if (!d || !(d instanceof Date) || isNaN(d.getTime())) return null
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function parseLocalDate(str?: string | null): Date | null {
+  if (!str) return null
+  const cleanStr = str.split('T')[0]
+  const [y, m, d] = cleanStr.split('-').map(Number)
+  if (!y || !m || !d) return null
+  return new Date(y, m - 1, d)
+}
+
 // ─── Wizard State ─────────────────────────────────────────────────────────────
 const currentStep = ref<1 | 2 | 3 | 4>(1)
 const loading = ref(false)
@@ -63,17 +81,14 @@ const steps = [
 
 const currentStepMeta = computed(() => steps[currentStep.value - 1])
 
-// 🎯 FIX: Robust unwrap logic matching your useGuarantors composable
 function unwrapList(res: unknown): any[] {
   if (!res) return []
   const r = res as any
 
-  // Dig deep to find the actual array data, bypassing Axios wrappers
   const body = r?.data?.data ?? r?.data ?? r
   if (Array.isArray(body)) return body
   if (Array.isArray(body?.data)) return body.data
 
-  // Fallbacks for standard pagination wrappers
   if (Array.isArray(r?.records)) return r.records
   if (Array.isArray(r?.data?.records)) return r.data.records
 
@@ -133,7 +148,6 @@ async function loadExistingGuarantors(): Promise<boolean> {
           sequence: 1,
           full_name: g1?.full_name ?? g1?.fullName ?? '',
           date_of_birth: g1?.date_of_birth ?? g1?.dateOfBirth ?? null,
-          // 🎯 FIX: Normalize civil_status to match PrimeVue dropdown option values ('single', not 'Single')
           civil_status: (g1?.civil_status ?? g1?.civilStatus ?? 'single').toString().toLowerCase(),
           nationality: g1?.nationality ?? 'Filipino',
           address: g1?.address ?? '',
@@ -166,7 +180,7 @@ async function loadExistingGuarantors(): Promise<boolean> {
   return false
 }
 
-// ─── Step 2: Internship ───────────────────────────────────────────────────────
+// ─── Step 2: Internship & Passport State ──────────────────────────────────────
 const internshipForm = ref<CreateInternshipPayload>({
   applicant_id: props.applicantId,
   program_type: 'titp',
@@ -178,15 +192,20 @@ const internshipForm = ref<CreateInternshipPayload>({
   municipality: 'Murcia',
   passport_number: props.applicant?.passport_number ?? null,
   passport_issuing_office_id: props.applicant?.passport_issuing_office_id ?? null,
+  passport_issue_date: props.applicant?.passport_issue_date ?? null, // ✅ Added
 })
 
 const startDate = ref<Date | null>(null)
+const passportIssueDate = ref<Date | null>(parseLocalDate(props.applicant?.passport_issue_date)) // ✅ Added
 
 watch(startDate, (v) => {
-  internshipForm.value.contract_start = v ? v.toISOString().split('T')[0] : null
+  internshipForm.value.contract_start = formatLocalDate(v)
 })
 
-// ✅ Format company options with Category Resolution
+watch(passportIssueDate, (v) => {
+  internshipForm.value.passport_issue_date = formatLocalDate(v) // ✅ Added
+})
+
 const companyOptions = computed(() => {
   return companyStore.companies.map((c: any) => {
     const categoryId =
@@ -217,19 +236,16 @@ const companyOptions = computed(() => {
   })
 })
 
-// Selected Company helper for displaying in input box
 const selectedCompany = computed(() => {
   return companyOptions.value.find((c) => c.value === internshipForm.value.receiving_company_id)
 })
 
-// 🎯 AUTO-FILL Job Description when selecting a Receiving Company
 watch(
   () => internshipForm.value.receiving_company_id,
   (newCompanyId) => {
     if (!newCompanyId) return
     const company = companyOptions.value.find((c) => c.value === newCompanyId)
     if (company && company.category_name) {
-      // Auto fill Job Description if empty or default 'FRAME WORKING'
       if (!internshipForm.value.job_description || internshipForm.value.job_description === 'FRAME WORKING') {
         internshipForm.value.job_description = company.category_name.toUpperCase()
       }
@@ -266,7 +282,7 @@ async function loadExistingInternship(): Promise<boolean> {
       }
 
       if (current.contract_start) {
-        startDate.value = new Date(current.contract_start)
+        startDate.value = parseLocalDate(current.contract_start)
       }
 
       return true
@@ -378,6 +394,11 @@ watch(
     if (!internshipForm.value.passport_issuing_office_id && app.passport_issuing_office_id) {
       internshipForm.value.passport_issuing_office_id = app.passport_issuing_office_id
     }
+
+    if (!internshipForm.value.passport_issue_date && app.passport_issue_date) {
+      internshipForm.value.passport_issue_date = app.passport_issue_date
+      passportIssueDate.value = parseLocalDate(app.passport_issue_date)
+    }
   },
   { immediate: true },
 )
@@ -387,6 +408,8 @@ watch(
   (val) => {
     if (!val || !String(val).trim()) {
       internshipForm.value.passport_issuing_office_id = null
+      internshipForm.value.passport_issue_date = null
+      passportIssueDate.value = null
     }
   },
 )
@@ -397,12 +420,6 @@ watch(
   async (isVisible) => {
     if (!isVisible) return
 
-    console.log('%c[MoaWizard] OPEN', 'color:#f59e0b;font-weight:bold', {
-      applicantId: props.applicantId,
-      visible: props.visible,
-    })
-
-    // reset guarantors every open so you don't show stale blanks/old data
     guarantors.value = [
       { sequence: 1, full_name: '', date_of_birth: null, civil_status: 'single', nationality: 'Filipino' },
       { sequence: 2, full_name: '', date_of_birth: null, civil_status: 'single', nationality: 'Filipino' },
@@ -413,6 +430,8 @@ watch(
     internshipForm.value.applicant_id = props.applicantId
     internshipForm.value.passport_number = props.applicant?.passport_number ?? null
     internshipForm.value.passport_issuing_office_id = props.applicant?.passport_issuing_office_id ?? null
+    internshipForm.value.passport_issue_date = props.applicant?.passport_issue_date ?? null
+    passportIssueDate.value = parseLocalDate(props.applicant?.passport_issue_date)
 
     loading.value = true
 
@@ -426,12 +445,6 @@ watch(
       const guarantorsReady = await loadExistingGuarantors()
       const internshipReady = await loadExistingInternship()
 
-      console.log('%c[MoaWizard] STEP DECISION', 'color:#10b981;font-weight:bold', {
-        guarantorsReady,
-        internshipReady,
-        guarantors: JSON.parse(JSON.stringify(guarantors.value)),
-      })
-
       if (guarantorsReady && internshipReady) currentStep.value = 3
       else if (guarantorsReady) currentStep.value = 2
       else currentStep.value = 1
@@ -442,7 +455,7 @@ watch(
       loading.value = false
     }
   },
-  { immediate: true }, // 🎯 CRITICAL FIX
+  { immediate: true },
 )
 
 onMounted(() => {
@@ -457,7 +470,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <Dialog :visible="visible" modal :closable="true" :style="{ width: '860px' }" :breakpoints="{ '960px': '92vw' }" :pt="{
+  <Dialog :visible="visible" modal :closable="true" :style="{ width: '880px' }" :breakpoints="{ '960px': '92vw' }" :pt="{
     root: { class: 'moa-wizard-dialog rounded-2xl overflow-hidden shadow-2xl !border-0' },
     header: { class: '!hidden' },
     content: { class: '!p-0' },
@@ -523,7 +536,6 @@ onMounted(() => {
     <!-- Body -->
     <div class="px-6 py-6 max-h-[60vh] overflow-y-auto bg-white">
 
-      <!-- Show simple loading state if still fetching api -->
       <div v-if="loading" class="py-12 flex flex-col items-center justify-center text-center">
         <i class="pi pi-spin pi-spinner text-3xl text-apricot-500 mb-4"></i>
         <p class="text-sm text-blueberry-500 font-medium">Checking applicant records...</p>
@@ -535,8 +547,7 @@ onMounted(() => {
           <i class="pi pi-info-circle text-apricot-500 mt-0.5" />
           <div class="text-xs text-blueberry-700 leading-relaxed">
             <strong>Required:</strong> Add 2 guarantors who will co-sign the MOA. Fill in at least the Full Name for
-            each to
-            proceed.
+            each to proceed.
           </div>
         </div>
 
@@ -575,11 +586,9 @@ onMounted(() => {
                 Receiving Company <span class="text-red-500">*</span>
               </label>
 
-              <!-- ✅ Enhanced Company Select Box with Badge formatting -->
               <Select v-model="internshipForm.receiving_company_id" :options="companyOptions" option-label="label"
                 option-value="value" filter show-clear :loading="companyStore.loading || categoryStore.loading"
                 placeholder="Search company or category..." class="w-full">
-                <!-- Custom Selected Item Input Display -->
                 <template #value="slotProps">
                   <div v-if="slotProps.value && selectedCompany" class="flex items-center gap-2 truncate py-0.5">
                     <span class="font-semibold text-blueberry-800 text-sm">
@@ -598,7 +607,6 @@ onMounted(() => {
                   </span>
                 </template>
 
-                <!-- Custom Dropdown List Item Display -->
                 <template #option="slotProps">
                   <div class="flex items-center justify-between w-full py-1">
                     <div class="flex flex-col">
@@ -680,10 +688,10 @@ onMounted(() => {
               No passport on file
             </span>
 
-            <span v-else-if="!internshipForm.passport_issuing_office_id"
+            <span v-else-if="!internshipForm.passport_issuing_office_id || !internshipForm.passport_issue_date"
               class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-semibold ring-1 ring-amber-200">
               <i class="pi pi-exclamation-triangle text-[9px]" />
-              Missing DFA location
+              Incomplete passport info
             </span>
 
             <span v-else
@@ -697,13 +705,13 @@ onMounted(() => {
             class="mb-4 flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
             <i class="pi pi-info-circle text-amber-600 text-sm mt-0.5" />
             <p class="leading-relaxed">
-              Applicant has no passport number on profile. Enter it here for this MOA generation, or leave blank if not
-              yet
-              available.
+              Applicant has no passport number on profile. Enter it here for this MOA generation, or leave blank if not yet available.
             </p>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- ✅ 3-Column Passport Section -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- 1. Passport Number -->
             <div class="min-w-0">
               <label class="block text-xs font-semibold text-blueberry-700 mb-1.5">
                 Passport Number
@@ -711,6 +719,7 @@ onMounted(() => {
               <InputText v-model="internshipForm.passport_number" class="w-full" placeholder="e.g. P1234567A" />
             </div>
 
+            <!-- 2. Issuing Office (DFA) -->
             <div class="min-w-0">
               <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 flex items-center gap-1">
                 Issuing Office (DFA)
@@ -731,18 +740,29 @@ onMounted(() => {
                   </div>
                 </template>
               </Select>
+            </div>
 
-              <p v-if="!internshipForm.passport_number" class="text-[10px] text-blueberry-400 mt-1">
-                Enter a passport number first
-              </p>
-
-              <p v-else-if="internshipForm.passport_number && !internshipForm.passport_issuing_office_id"
-                class="text-[10px] text-amber-600 mt-1">
-                <i class="pi pi-exclamation-triangle text-[9px] mr-0.5" />
-                Recommended for MOA generation
-              </p>
+            <!-- 3. Date Issued (NEW) -->
+            <div class="min-w-0">
+              <label class="block text-xs font-semibold text-blueberry-700 mb-1.5">
+                Date Issued
+              </label>
+              <DatePicker
+                v-model="passportIssueDate"
+                show-icon
+                date-format="yy-mm-dd"
+                placeholder="YYYY-MM-DD"
+                class="w-full"
+                :disabled="!internshipForm.passport_number"
+              />
             </div>
           </div>
+
+          <p v-if="internshipForm.passport_number && (!internshipForm.passport_issuing_office_id || !internshipForm.passport_issue_date)"
+            class="text-[10px] text-amber-600 mt-2">
+            <i class="pi pi-exclamation-triangle text-[9px] mr-0.5" />
+            Recommended to select both DFA Office & Date Issued for complete MOA document.
+          </p>
         </div>
       </div>
 
@@ -803,8 +823,7 @@ onMounted(() => {
             You're All Set! 🎉
           </h4>
           <p class="text-sm text-blueberry-500 max-w-sm mx-auto leading-relaxed">
-            Your MOA document has been prepared with the applicant's data. Click below to download the file to your
-            device.
+            Your MOA document has been prepared with the applicant's data. Click below to download the file to your device.
           </p>
         </div>
       </div>
