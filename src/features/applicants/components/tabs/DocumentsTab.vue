@@ -1,9 +1,10 @@
 <!-- src/features/applicants/components/tabs/DocumentsTab.vue -->
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { useToast } from 'primevue/usetoast'
+import { storeToRefs } from 'pinia'
 import InputText from 'primevue/inputtext'
 import DatePicker from 'primevue/datepicker'
 import Dialog from 'primevue/dialog'
@@ -13,6 +14,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import axios from 'axios'
 
 import { documentsSchema, type DocumentsFormValues } from '../../schemas/applicant.schema'
+import { useApplicantStore } from '../../stores/applicant.store'
 import type { Applicant } from '../../types'
 
 const props = defineProps<{
@@ -20,6 +22,7 @@ const props = defineProps<{
     id_photo_file?: File | null
     biodata_file?:  File | null
     biodata_notes?: string | null
+    passport_issuing_office_id?: number | null
   }
 }>()
 
@@ -30,6 +33,19 @@ const emit = defineEmits<{
 }>()
 
 const toast = useToast()
+const store = useApplicantStore()
+const { passportOffices, loadingOffices } = storeToRefs(store)
+
+// ─── Flatten grouped passport offices for Select dropdown options ─────────────
+const flatPassportOffices = computed(() => {
+  return Object.entries(passportOffices.value).flatMap(([region, offices]) =>
+    (offices ?? []).map((o) => ({
+      id: o.id,
+      name: o.name,
+      region: region,
+    }))
+  )
+})
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 function toDate(val: string | null | undefined): Date | null {
@@ -51,24 +67,26 @@ const { handleSubmit, defineField, setFieldValue, errors, values } =
   useForm<DocumentsFormValues>({
     validationSchema: toTypedSchema(documentsSchema),
     initialValues: {
-      passport_number:   props.initialValues?.passport_number   ?? '',
-      passport_expiry:   props.initialValues?.passport_expiry   ?? null,
-      sss_number:        props.initialValues?.sss_number        ?? '',
-      tin_number:        props.initialValues?.tin_number        ?? '',
-      philhealth_number: props.initialValues?.philhealth_number ?? '',
-      pagibig_number:    props.initialValues?.pagibig_number    ?? '',
-      id_photo_file:     props.initialValues?.id_photo_file     ?? null,
-      biodata_file:      props.initialValues?.biodata_file      ?? null,
-      biodata_notes:     props.initialValues?.biodata_notes     ?? null,
+      passport_number:            props.initialValues?.passport_number            ?? '',
+      passport_expiry:            props.initialValues?.passport_expiry            ?? null,
+      passport_issuing_office_id: props.initialValues?.passport_issuing_office_id ?? null,
+      sss_number:                 props.initialValues?.sss_number                 ?? '',
+      tin_number:                 props.initialValues?.tin_number                 ?? '',
+      philhealth_number:          props.initialValues?.philhealth_number          ?? '',
+      pagibig_number:             props.initialValues?.pagibig_number             ?? '',
+      id_photo_file:              props.initialValues?.id_photo_file              ?? null,
+      biodata_file:               props.initialValues?.biodata_file               ?? null,
+      biodata_notes:              props.initialValues?.biodata_notes              ?? null,
     },
   })
 
-const [passport_number]   = defineField('passport_number')
-const [passport_expiry]   = defineField('passport_expiry')
-const [sss_number]        = defineField('sss_number')
-const [tin_number]        = defineField('tin_number')
-const [philhealth_number] = defineField('philhealth_number')
-const [pagibig_number]    = defineField('pagibig_number')
+const [passport_number]            = defineField('passport_number')
+const [passport_expiry]            = defineField('passport_expiry')
+const [passport_issuing_office_id] = defineField('passport_issuing_office_id')
+const [sss_number]                 = defineField('sss_number')
+const [tin_number]                 = defineField('tin_number')
+const [philhealth_number]          = defineField('philhealth_number')
+const [pagibig_number]             = defineField('pagibig_number')
 
 const passportExpiryProxy = computed<Date | null>({
   get: () => toDate(passport_expiry.value),
@@ -154,7 +172,6 @@ function formatFileSize(bytes: number): string {
 
 watch(biodataNotes, (v) => setFieldValue('biodata_notes', v || null))
 
-
 // ════════════════════════════════════════════════════════════════════════════
 // 🖨️ PHYSICAL SCANNER LOGIC (NAPS2 Integration)
 // ════════════════════════════════════════════════════════════════════════════
@@ -219,7 +236,6 @@ async function executeScan() {
   try {
     toast.add({ severity: 'info', summary: '📄 Scanning...', detail: 'Scanner is capturing document. Please wait...', life: 5000 })
 
-    // If scanning a photo, request JPG. If biodata, request PDF.
     const format = scanTarget.value === 'photo' ? 'jpg' : 'pdf'
 
     const { data: scanData } = await helperApi.post('/scan', {
@@ -231,15 +247,12 @@ async function executeScan() {
 
     if (!scanData.success) throw new Error('Scan failed')
 
-    // Fetch the blob from the local helper server
     const response = await fetch(scanData.data)
     const blob     = await response.blob()
     
-    // Create File object
     const filename = scanTarget.value === 'photo' ? `scanned_photo_${Date.now()}.jpg` : `scanned_biodata_${Date.now()}.pdf`
     const file = new File([blob], filename, { type: scanData.mimeType ?? (format === 'jpg' ? 'image/jpeg' : 'application/pdf') })
 
-    // Apply to VeeValidate Form State
     if (scanTarget.value === 'photo') {
       applyPhoto(file)
     } else {
@@ -254,6 +267,11 @@ async function executeScan() {
     scanning.value = false
   }
 }
+
+// ─── Lifecycle Hook ──────────────────────────────────────────────────────────
+onMounted(async () => {
+  await store.fetchPassportOffices()
+})
 
 // ─── Submit ───────────────────────────────────────────────────────────────────
 const onSubmit = handleSubmit((values) => {
@@ -315,15 +333,42 @@ const onSubmit = handleSubmit((values) => {
         Passport Information
       </h3>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Passport Number -->
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold text-blueberry-700 uppercase tracking-wide">Passport Number</label>
           <InputText v-model="passport_number" placeholder="e.g. P1234567A" class="w-full" />
         </div>
+
+        <!-- Passport Expiry -->
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold text-blueberry-700 uppercase tracking-wide">Passport Expiry Date</label>
           <DatePicker v-model="passportExpiryProxy" date-format="yy-mm-dd" placeholder="YYYY-MM-DD" show-icon class="w-full" />
           <small v-if="errors.passport_expiry" class="text-red-500 text-xs">{{ errors.passport_expiry }}</small>
+        </div>
+
+        <!-- 🎯 Dynamic Passport Issuing Location Selector (DFA) -->
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold text-blueberry-700 uppercase tracking-wide">Passport Issuing Office (DFA)</label>
+          <Select
+            v-model="passport_issuing_office_id"
+            :options="flatPassportOffices"
+            option-label="name"
+            option-value="id"
+            placeholder="Select DFA Location"
+            :loading="loadingOffices"
+            filter
+            show-clear
+            class="w-full"
+          >
+            <template #option="slotProps">
+              <div class="flex flex-col">
+                <span class="text-xs font-semibold text-apricot-600 uppercase tracking-wider mb-0.5">{{ slotProps.option.region }}</span>
+                <span class="text-sm font-medium text-blueberry-800">{{ slotProps.option.name }}</span>
+              </div>
+            </template>
+          </Select>
+          <small v-if="errors.passport_issuing_office_id" class="text-red-500 text-xs">{{ errors.passport_issuing_office_id }}</small>
         </div>
       </div>
     </section>

@@ -7,11 +7,11 @@ import type { CompanyCategory, CompanyCategoryFilters, CompanyCategoryPayload, P
 
 export const useCompanyCategoryStore = defineStore('company-category', () => {
   const categories = ref<CompanyCategory[]>([])
-  const category   = ref<CompanyCategory | null>(null)
+  const category = ref<CompanyCategory | null>(null)
   const pagination = ref<Pagination | null>(null)
-  const loading    = ref(false)
+  const loading = ref(false)
   const submitting = ref(false)
-  const error      = ref<string | null>(null)
+  const error = ref<string | null>(null)
 
   const activeCategories = ref<CompanyCategory[]>([])
   const hasFetchedActive = ref(false)
@@ -61,8 +61,8 @@ export const useCompanyCategoryStore = defineStore('company-category', () => {
     } catch (e: any) {
       error.value = e?.message ?? 'Failed to load categories'
       categories.value = []
-    } finally { 
-      loading.value = false 
+    } finally {
+      loading.value = false
     }
   }
 
@@ -72,8 +72,8 @@ export const useCompanyCategoryStore = defineStore('company-category', () => {
 
     activeFetchPromise = (async () => {
       try {
-        const res = await companyCategoryApi.list({ is_active: true, limit: 1000 } as any)
-        activeCategories.value = res.data
+        const res = await companyCategoryApi.list({ is_active: 1, limit: 1000 } as any)
+        activeCategories.value = res?.data ?? []
         hasFetchedActive.value = true
         return activeCategories.value
       } catch {
@@ -91,12 +91,12 @@ export const useCompanyCategoryStore = defineStore('company-category', () => {
     if (loading.value) return
     loading.value = true
     error.value = null
-    try { 
-      category.value = await companyCategoryApi.get(id) 
-    } catch (e: any) { 
-      error.value = e?.message ?? 'Failed to load category' 
-    } finally { 
-      loading.value = false 
+    try {
+      category.value = await companyCategoryApi.get(id)
+    } catch (e: any) {
+      error.value = e?.message ?? 'Failed to load category'
+    } finally {
+      loading.value = false
     }
   }
 
@@ -108,10 +108,10 @@ export const useCompanyCategoryStore = defineStore('company-category', () => {
       categories.value.unshift(created)
       hasFetchedActive.value = false
       return created
-    } catch (e: any) { 
-      throw e 
-    } finally { 
-      submitting.value = false 
+    } catch (e: any) {
+      throw e
+    } finally {
+      submitting.value = false
     }
   }
 
@@ -124,8 +124,8 @@ export const useCompanyCategoryStore = defineStore('company-category', () => {
       if (category.value?.id === id) category.value = updated
       hasFetchedActive.value = false
       return updated
-    } finally { 
-      submitting.value = false 
+    } finally {
+      submitting.value = false
     }
   }
 
@@ -135,8 +135,8 @@ export const useCompanyCategoryStore = defineStore('company-category', () => {
       await companyCategoryApi.remove(id)
       categories.value = categories.value.filter((c) => c.id !== id)
       hasFetchedActive.value = false
-    } finally { 
-      submitting.value = false 
+    } finally {
+      submitting.value = false
     }
   }
 
@@ -149,8 +149,8 @@ export const useCompanyCategoryStore = defineStore('company-category', () => {
       if (category.value?.id === id) category.value = updated
       hasFetchedActive.value = false
       return updated
-    } finally { 
-      submitting.value = false 
+    } finally {
+      submitting.value = false
     }
   }
 

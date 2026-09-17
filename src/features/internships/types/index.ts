@@ -23,7 +23,8 @@ export interface ApplicantGuarantor {
   applicant_id?: number
   sequence: number
   full_name: string
-  age?: number | null
+  date_of_birth?: string | null 
+  age?: number | null          
   civil_status?: string | null
   nationality?: string | null
   address?: string | null
@@ -140,6 +141,9 @@ export interface CreateInternshipPayload {
   time_end?: string | null
   lunch_break?: string | null
   guarantors?: Omit<ApplicantGuarantor, 'id' | 'applicant_id'>[]
+  // ── Passport (for MOA) ──────────────────────────────
+  passport_number?: string | null
+  passport_issuing_office_id?: number | null
 }
 
 export type UpdateInternshipPayload = Partial<

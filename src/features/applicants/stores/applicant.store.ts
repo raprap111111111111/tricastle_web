@@ -1,8 +1,7 @@
-// src/features/applicants/stores/applicant.store.ts
-
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { applicantApi } from '../api/applicant.api'
+import { passportOfficeApi } from '../api/passport-office.api'
 import type {
   Applicant,
   ApplicantFilters,
@@ -13,6 +12,7 @@ import type {
   DuplicateItem,
   Pagination,
   UpdateApplicantPayload,
+  GroupedPassportOffices,
 } from '../types'
 
 export const useApplicantStore = defineStore('applicants', () => {
@@ -24,6 +24,10 @@ export const useApplicantStore = defineStore('applicants', () => {
   const duplicates = ref<DuplicateItem[]>([])
   const pagination = ref<Pagination | null>(null)
 
+  // ─── State for Passport Offices ─────────────────────────
+  const passportOffices = ref<GroupedPassportOffices>({})
+  const loadingOffices = ref(false)
+
   const filters = ref<ApplicantFilters>({
     offset: 0,
     limit: 10,
@@ -32,6 +36,7 @@ export const useApplicantStore = defineStore('applicants', () => {
     exclude_statuses: '',
     order_by: 'created_at',
     order_dir: 'desc',
+    passport_issuing_office_id: null,
   })
 
   // ─── Helpers ────────────────────────────────────────────
@@ -67,7 +72,6 @@ export const useApplicantStore = defineStore('applicants', () => {
 
       applicants.value = payload?.records ?? []
 
-      // 🎯 Fixed: Map 'from' and 'to' so AppPagination displays correct entry counts
       pagination.value = {
         current_page: payload?.current_page ?? 1,
         last_page: payload?.last_page ?? 1,
@@ -97,6 +101,29 @@ export const useApplicantStore = defineStore('applicants', () => {
       error.value = e?.message ?? 'Failed to load applicant'
     } finally {
       loading.value = false
+    }
+  }
+
+  // ─── Fetch Passport Offices ─────────────────────────────
+  async function fetchPassportOffices() {
+    // 🎯 Defensive null check on passportOffices.value before calling Object.keys
+    if (
+      passportOffices.value &&
+      typeof passportOffices.value === 'object' &&
+      Object.keys(passportOffices.value).length > 0
+    ) {
+      return
+    }
+
+    loadingOffices.value = true
+    try {
+      const res = await passportOfficeApi.listGrouped()
+      passportOffices.value = res && typeof res === 'object' ? res : {}
+    } catch (e: any) {
+      passportOffices.value = {} // Ensure state stays an object on error
+      console.error('Failed to load Passport Issuing Offices:', e)
+    } finally {
+      loadingOffices.value = false
     }
   }
 
@@ -274,6 +301,7 @@ export const useApplicantStore = defineStore('applicants', () => {
       exclude_statuses: '',
       order_by: 'created_at',
       order_dir: 'desc',
+      passport_issuing_office_id: null,
     }
   }
 
@@ -291,10 +319,13 @@ export const useApplicantStore = defineStore('applicants', () => {
     duplicates,
     pagination,
     filters,
+    passportOffices,
+    loadingOffices,
 
     // Actions
     fetchApplicants,
     fetchApplicant,
+    fetchPassportOffices,
     createApplicant,
     updateApplicant,
     deleteApplicant,

@@ -14,8 +14,20 @@ const toast = useToast()
 const { fetch, sync, loading, saving } = useGuarantors()
 
 const guarantors = ref<ApplicantGuarantor[]>([
-  { sequence: 1, full_name: '', nationality: 'Filipino', civil_status: 'Single' },
-  { sequence: 2, full_name: '', nationality: 'Filipino', civil_status: 'Single' },
+  {
+    sequence: 1,
+    full_name: '',
+    date_of_birth: null,
+    nationality: 'Filipino',
+    civil_status: 'Single',
+  },
+  {
+    sequence: 2,
+    full_name: '',
+    date_of_birth: null,
+    nationality: 'Filipino',
+    civil_status: 'Single',
+  },
 ])
 
 onMounted(async () => {
@@ -29,6 +41,7 @@ onMounted(async () => {
             id: item.id,
             sequence: idx + 1,
             full_name: item.full_name ?? '',
+            date_of_birth: item.date_of_birth ?? null,
             age: item.age ?? null,
             civil_status: item.civil_status ?? 'Single',
             nationality: item.nationality ?? 'Filipino',
@@ -70,10 +83,10 @@ async function save() {
     return
   }
 
-  const payload = guarantors.value.map((g, idx) => ({
+  const payload: ApplicantGuarantor[] = guarantors.value.map((g, idx) => ({
     sequence: idx + 1,
     full_name: g.full_name.trim(),
-    age: g.age || null,
+    date_of_birth: g.date_of_birth || null,
     civil_status: g.civil_status || 'Single',
     nationality: g.nationality || 'Filipino',
     address: g.address || null,
@@ -89,7 +102,11 @@ async function save() {
       savedList.forEach((item) => {
         const idx = item.sequence ? item.sequence - 1 : 0
         if (idx >= 0 && idx < 2) {
-          guarantors.value[idx] = { ...guarantors.value[idx], ...item }
+          guarantors.value[idx] = {
+            ...guarantors.value[idx],
+            ...item,
+            date_of_birth: item.date_of_birth ?? guarantors.value[idx].date_of_birth ?? null,
+          }
         }
       })
     }

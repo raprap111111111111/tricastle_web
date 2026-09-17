@@ -1,24 +1,31 @@
 <!-- src/features/applicants/components/ApplicantFilters.vue -->
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import Select from 'primevue/select'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Dialog from 'primevue/dialog'
 import { AppSearchBar } from '@shared/ui'
 import { usePsgc } from '@shared/composables/usePsgc'
+import { useApplicantStore } from '../stores/applicant.store' // 👈 Fixed relative path (one parent folder up, not two)
 import type {
   ApplicantFilters as IFilters,
   ApplicantStatus,
   ApplicantGender,
   CivilStatus,
   QualityGrade,
+  PassportIssuingOffice, // 👈 Imported PassportIssuingOffice interface for strict type checking
 } from '../types'
 
 const emit = defineEmits<{
   (e: 'filter', value: Partial<IFilters>): void
   (e: 'reset'): void
 }>()
+
+// ─── Store Integration ────────────────────────────────
+const store = useApplicantStore()
+const { passportOffices, loadingOffices } = storeToRefs(store)
 
 // ─── PSGC (Philippine geographic data) ────────────────
 const {
@@ -36,17 +43,17 @@ const search = ref('')
 const status = ref<ApplicantStatus | ''>('')
 
 // ─── Advanced (staged) ────────────────────────────────
-const gender       = ref<ApplicantGender | ''>('')
-const civilStatus  = ref<CivilStatus | ''>('')
-const nationality  = ref<string>('')
-const qualityGrade = ref<QualityGrade | ''>('')
-const city         = ref<string>('')
-const province     = ref<string>('')
-const address      = ref<string>('')
+const gender                  = ref<ApplicantGender | ''>('')
+const civilStatus             = ref<CivilStatus | ''>('')
+const nationality             = ref<string>('')
+const qualityGrade            = ref<QualityGrade | ''>('')
+const city                    = ref<string>('')
+const province                = ref<string>('')
+const address                 = ref<string>('')
+const passportIssuingOfficeId = ref<number | null>(null)
 
 const appliedAdvanced = ref<Partial<IFilters>>({})
 
-// 🔥 Simple boolean for Dialog visibility
 const showAdvanced = ref(false)
 
 // ─── Options ──────────────────────────────────────────
@@ -71,6 +78,7 @@ const civilStatusOptions = [
   { label: 'Widowed',          value: 'widowed' },
   { label: 'Separated',        value: 'separated' },
   { label: 'Divorced',         value: 'divorced' },
+  { label: 'Live-in Partner',  value: 'live_in_partner' },
 ]
 
 const nationalityOptions = [
@@ -114,6 +122,33 @@ const cityOptions = computed(() => [
   })),
 ])
 
+// ─── Flatten Grouped Passport Offices for Select Options ─────────────────────
+// 🎯 Fixed: Explicitly typed 'region' and 'offices' array elements to satisfy typescript compiler compiler warnings
+const flatPassportOffices = computed(() => {
+  return Object.entries(passportOffices.value).flatMap(([region, offices]) => {
+    const activeList = (offices ?? []) as PassportIssuingOffice[]
+    return activeList.map((o: PassportIssuingOffice) => ({
+      label: o.name,
+      value: o.id,
+      region: region,
+    }))
+  })
+})
+
+const groupedPassportOfficeOptions = computed(() => {
+  const grouped = Object.entries(passportOffices.value).map(([region, offices]) => {
+    const activeList = (offices ?? []) as PassportIssuingOffice[]
+    return {
+      label: region,
+      items: activeList.map((o: PassportIssuingOffice) => ({
+        label: o.name,
+        value: o.id,
+      })),
+    }
+  })
+  return [{ label: 'All DFA Locations', value: null }, ...grouped]
+})
+
 // ─── Watch province → load cities ─────────────────────
 watch(province, async (newProvince) => {
   if (!newProvince) {
@@ -148,13 +183,14 @@ function onStatusChange() {
 
 function applyAdvanced() {
   const advanced: Partial<IFilters> = {
-    gender:        gender.value || undefined,
-    civil_status:  civilStatus.value || undefined,
-    nationality:   nationality.value || undefined,
-    quality_grade: qualityGrade.value || undefined,
-    city:          city.value.trim() || undefined,
-    province:      province.value || undefined,
-    address:       address.value.trim() || undefined,
+    gender:                     gender.value || undefined,
+    civil_status:               civilStatus.value || undefined,
+    nationality:                nationality.value || undefined,
+    quality_grade:              qualityGrade.value || undefined,
+    city:                       city.value.trim() || undefined,
+    province:                   province.value || undefined,
+    address:                    address.value.trim() || undefined,
+    passport_issuing_office_id: passportIssuingOfficeId.value || undefined,
   }
 
   Object.keys(advanced).forEach((k) => {
@@ -175,15 +211,16 @@ function applyAdvanced() {
 }
 
 function clearAdvanced() {
-  gender.value       = ''
-  civilStatus.value  = ''
-  nationality.value  = ''
-  qualityGrade.value = ''
-  city.value         = ''
-  province.value     = ''
-  address.value      = ''
-  psgcCities.value   = []
-  appliedAdvanced.value = {}
+  gender.value                  = ''
+  civilStatus.value             = ''
+  nationality.value             = ''
+  qualityGrade.value            = ''
+  city.value                    = ''
+  province.value                = ''
+  address.value                 = ''
+  passportIssuingOfficeId.value = null
+  psgcCities.value              = []
+  appliedAdvanced.value         = {}
 
   emit('filter', {
     search: search.value.trim() || undefined,
@@ -192,30 +229,32 @@ function clearAdvanced() {
 }
 
 function resetAll() {
-  search.value       = ''
-  status.value       = ''
-  gender.value       = ''
-  civilStatus.value  = ''
-  nationality.value  = ''
-  qualityGrade.value = ''
-  city.value         = ''
-  province.value     = ''
-  address.value      = ''
-  psgcCities.value   = []
-  appliedAdvanced.value = {}
+  search.value                  = ''
+  status.value                  = ''
+  gender.value                  = ''
+  civilStatus.value             = ''
+  nationality.value             = ''
+  qualityGrade.value            = ''
+  city.value                    = ''
+  province.value                = ''
+  address.value                 = ''
+  passportIssuingOfficeId.value = null
+  psgcCities.value              = []
+  appliedAdvanced.value         = {}
   emit('reset')
 }
 
 // ─── Counts ───────────────────────────────────────────
 const stagedAdvancedCount = computed(() => {
   let count = 0
-  if (gender.value)         count++
-  if (civilStatus.value)    count++
-  if (nationality.value)    count++
-  if (qualityGrade.value)   count++
-  if (city.value.trim())    count++
-  if (province.value)       count++
-  if (address.value.trim()) count++
+  if (gender.value)                  count++
+  if (civilStatus.value)             count++
+  if (nationality.value)             count++
+  if (qualityGrade.value)            count++
+  if (city.value.trim())             count++
+  if (province.value)                count++
+  if (address.value.trim())          count++
+  if (passportIssuingOfficeId.value) count++
   return count
 })
 
@@ -223,22 +262,24 @@ const appliedAdvancedCount = computed(() => Object.keys(appliedAdvanced.value).l
 
 const hasUnsavedChanges = computed(() => {
   const current = JSON.stringify({
-    gender: gender.value || undefined,
-    civil_status: civilStatus.value || undefined,
-    nationality: nationality.value || undefined,
-    quality_grade: qualityGrade.value || undefined,
-    city: city.value.trim() || undefined,
-    province: province.value || undefined,
-    address: address.value.trim() || undefined,
+    gender:                     gender.value || undefined,
+    civil_status:               civilStatus.value || undefined,
+    nationality:                nationality.value || undefined,
+    quality_grade:              qualityGrade.value || undefined,
+    city:                       city.value.trim() || undefined,
+    province:                   province.value || undefined,
+    address:                    address.value.trim() || undefined,
+    passport_issuing_office_id: passportIssuingOfficeId.value || undefined,
   })
   const applied = JSON.stringify({
-    gender: appliedAdvanced.value.gender || undefined,
-    civil_status: appliedAdvanced.value.civil_status || undefined,
-    nationality: appliedAdvanced.value.nationality || undefined,
-    quality_grade: appliedAdvanced.value.quality_grade || undefined,
-    city: appliedAdvanced.value.city || undefined,
-    province: appliedAdvanced.value.province || undefined,
-    address: appliedAdvanced.value.address || undefined,
+    gender:                     appliedAdvanced.value.gender || undefined,
+    civil_status:               appliedAdvanced.value.civil_status || undefined,
+    nationality:                appliedAdvanced.value.nationality || undefined,
+    quality_grade:              appliedAdvanced.value.quality_grade || undefined,
+    city:                       appliedAdvanced.value.city || undefined,
+    province:                   appliedAdvanced.value.province || undefined,
+    address:                    appliedAdvanced.value.address || undefined,
+    passport_issuing_office_id: appliedAdvanced.value.passport_issuing_office_id || undefined,
   })
   return current !== applied
 })
@@ -255,6 +296,18 @@ const activeFilters = computed(() => {
   if (appliedAdvanced.value.city)          filters.push({ key: 'city',          label: 'City',        value: appliedAdvanced.value.city })
   if (appliedAdvanced.value.province)      filters.push({ key: 'province',      label: 'Province',    value: appliedAdvanced.value.province })
   if (appliedAdvanced.value.address)       filters.push({ key: 'address',       label: 'Address',     value: appliedAdvanced.value.address })
+  
+  if (appliedAdvanced.value.passport_issuing_office_id) {
+    const matchedOffice = flatPassportOffices.value.find(
+      (o) => o.value === appliedAdvanced.value.passport_issuing_office_id,
+    )
+    filters.push({
+      key:   'passport_issuing_office_id',
+      label: 'DFA Location',
+      value: matchedOffice ? matchedOffice.label : 'Selected Office',
+    })
+  }
+
   return filters
 })
 
@@ -272,17 +325,18 @@ function removeFilter(key: string) {
       break
     default:
       switch (key) {
-        case 'gender':         gender.value = '';       break
-        case 'civil_status':   civilStatus.value = '';  break
-        case 'nationality':    nationality.value = '';  break
-        case 'quality_grade':  qualityGrade.value = ''; break
-        case 'city':           city.value = '';         break
+        case 'gender':                     gender.value = '';                  break
+        case 'civil_status':               civilStatus.value = '';             break
+        case 'nationality':                nationality.value = '';             break
+        case 'quality_grade':              qualityGrade.value = '';            break
+        case 'city':                       city.value = '';                    break
         case 'province':
           province.value = ''
           psgcCities.value = []
           city.value = ''
           break
-        case 'address':        address.value = '';      break
+        case 'address':                    address.value = '';                 break
+        case 'passport_issuing_office_id': passportIssuingOfficeId.value = null; break
       }
       delete appliedAdvanced.value[key as keyof IFilters]
       if (key === 'province') {
@@ -300,6 +354,7 @@ function removeFilter(key: string) {
 // ─── Lifecycle ────────────────────────────────────────
 onMounted(async () => {
   await fetchAllProvinces()
+  await store.fetchPassportOffices()
 })
 </script>
 
@@ -378,7 +433,7 @@ onMounted(async () => {
       </span>
     </div>
 
-    <!-- 🎯 Advanced Filter DIALOG (replaces Popover) -->
+    <!-- Advanced Filter DIALOG -->
     <Dialog
       v-model:visible="showAdvanced"
       modal
@@ -477,6 +532,32 @@ onMounted(async () => {
                     size="small"
                   />
                 </div>
+              </div>
+            </div>
+
+            <!-- Identity Document Passport DFA Office Group Filters -->
+            <div class="pt-4 border-t border-appleCore-100">
+              <p class="text-[11px] font-bold text-blueberry-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <i class="pi pi-id-card text-blueberry-500 text-xs" />
+                Identity & Documents
+              </p>
+              <div>
+                <label class="block text-xs font-medium text-blueberry-700 mb-1.5 flex items-center gap-1">
+                  <span>Passport Issuing DFA Location</span>
+                  <i v-if="loadingOffices" class="pi pi-spin pi-spinner text-[10px] text-apricot-500" />
+                </label>
+                <Select
+                  v-model="passportIssuingOfficeId"
+                  :options="flatPassportOffices"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Select DFA Location"
+                  :loading="loadingOffices"
+                  filter
+                  show-clear
+                  class="w-full"
+                  size="small"
+                />
               </div>
             </div>
 

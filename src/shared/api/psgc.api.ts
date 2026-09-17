@@ -5,12 +5,12 @@ import type {
   PsgcProvince,
   PsgcCity,
   PsgcBarangay,
-} from '@features/applicants/types'   // ← FIXED: use alias path
+} from '@features/applicants/types'
 
-// Public Philippine PSGC API
+// Dedicated Axios instance with 10s timeout (isolated from main app API)
 const psgc = axios.create({
   baseURL: 'https://psgc.gitlab.io/api',
-  timeout: 15000,
+  timeout: 10000,
 })
 
 export const psgcApi = {
@@ -20,8 +20,7 @@ export const psgcApi = {
   },
 
   /**
-   * Get ALL provinces (used for filter dropdown)
-   * Returns all 81 provinces at once
+   * Get ALL provinces
    */
   async allProvinces(): Promise<PsgcProvince[]> {
     const { data } = await psgc.get<PsgcProvince[]>('/provinces')
@@ -29,7 +28,7 @@ export const psgcApi = {
   },
 
   /**
-   * Get provinces by region (for cascading form)
+   * Get provinces by region
    */
   async provinces(regionCode: string): Promise<PsgcProvince[]> {
     const { data } = await psgc.get<PsgcProvince[]>(

@@ -80,11 +80,12 @@ const genderOptions = [
 ]
 
 const civilOptions = [
-  { label: 'Single',    value: 'single'    },
-  { label: 'Married',   value: 'married'   },
-  { label: 'Widowed',   value: 'widowed'   },
-  { label: 'Separated', value: 'separated' },
-  { label: 'Divorced',  value: 'divorced'  },
+  { label: 'Single',          value: 'single'          },
+  { label: 'Married',         value: 'married'         },
+  { label: 'Widowed',         value: 'widowed'         },
+  { label: 'Separated',       value: 'separated'       },
+  { label: 'Divorced',        value: 'divorced'        },
+  { label: 'Live-in Partner', value: 'live_in_partner' }, // 👈 Added option
 ]
 
 // ─── Real-time Duplicate Check ──────────────────────────
@@ -171,7 +172,6 @@ watch(values, async () => {
 }, { deep: true, immediate: false })
 
 const onSubmit = handleSubmit((formValues) => {
-  // Block submit if email is taken
   if (emailStatus.value === 'taken') {
     return
   }
@@ -217,7 +217,7 @@ const onSubmit = handleSubmit((formValues) => {
           <InputText v-model="suffix" placeholder="Jr., Sr., III" />
         </div>
 
-        <!-- Email (with real-time check) -->
+        <!-- Email -->
         <div class="flex flex-col gap-1">
           <label class="text-sm font-medium text-blueberry-700">
             Email <span class="text-red-500">*</span>
@@ -275,6 +275,7 @@ const onSubmit = handleSubmit((formValues) => {
             option-label="label"
             option-value="value"
             placeholder="Select gender"
+            class="w-full"
           />
         </div>
 
@@ -287,10 +288,11 @@ const onSubmit = handleSubmit((formValues) => {
             option-label="label"
             option-value="value"
             placeholder="Select status"
+            class="w-full"
           />
         </div>
 
-        <!-- Date of Birth (with duplicate check) -->
+        <!-- Date of Birth -->
         <div class="flex flex-col gap-1">
           <label class="text-sm font-medium text-blueberry-700">Date of Birth</label>
           <DatePicker
@@ -298,6 +300,7 @@ const onSubmit = handleSubmit((formValues) => {
             date-format="yy-mm-dd"
             placeholder="YYYY-MM-DD"
             show-icon
+            class="w-full"
           />
           <small v-if="errors.date_of_birth" class="text-red-500">{{ errors.date_of_birth }}</small>
           <small v-else-if="nameStatus === 'taken'" class="text-yellow-600">
@@ -312,7 +315,7 @@ const onSubmit = handleSubmit((formValues) => {
         <!-- Number of Children -->
         <div class="flex flex-col gap-1">
           <label class="text-sm font-medium text-blueberry-700">Number of Children</label>
-          <InputNumber v-model="number_of_children" :min="0" :max="30" show-buttons />
+          <InputNumber v-model="number_of_children" :min="0" :max="30" show-buttons class="w-full" />
         </div>
 
         <!-- Nationality -->
@@ -322,7 +325,7 @@ const onSubmit = handleSubmit((formValues) => {
         </div>
       </div>
 
-      <!-- ─── Duplicate Warning Banner ─────────────────── -->
+      <!-- Duplicate Warning Banner -->
       <div
         v-if="emailStatus === 'taken'"
         class="mt-4 flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg"

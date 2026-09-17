@@ -1,5 +1,3 @@
-// src/features/applicants/schemas/applicant.schema.ts
-
 import { z } from 'zod'
 
 // ─── Shared helpers ────────────────────────────────────────────────────────────
@@ -24,7 +22,7 @@ export const personalSchema = z.object({
   birthplace: z.string().max(150).nullable().optional(),           // AIS
   gender: z.enum(['male', 'female']).nullable().optional(),
   civil_status: z
-    .enum(['single', 'married', 'widowed', 'separated', 'divorced'])
+    .enum(['single', 'married', 'widowed', 'separated', 'divorced', 'live_in_partner']) // 👈 Added 'live_in_partner'
     .nullable()
     .optional(),
   religion: z.string().max(100).nullable().optional(),             // AIS
@@ -55,12 +53,13 @@ export const physicalAddressSchema = z.object({
 // ─── Step 3: Documents ────────────────────────────────────────────────────────
 
 export const documentsSchema = z.object({
-  passport_number:   z.string().max(50).nullable().optional(),
-  passport_expiry:   dateString,
-  sss_number:        z.string().max(50).nullable().optional(),
-  tin_number:        z.string().max(50).nullable().optional(),
-  philhealth_number: z.string().max(50).nullable().optional(),
-  pagibig_number:    z.string().max(50).nullable().optional(),
+  passport_number:            z.string().max(50).nullable().optional(),
+  passport_expiry:            dateString,
+  passport_issuing_office_id: z.coerce.number().int().positive().nullable().optional(), // 👈 Added Validation Constraint
+  sss_number:                 z.string().max(50).nullable().optional(),
+  tin_number:                 z.string().max(50).nullable().optional(),
+  philhealth_number:          z.string().max(50).nullable().optional(),
+  pagibig_number:             z.string().max(50).nullable().optional(),
 
   id_photo_file: z.instanceof(File).nullable().optional(),
   biodata_file:  z.instanceof(File).nullable().optional(),

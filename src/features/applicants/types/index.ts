@@ -1,5 +1,3 @@
-// src/features/applicants/types/index.ts
-
 // ─── Enums / Literals ─────────────────────────────────────────────────────────
 
 export type ApplicantStatus =
@@ -18,6 +16,7 @@ export type CivilStatus =
   | 'widowed'
   | 'separated'
   | 'divorced'
+  | 'live_in_partner' // 👈 Added 'live_in_partner'
 
 export type DominantHand = 'left' | 'right' | 'both'
 export type BloodType    = 'A' | 'B' | 'AB' | 'O'
@@ -54,6 +53,26 @@ export type ApplicantBatchStatus =
   | 'rejected'
   | 'withdrawn'
   | 'deployed'
+
+// ─── Passport Issuing Office Interfaces ──────────────────────────────────────
+
+export interface PassportIssuingOffice {
+  id: number
+  region: 'Luzon' | 'Visayas' | 'Mindanao' | 'NCR' | 'Overseas'
+  name: string
+  address: string | null
+  is_active: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export interface GroupedPassportOffices {
+  Luzon?: PassportIssuingOffice[]
+  Visayas?: PassportIssuingOffice[]
+  Mindanao?: PassportIssuingOffice[]
+  NCR?: PassportIssuingOffice[]
+  Overseas?: PassportIssuingOffice[]
+}
 
 // ─── Shared / Relation Types ──────────────────────────────────────────────────
 
@@ -234,12 +253,14 @@ export interface Applicant {
   postal_code:       string | null
 
   // Passport / IDs
-  passport_number:   string | null
-  passport_expiry:   string | null
-  sss_number:        string | null
-  tin_number:        string | null
-  philhealth_number: string | null
-  pagibig_number:    string | null
+  passport_number:            string | null
+  passport_expiry:            string | null
+  passport_issuing_office_id: number | null               // 👈 Added ID
+  passport_office?:           PassportIssuingOffice | null // 👈 Added Relation
+  sss_number:                 string | null
+  tin_number:                 string | null
+  philhealth_number:          string | null
+  pagibig_number:             string | null
 
   // Status
   status:           ApplicantStatus
@@ -390,12 +411,13 @@ export interface CreateApplicantPayload {
   province?:          string | null
   postal_code?:       string | null
 
-  passport_number?:   string | null
-  passport_expiry?:   string | null
-  sss_number?:        string | null
-  tin_number?:        string | null
-  philhealth_number?: string | null
-  pagibig_number?:    string | null
+  passport_number?:            string | null
+  passport_expiry?:            string | null
+  passport_issuing_office_id?: number | null // 👈 Added
+  sss_number?:                 string | null
+  tin_number?:                 string | null
+  philhealth_number?:          string | null
+  pagibig_number?:             string | null
 
   skill_category?:      SkillCategory | null
   trade_or_occupation?: string | null
@@ -518,7 +540,7 @@ export interface ApplicantFilters {
   search?:        string
   offset?:        number
   limit?:         number
-  page?:          number | null  // 🎯 Added page parameter support
+  page?:          number | null
   order_by?:      string
   order_dir?:     'asc' | 'desc'
   status?:        ApplicantStatus | ''
@@ -527,9 +549,10 @@ export interface ApplicantFilters {
   civil_status?:  CivilStatus | ''
   nationality?:   string
   quality_grade?: QualityGrade | ''
-  assigned_staff_id?: number | null
-  batch_id?:          number | null
-  batch_status?:      ApplicantBatchStatus | ''
+  assigned_staff_id?:          number | null
+  passport_issuing_office_id?: number | null // 👈 Added filter
+  batch_id?:                   number | null
+  batch_status?:               ApplicantBatchStatus | ''
   passport_expiring_within_months?: number | null
 
   // Location
@@ -574,8 +597,8 @@ export interface Pagination {
   offset:       number
   limit:        number
   has_more:     boolean
-  from?:        number | null  // 🎯 Nullable for API response compatibility
-  to?:          number | null  // 🎯 Nullable for API response compatibility
+  from?:        number | null
+  to?:          number | null
 }
 
 export interface PaginatedResponse<T> {

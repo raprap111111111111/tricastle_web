@@ -804,7 +804,7 @@ onMounted(async () => {
         </dl>
       </section>
 
-      <!-- ─── DOCUMENTS & GOVERNMENT IDs ─── -->
+       <!-- ─── DOCUMENTS & GOVERNMENT IDs ─── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
         <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
           <i class="pi pi-id-card text-apricot-500" />
@@ -813,6 +813,22 @@ onMounted(async () => {
         <dl class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
           <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Passport Number</dt><dd class="text-sm font-medium text-blueberry-800 mt-1 font-mono">{{ display(a.passport_number) }}</dd></div>
           <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Passport Expiry</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ formatDate(a.passport_expiry) }}</dd></div>
+          
+          <!-- 🎯 NEW: DFA Issuing Location -->
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Issuing Location (DFA)</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">
+              <template v-if="a.passport_office">
+                <span class="block">{{ a.passport_office.name }}</span>
+                <span class="text-[10px] text-blueberry-500 uppercase tracking-wider">{{ a.passport_office.region }}</span>
+              </template>
+              <span v-else class="text-amber-600 text-xs font-medium">
+                <i class="pi pi-exclamation-triangle text-[10px] mr-0.5" />
+                {{ a.passport_number ? 'Missing DFA location' : 'No passport on file' }}
+              </span>
+            </dd>
+          </div>
+
           <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">SSS Number</dt><dd class="text-sm font-medium text-blueberry-800 mt-1 font-mono">{{ display(a.sss_number) }}</dd></div>
           <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">TIN Number</dt><dd class="text-sm font-medium text-blueberry-800 mt-1 font-mono">{{ display(a.tin_number) }}</dd></div>
           <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">PhilHealth Number</dt><dd class="text-sm font-medium text-blueberry-800 mt-1 font-mono">{{ display(a.philhealth_number) }}</dd></div>
@@ -1259,6 +1275,7 @@ onMounted(async () => {
       v-if="showMoaWizard && a"
       v-model:visible="showMoaWizard"
       :applicant-id="a.id"
+      :applicant="a"
       @completed="loadMoaFlowState"
     />
 
