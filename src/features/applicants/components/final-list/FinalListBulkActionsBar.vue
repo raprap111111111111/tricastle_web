@@ -10,8 +10,9 @@ defineProps<{
 }>()
 
 defineEmits<{
-  clear:  []
-  deploy: []
+  clear:              []
+  deploy:             []
+  'export-insurance': []
 }>()
 </script>
 
@@ -40,7 +41,20 @@ defineEmits<{
     </div>
     <div class="flex items-center gap-2">
       <Button label="Clear Selection" icon="pi pi-times" severity="secondary" text size="small" @click="$emit('clear')" />
+      
+      <!-- 🛡️ EXPORT INSURANCE BUTTON -->
+      <Button
+        label="Export Insurance"
+        icon="pi pi-file-word"
+        severity="secondary"
+        outlined
+        size="small"
+        class="!bg-white !border-green-300 hover:!bg-green-100/60 !text-green-800 !shadow-sm"
+        @click="$emit('export-insurance')"
+      />
+
       <Button :label="`Deploy Selected (${deployableCount})`" icon="pi pi-send"
+        size="small"
         :disabled="deployableCount === 0"
         :loading="submitting"
         class="!bg-green-600 hover:!bg-green-700 !border-green-600 !text-white !shadow-sm"

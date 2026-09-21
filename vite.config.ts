@@ -6,11 +6,11 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
-      '@':         path.resolve(__dirname, './src'),
-      '@app':      path.resolve(__dirname, './src/app'),
-      '@shared':   path.resolve(__dirname, './src/shared'),
-      '@features': path.resolve(__dirname, './src/features'),
-      '@assets':   path.resolve(__dirname, './src/assets'),
+      '@':         path.resolve(import.meta.dirname, './src'),
+      '@app':      path.resolve(import.meta.dirname, './src/app'),
+      '@shared':   path.resolve(import.meta.dirname, './src/shared'),
+      '@features': path.resolve(import.meta.dirname, './src/features'),
+      '@assets':   path.resolve(import.meta.dirname, './src/assets'),
     },
   },
   server: {

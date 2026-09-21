@@ -1,22 +1,25 @@
 <!-- src/features/applicants/views/FinalListView.vue -->
 <script setup lang="ts">
-
 import Skeleton from 'primevue/skeleton'
 import Button from 'primevue/button'
 import { AppCard } from '@shared/ui'
 import { useApplicantStore } from '../stores/applicant.store'
 import { useBatchStore } from '@features/batches/stores/batch.store'
+import { useCompanyStore } from '@features/companies/stores/company.store'
 import ApplicantTable from '../components/ApplicantTable.vue'
 import type { BatchSummary } from '../types'
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router' // 👈 Added useRoute
-
+import { useRouter, useRoute } from 'vue-router'
 
 // 🚀 Deployment
 import BulkDeployDialog from '@features/deployments/components/BulkDeployDialog.vue'
 import { useDeployments } from '@features/deployments/composables/useDeployments'
 import { useDeploymentStore } from '@features/deployments/stores/deployment.store'
 import type { DeployApplicantPayload } from '@features/deployments/types'
+
+// 🛡️ Insurance Export
+import InsuranceExportDialog from '../components/insurance/InsuranceExportDialog.vue'
+import { useInsuranceExport } from '../composables/useInsuranceExport'
 
 // 📚 Composables
 import { useFinalListFilters } from '../composables/useFinalListFilters'
@@ -40,19 +43,63 @@ import { useToast } from 'primevue/usetoast'
 
 const store = useApplicantStore()
 const batchStore = useBatchStore()
+const companyStore = useCompanyStore()
 const deploymentStore = useDeploymentStore()
 const { handleBulkDeploy } = useDeployments()
+const insurance = useInsuranceExport()
 const toast = useToast()
 const router = useRouter()
-const route = useRoute() // 👈 Added route instance
+const route = useRoute()
 
 // ─── Filters composable ─────────────────────────────────────────────────────
 const filters = useFinalListFilters()
 
-// ─── Selection state ────────────────────────────────────────────────────────
-const selectedIds = ref<number[]>([])
+// ═══════════════════════════════════════════════════════════════════════════
+// MULTI-PAGE SELECTION (Smart Merge - Prevents losing other pages)
+// ═══════════════════════════════════════════════════════════════════════════
 
-// ─── SERVER-SIDE DATA FETCHING ──────────────────────────────────────────────
+const selectedIds = ref<number[]>([])
+const selectedApplicantsById = ref<Record<number, any>>({})
+
+/**
+ * Smart Selection Handler:
+ * Preserves selections from OTHER pages while toggling selections on the CURRENT page.
+ */
+function onSelectedIdsUpdate(emittedIds: number[]): void {
+  const currentPageIds = new Set(store.applicants.map((a) => a.id))
+
+  // 1. Keep selected IDs from OTHER pages
+  const otherPagesSelected = selectedIds.value.filter((id) => !currentPageIds.has(id))
+
+  // 2. Get selected IDs for the CURRENT page
+  const currentPageSelected = emittedIds.filter((id) => currentPageIds.has(id))
+
+  // 3. Merge both so previous pages are never lost
+  selectedIds.value = [...otherPagesSelected, ...currentPageSelected]
+
+  // 4. Cache full applicant objects for modal preview
+  store.applicants.forEach((applicant) => {
+    if (currentPageSelected.includes(applicant.id)) {
+      selectedApplicantsById.value[applicant.id] = applicant
+    }
+  })
+}
+
+function clearSelection(): void {
+  selectedIds.value = []
+  selectedApplicantsById.value = {}
+}
+
+/** Selects all loaded applicants across all loaded pages */
+function selectAllLoaded(): void {
+  const allIds = store.applicants.map((a) => a.id)
+  onSelectedIdsUpdate(allIds)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DATA FETCHING
+// ═══════════════════════════════════════════════════════════════════════════
+
 async function fetchFinalList(targetPage?: number | null): Promise<void> {
   const adv = filters.appliedAdvanced.value
 
@@ -82,9 +129,7 @@ async function fetchFinalList(targetPage?: number | null): Promise<void> {
     previous_japan_experience: adv.previous_japan_experience
       ? adv.previous_japan_experience === 'true'
       : '',
-    ssw_eligible: adv.ssw_eligible
-      ? adv.ssw_eligible === 'true'
-      : '',
+    ssw_eligible: adv.ssw_eligible ? adv.ssw_eligible === 'true' : '',
 
     limit: limitToFetch,
     page: pageToFetch,
@@ -92,17 +137,27 @@ async function fetchFinalList(targetPage?: number | null): Promise<void> {
   } as any)
 
   await store.fetchApplicants()
+
+  // Pre-cache current page applicants if already selected
+  store.applicants.forEach((applicant) => {
+    if (selectedIds.value.includes(applicant.id)) {
+      selectedApplicantsById.value[applicant.id] = applicant
+    }
+  })
 }
 
 async function loadAllBatches(): Promise<void> {
-  // ⚡ FIX: Skip fetching if batches are already in memory
   if (batchStore.batches.length > 0) return
   batchStore.setFilters({ limit: 1000 } as any)
   await batchStore.fetchBatches()
 }
 
+// ⚡ Load ALL companies (safely paginated via listAll)
+async function loadAllCompanies(): Promise<void> {
+  await companyStore.fetchActiveCompanies()
+}
+
 onMounted(async () => {
-  // 1. Read saved filters from URL when page is loaded or refreshed
   if (route.query.search) {
     filters.searchQuery.value = String(route.query.search)
   }
@@ -116,22 +171,20 @@ onMounted(async () => {
     filters.appliedAdvanced.value.province = String(route.query.province)
   }
 
-  // 2. Fetch list with restored filters
   await Promise.all([
     fetchFinalList(1),
     filters.fetchAllProvinces(),
     loadAllBatches(),
+    loadAllCompanies(),
   ])
 })
 
-// Re-fetch from MySQL whenever search or filters change (resetting to Page 1)
+// ⚡ FIX: Do NOT clear selections when searching or changing filters
 watch(
   [filters.searchQuery, filters.selectedBatchId, filters.appliedAdvanced],
   () => {
-    selectedIds.value = []
     store.setPage(1)
 
-    // 🟢 Keep URL in sync with filters so page refreshes don't lose filters
     router.replace({
       query: {
         ...route.query,
@@ -147,20 +200,14 @@ watch(
   { deep: true },
 )
 
-// ─── Pagination Handlers ────────────────────────────────────────────────────
+// Pagination Handlers
 async function onPageChange(page: number): Promise<void> {
-  selectedIds.value = []
-
   store.setPage(page)
-
   await fetchFinalList(page)
 }
 
 async function onLimitChange(limit: number): Promise<void> {
-  selectedIds.value = []
-
   store.setLimit(limit)
-
   await fetchFinalList(1)
 }
 
@@ -168,12 +215,13 @@ async function onLimitChange(limit: number): Promise<void> {
 // BATCH OPTIONS
 // ═══════════════════════════════════════════════════════════════════════════
 
-const availableBatches = computed<BatchSummary[]>(() =>
-  [...batchStore.batches].sort((a, b) => {
-    if (a.is_active && !b.is_active) return -1
-    if (!a.is_active && b.is_active) return 1
-    return a.name.localeCompare(b.name)
-  }) as any,
+const availableBatches = computed<BatchSummary[]>(
+  () =>
+    [...batchStore.batches].sort((a, b) => {
+      if (a.is_active && !b.is_active) return -1
+      if (!a.is_active && b.is_active) return 1
+      return a.name.localeCompare(b.name)
+    }) as any,
 )
 
 const batchOptions = computed(() => {
@@ -260,7 +308,7 @@ function removeFilter(key: string): void {
 
 function resetFilters(): void {
   filters.resetAll()
-  selectedIds.value = []
+  clearSelection()
   store.setPage(1)
   fetchFinalList(1)
 }
@@ -269,7 +317,7 @@ function goBack(): void {
   if (window.history.state?.back) {
     router.back()
   } else {
-    router.push({ name: 'applicants.index' }) // fallback if opened from direct link
+    router.push({ name: 'applicants.index' })
   }
 }
 
@@ -280,9 +328,8 @@ function goBack(): void {
 const bulkDeployDialog = ref(false)
 
 const selectedApplicantBatchIds = computed<number[]>(() =>
-  store.applicants
-    .filter((a) => selectedIds.value.includes(a.id))
-    .map((a) => a.applicant_batches?.[0]?.id)
+  Object.values(selectedApplicantsById.value)
+    .map((a: any) => a?.applicant_batches?.[0]?.id)
     .filter((id): id is number => id !== undefined),
 )
 
@@ -301,7 +348,7 @@ async function onBulkDeploySubmit(payload: DeployApplicantPayload): Promise<void
   })
   if (success) {
     bulkDeployDialog.value = false
-    selectedIds.value = []
+    clearSelection()
     await fetchFinalList(1)
   }
 }
@@ -310,6 +357,7 @@ async function onDelete(id: number): Promise<void> {
   try {
     await store.deleteApplicant(id)
     selectedIds.value = selectedIds.value.filter((selectedId) => selectedId !== id)
+    delete selectedApplicantsById.value[id]
 
     const currentPage = store.pagination?.current_page ?? store.filters.page ?? 1
     const isNowEmptyPage = store.applicants.length === 0 && currentPage > 1
@@ -351,6 +399,37 @@ const bulkAIS = useBulkAISDialog(
   selectedIds,
   filters.selectedBatchId,
 )
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🛡️ MIGRANT WORKER INSURANCE EXPORT
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function openInsuranceExport(): Promise<void> {
+  if (companyStore.activeCompanies.length === 0) {
+    await companyStore.fetchActiveCompanies()
+  }
+
+  const selectedApplicants = selectedIds.value.map((id) => {
+    return (
+      selectedApplicantsById.value[id] ?? {
+        id,
+        full_name: `Applicant #${id}`,
+      }
+    )
+  })
+
+  if (selectedApplicants.length === 0) {
+    toast.add({
+      severity: 'warn',
+      summary: 'No applicants selected',
+      detail: 'Please select applicants from the table first.',
+      life: 3000,
+    })
+    return
+  }
+
+  insurance.open(selectedApplicants as any)
+}
 </script>
 
 <template>
@@ -374,18 +453,18 @@ const bulkAIS = useBulkAISDialog(
 
     <!-- ─── Bulk Actions Bar ──────────────────────────────────────────────── -->
     <FinalListBulkActionsBar :selected-count="selectedIds.length" :deployable-count="deployableCount"
-      :non-deployable-count="nonDeployableCount" :submitting="deploymentStore.submitting" @clear="selectedIds = []"
-      @deploy="openBulkDeploy" />
+      :non-deployable-count="nonDeployableCount" :submitting="deploymentStore.submitting" @clear="clearSelection"
+      @deploy="openBulkDeploy" @export-insurance="openInsuranceExport" />
 
-    <!-- ─── Table (Server-Side Paginated) ─────────────────────────────────── -->
+    <!-- ─── Table ─────────────────────────────────────────────────────────── -->
     <template v-if="store.loading && store.applicants.length === 0">
       <Skeleton height="400px" border-radius="16px" />
     </template>
 
     <AppCard v-else :padding="'none'" :shadow="'soft'">
       <ApplicantTable :applicants="store.applicants" :pagination="store.pagination" :loading="store.loading"
-        :submitting="false" :selectable="true" v-model:selectedIds="selectedIds" @page-change="onPageChange"
-        @limit-change="onLimitChange" @delete="onDelete" />
+        :submitting="false" :selectable="true" :selected-ids="selectedIds" @update:selected-ids="onSelectedIdsUpdate"
+        @page-change="onPageChange" @limit-change="onLimitChange" @delete="onDelete" />
     </AppCard>
 
     <!-- ─── Empty state ───────────────────────────────────────────────────── -->
@@ -397,90 +476,57 @@ const bulkAIS = useBulkAISDialog(
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════════════
-         DIALOGS (Wrapped with v-if to lazy-load on demand)
+         DIALOGS
     ═══════════════════════════════════════════════════════════════════════ -->
 
-    <AdvancedFiltersDialog
-      v-if="filters.showAdvanced.value"
-      v-model:visible="filters.showAdvanced.value"
-      v-model:gender="filters.gender.value"
-      v-model:civil-status="filters.civilStatus.value"
-      v-model:nationality="filters.nationality.value"
-      v-model:quality-grade="filters.qualityGrade.value"
-      v-model:city="filters.city.value"
-      v-model:province="filters.province.value"
-      v-model:address="filters.address.value"
-      v-model:skill-category="filters.skillCategory.value"
-      v-model:jlpt-level="filters.jlptLevel.value"
-      v-model:willing-to-be-deployed="filters.willingToBeDeployed.value"
+    <AdvancedFiltersDialog v-if="filters.showAdvanced.value" v-model:visible="filters.showAdvanced.value"
+      v-model:gender="filters.gender.value" v-model:civil-status="filters.civilStatus.value"
+      v-model:nationality="filters.nationality.value" v-model:quality-grade="filters.qualityGrade.value"
+      v-model:city="filters.city.value" v-model:province="filters.province.value"
+      v-model:address="filters.address.value" v-model:skill-category="filters.skillCategory.value"
+      v-model:jlpt-level="filters.jlptLevel.value" v-model:willing-to-be-deployed="filters.willingToBeDeployed.value"
       v-model:japan-deployment-ready="filters.japanDeploymentReady.value"
       v-model:previous-japan-experience="filters.previousJapanExperience.value"
-      v-model:ssw-eligible="filters.sswEligible.value"
-      :gender-options="filters.genderOptions"
-      :civil-status-options="filters.civilStatusOptions"
-      :nationality-options="filters.nationalityOptions"
-      :quality-grade-options="filters.qualityGradeOptions"
-      :skill-category-options="filters.skillCategoryOptions"
-      :jlpt-level-options="filters.jlptLevelOptions"
-      :boolean-options="filters.booleanOptions"
-      :province-options="filters.provinceOptions.value"
-      :city-options="filters.cityOptions.value"
-      :psgc-provinces="filters.psgcProvinces.value"
-      :psgc-cities="filters.psgcCities.value"
-      :loading-provinces="filters.loadingProvinces.value"
-      :loading-cities="filters.loadingCities.value"
-      :staged-advanced-count="filters.stagedAdvancedCount.value"
-      :has-unsaved-changes="filters.hasUnsavedChanges.value"
-      @apply="filters.applyAdvanced"
-      @clear="filters.clearAdvanced"
-    />
+      v-model:ssw-eligible="filters.sswEligible.value" :gender-options="filters.genderOptions"
+      :civil-status-options="filters.civilStatusOptions" :nationality-options="filters.nationalityOptions"
+      :quality-grade-options="filters.qualityGradeOptions" :skill-category-options="filters.skillCategoryOptions"
+      :jlpt-level-options="filters.jlptLevelOptions" :boolean-options="filters.booleanOptions"
+      :province-options="filters.provinceOptions.value" :city-options="filters.cityOptions.value"
+      :psgc-provinces="filters.psgcProvinces.value" :psgc-cities="filters.psgcCities.value"
+      :loading-provinces="filters.loadingProvinces.value" :loading-cities="filters.loadingCities.value"
+      :staged-advanced-count="filters.stagedAdvancedCount.value" :has-unsaved-changes="filters.hasUnsavedChanges.value"
+      @apply="filters.applyAdvanced" @clear="filters.clearAdvanced" />
 
-    <ExcelExportDialog
-      v-if="excel.showExportDialog.value"
-      v-model:visible="excel.showExportDialog.value"
-      v-model:export-scope="excel.exportScope.value"
-      v-model:export-batch-id="excel.exportBatchId.value"
-      v-model:export-location="excel.exportLocation.value"
-      v-model:export-status="excel.exportStatus.value"
-      :exporting="excel.exporting.value"
-      :filtered-count="store.applicants.length"
-      :export-count="excel.exportApplicants.value.length"
-      :available-batches="availableBatches"
-      :available-locations="excel.availableLocations.value"
-      :available-statuses="excel.availableStatuses.value"
-      :selected-column-keys="excel.selectedColumnKeys.value"
-      :column-groups="excel.columnGroups.value"
-      :all-columns="excel.ALL_COLUMNS"
-      @toggle-column="excel.toggleColumn"
-      @toggle-group="excel.toggleGroup"
-      @apply-preset="excel.applyPreset"
-      @select-all="excel.selectAllColumns"
-      @clear-all="excel.clearAllColumns"
-      @download="excel.handleDownload"
-    />
+    <ExcelExportDialog v-if="excel.showExportDialog.value" v-model:visible="excel.showExportDialog.value"
+      v-model:export-scope="excel.exportScope.value" v-model:export-batch-id="excel.exportBatchId.value"
+      v-model:export-location="excel.exportLocation.value" v-model:export-status="excel.exportStatus.value"
+      :exporting="excel.exporting.value" :filtered-count="store.applicants.length"
+      :export-count="excel.exportApplicants.value.length" :available-batches="availableBatches"
+      :available-locations="excel.availableLocations.value" :available-statuses="excel.availableStatuses.value"
+      :selected-column-keys="excel.selectedColumnKeys.value" :column-groups="excel.columnGroups.value"
+      :all-columns="excel.ALL_COLUMNS" @toggle-column="excel.toggleColumn" @toggle-group="excel.toggleGroup"
+      @apply-preset="excel.applyPreset" @select-all="excel.selectAllColumns" @clear-all="excel.clearAllColumns"
+      @download="excel.handleDownload" />
 
-    <BulkAISDialog
-      v-if="bulkAIS.showBulkAISDialog.value"
-      v-model:visible="bulkAIS.showBulkAISDialog.value"
-      v-model:source="bulkAIS.bulkAISSource.value"
-      v-model:batch-id="bulkAIS.bulkAISBatchId.value"
-      v-model:mode="bulkAIS.bulkAISMode.value"
-      :generating="bulkAIS.bulkAISGenerating.value"
-      :progress="bulkAIS.bulkAISProgress.value"
-      :selected-count="selectedIds.length"
-      :filtered-count="store.applicants.length"
-      :applicants-count="bulkAIS.bulkAISApplicants.value.length"
-      :available-batches="availableBatches"
-      @generate="bulkAIS.handleBulkAISGenerate"
-      @close="bulkAIS.closeBulkAISDialog"
-    />
+    <BulkAISDialog v-if="bulkAIS.showBulkAISDialog.value" v-model:visible="bulkAIS.showBulkAISDialog.value"
+      v-model:source="bulkAIS.bulkAISSource.value" v-model:batch-id="bulkAIS.bulkAISBatchId.value"
+      v-model:mode="bulkAIS.bulkAISMode.value" :generating="bulkAIS.bulkAISGenerating.value"
+      :progress="bulkAIS.bulkAISProgress.value" :selected-count="selectedIds.length"
+      :filtered-count="store.applicants.length" :applicants-count="bulkAIS.bulkAISApplicants.value.length"
+      :available-batches="availableBatches" @generate="bulkAIS.handleBulkAISGenerate"
+      @close="bulkAIS.closeBulkAISDialog" />
 
-    <BulkDeployDialog
-      v-if="bulkDeployDialog"
-      v-model:visible="bulkDeployDialog"
-      :applicant-batch-ids="selectedApplicantBatchIds"
-      :submitting="deploymentStore.submitting"
-      @submit="onBulkDeploySubmit"
-    />
+    <BulkDeployDialog v-if="bulkDeployDialog" v-model:visible="bulkDeployDialog"
+      :applicant-batch-ids="selectedApplicantBatchIds" :submitting="deploymentStore.submitting"
+      @submit="onBulkDeploySubmit" />
+
+    <!-- src/features/applicants/views/FinalListView.vue -->
+
+    <!-- 🛡️ MIGRANT WORKER INSURANCE EXPORT DIALOG -->
+    <InsuranceExportDialog v-if="insurance.isDialogOpen.value" v-model:visible="insurance.isDialogOpen.value"
+      :is-exporting="insurance.isExporting.value" :is-loading-details="insurance.isLoadingDetails.value"
+      v-model:departure-date="insurance.departureDate.value" v-model:sort-by="insurance.sortBy.value"
+      :rows="insurance.rows.value" :missing-fields="insurance.missingFields.value" :is-valid="insurance.isValid.value"
+      :error-message="insurance.errorMessage.value" @close="insurance.close" @submit="insurance.submit" />
   </div>
 </template>

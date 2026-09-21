@@ -1,40 +1,46 @@
 // src/features/companies/stores/company.store.ts
-
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { companyApi } from '../api/company.api'
 import type { Company, CompanyFilters, CompanyPayload, Pagination } from '../types'
 
 export const useCompanyStore = defineStore('company', () => {
-  const companies  = ref<Company[]>([])
-  const company    = ref<Company | null>(null)
+  const companies = ref<Company[]>([])
+  const company = ref<Company | null>(null)
   const pagination = ref<Pagination | null>(null)
-  const loading    = ref(false)
+  const loading = ref(false)
   const submitting = ref(false)
-  const error      = ref<string | null>(null)
+  const error = ref<string | null>(null)
 
-  const activeCompanies  = ref<Company[]>([])
-  const loadingActive    = ref(false)
+  const allCompanies = ref<Company[]>([])
+  const activeCompanies = ref<Company[]>([])
+  const loadingActive = ref(false)
   const hasFetchedActive = ref(false)
 
   let activeFetchPromise: Promise<Company[]> | null = null
   let fetchCompaniesPromise: Promise<void> | null = null
 
   const filters = ref<CompanyFilters>({
-    search: '', category_id: null, prefecture: '', city: '',
-    country: '', is_active: '', page: 1, limit: 15,
-    order_by: 'created_at', order_dir: 'desc',
+    search: '',
+    category_id: null,
+    prefecture: '',
+    city: '',
+    country: '',
+    is_active: '',
+    page: 1,
+    limit: 15,
+    order_by: 'created_at',
+    order_dir: 'desc',
   })
 
-  function cleanParams(obj: Record<string, any>): Record<string, any> {
-    const cleaned: Record<string, any> = {}
-    for (const key in obj) {
-      if (obj[key] !== '' && obj[key] !== null && obj[key] !== undefined) {
-        cleaned[key] = obj[key]
-      }
-    }
-    return cleaned
-  }
+  // Fast O(1) lookup Map: companyMap.get(id)
+  const companyMap = computed(() => {
+    const map = new Map<number, Company>()
+    allCompanies.value.forEach((c) => map.set(c.id, c))
+    activeCompanies.value.forEach((c) => map.set(c.id, c))
+    companies.value.forEach((c) => map.set(c.id, c))
+    return map
+  })
 
   function setFilters(patch: Partial<CompanyFilters>) {
     filters.value = { ...filters.value, ...patch, page: 1, offset: 0 }
@@ -49,12 +55,24 @@ export const useCompanyStore = defineStore('company', () => {
     filters.value.offset = 0
   }
   function resetFilters() {
-    filters.value = { search: '', category_id: null, prefecture: '', city: '', country: '', is_active: '', page: 1, limit: 15, order_by: 'created_at', order_dir: 'desc' }
+    filters.value = {
+      search: '',
+      category_id: null,
+      prefecture: '',
+      city: '',
+      country: '',
+      is_active: '',
+      page: 1,
+      limit: 15,
+      order_by: 'created_at',
+      order_dir: 'desc',
+    }
   }
-  function clearCompany() { company.value = null }
+  function clearCompany() {
+    company.value = null
+  }
 
   async function fetchCompanies(force = false) {
-    // ⚡ FIX: Deduplicate concurrent requests
     if (fetchCompaniesPromise && !force) return fetchCompaniesPromise
     if (loading.value && !force) return
 
@@ -63,7 +81,7 @@ export const useCompanyStore = defineStore('company', () => {
 
     fetchCompaniesPromise = (async () => {
       try {
-        const res = await companyApi.list(cleanParams(filters.value))
+        const res = await companyApi.list(filters.value)
         companies.value = res.data
         pagination.value = res.meta ?? res.pagination ?? null
       } catch (e: any) {
@@ -79,15 +97,17 @@ export const useCompanyStore = defineStore('company', () => {
     return fetchCompaniesPromise
   }
 
-  async function fetchActiveCompanies(): Promise<Company[]> {
-    if (hasFetchedActive.value) return activeCompanies.value
-    if (activeFetchPromise) return activeFetchPromise
+  async function fetchActiveCompanies(force = false): Promise<Company[]> {
+    if (hasFetchedActive.value && !force) return activeCompanies.value
+    if (activeFetchPromise && !force) return activeFetchPromise
 
     loadingActive.value = true
     activeFetchPromise = (async () => {
       try {
-        const res = await companyApi.list({ is_active: true, limit: 1000 } as any)
-        activeCompanies.value = res.data
+        // ⚡ Pass 1 (integer) instead of boolean true to satisfy backend validation
+        const records = await companyApi.listAll({ is_active: 1 as any })
+        activeCompanies.value = records
+        allCompanies.value = records
         hasFetchedActive.value = true
         return activeCompanies.value
       } catch {
@@ -106,12 +126,12 @@ export const useCompanyStore = defineStore('company', () => {
     if (loading.value) return
     loading.value = true
     error.value = null
-    try { 
-      company.value = await companyApi.get(id) 
-    } catch (e: any) { 
-      error.value = e?.message ?? 'Failed to load company' 
-    } finally { 
-      loading.value = false 
+    try {
+      company.value = await companyApi.get(id)
+    } catch (e: any) {
+      error.value = e?.message ?? 'Failed to load company'
+    } finally {
+      loading.value = false
     }
   }
 
@@ -123,10 +143,8 @@ export const useCompanyStore = defineStore('company', () => {
       companies.value.unshift(created)
       hasFetchedActive.value = false
       return created
-    } catch (e: any) { 
-      throw e 
-    } finally { 
-      submitting.value = false 
+    } finally {
+      submitting.value = false
     }
   }
 
@@ -140,10 +158,8 @@ export const useCompanyStore = defineStore('company', () => {
       if (company.value?.id === id) company.value = updated
       hasFetchedActive.value = false
       return updated
-    } catch (e: any) { 
-      throw e 
-    } finally { 
-      submitting.value = false 
+    } finally {
+      submitting.value = false
     }
   }
 
@@ -154,10 +170,8 @@ export const useCompanyStore = defineStore('company', () => {
       await companyApi.remove(id)
       companies.value = companies.value.filter((c) => c.id !== id)
       hasFetchedActive.value = false
-    } catch (e: any) { 
-      throw e 
-    } finally { 
-      submitting.value = false 
+    } finally {
+      submitting.value = false
     }
   }
 
@@ -170,15 +184,34 @@ export const useCompanyStore = defineStore('company', () => {
       if (company.value?.id === id) company.value = updated
       hasFetchedActive.value = false
       return updated
-    } finally { 
-      submitting.value = false 
+    } finally {
+      submitting.value = false
     }
   }
 
   return {
-    companies, company, activeCompanies, pagination, loading, loadingActive, submitting, error, filters,
-    setFilters, setPage, setLimit, resetFilters, clearCompany,
-    fetchCompanies, fetchActiveCompanies, fetchCompany,
-    createCompany, updateCompany, deleteCompany, toggleStatus,
+    companies,
+    company,
+    allCompanies,
+    activeCompanies,
+    companyMap,
+    pagination,
+    loading,
+    loadingActive,
+    submitting,
+    error,
+    filters,
+    setFilters,
+    setPage,
+    setLimit,
+    resetFilters,
+    clearCompany,
+    fetchCompanies,
+    fetchActiveCompanies,
+    fetchCompany,
+    createCompany,
+    updateCompany,
+    deleteCompany,
+    toggleStatus,
   }
 })
