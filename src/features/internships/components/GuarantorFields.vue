@@ -120,13 +120,17 @@ const fullAddressPreview = computed(() => {
   if (localStreet.value) parts.push(localStreet.value.trim())
   if (localCity.value) parts.push(localCity.value)
   if (localProvince.value) parts.push(localProvince.value)
-  return parts.filter(Boolean).join(', ')
+  let full = parts.filter(Boolean).join(', ')
+  if (full && !/philippines$/i.test(full)) {
+    full += ', Philippines'
+  }
+  return full
 })
 
 watch(localProvince, async (newVal?: string) => {
   localCity.value = ''
   psgcCities.value = []
-  
+
   if (newVal && typeof newVal === 'string') {
     const p = psgcProvinces.value.find(x => x.name === newVal || x.code === newVal)
     if (p && typeof p.code === 'string') {
@@ -145,14 +149,13 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="bg-white rounded-2xl border border-appleCore-100 shadow-sm overflow-hidden flex flex-col h-full hover:border-apricot-200 transition-colors duration-300">
-    
+  <div
+    class="bg-white rounded-2xl border border-appleCore-100 shadow-sm overflow-hidden flex flex-col h-full hover:border-apricot-200 transition-colors duration-300">
+
     <!-- ─── CARD HEADER ─── -->
     <div class="flex items-center gap-3 px-5 py-3.5 border-b border-appleCore-100 bg-appleCore-50">
-      <span
-        class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm"
-        :class="index === 0 ? 'bg-apricot-500' : 'bg-blueberry-400'"
-      >
+      <span class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm"
+        :class="index === 0 ? 'bg-apricot-500' : 'bg-blueberry-400'">
         {{ index + 1 }}
       </span>
       <div>
@@ -165,18 +168,14 @@ onMounted(async () => {
 
     <!-- ─── CARD BODY ─── -->
     <div class="p-5 flex flex-col gap-5 flex-1">
-      
+
       <!-- 1. Identity Section -->
       <section>
         <div class="mb-4">
           <label class="block text-[11px] font-semibold text-blueberry-700 mb-1.5">
             Full Name <span class="text-apricot-500">*</span>
           </label>
-          <InputText
-            v-model="form.full_name"
-            class="w-full !text-sm"
-            placeholder="e.g. Maria Santos Dela Cruz"
-          />
+          <InputText v-model="form.full_name" class="w-full !text-sm" placeholder="e.g. Maria Santos Dela Cruz" />
         </div>
 
         <div class="grid grid-cols-2 gap-3">
@@ -187,11 +186,13 @@ onMounted(async () => {
           <div class="min-w-0">
             <div class="flex items-center justify-between mb-1.5">
               <label class="text-[11px] font-semibold text-blueberry-700">Birthday</label>
-              <span v-if="computedAge !== null" class="text-[10px] font-bold text-apricot-700 bg-apricot-50 px-1.5 py-0.5 rounded border border-apricot-100">
+              <span v-if="computedAge !== null"
+                class="text-[10px] font-bold text-apricot-700 bg-apricot-50 px-1.5 py-0.5 rounded border border-apricot-100">
                 {{ computedAge }} yrs
               </span>
             </div>
-            <DatePicker v-model="birthDateValue" show-icon date-format="yy-mm-dd" class="w-full" input-class="!text-sm" placeholder="YYYY-MM-DD" />
+            <DatePicker v-model="birthDateValue" show-icon date-format="yy-mm-dd" class="w-full" input-class="!text-sm"
+              placeholder="YYYY-MM-DD" />
           </div>
         </div>
       </section>
@@ -201,7 +202,8 @@ onMounted(async () => {
         <div class="grid grid-cols-2 gap-3">
           <div class="min-w-0">
             <label class="block text-[11px] font-semibold text-blueberry-700 mb-1.5">Civil Status</label>
-            <Select v-model="form.civil_status" :options="civilOptions" option-label="label" option-value="value" class="w-full !text-sm" placeholder="Choose..." />
+            <Select v-model="form.civil_status" :options="civilOptions" option-label="label" option-value="value"
+              class="w-full !text-sm" placeholder="Choose..." />
           </div>
           <div class="min-w-0">
             <label class="block text-[11px] font-semibold text-blueberry-700 mb-1.5">Nationality</label>
@@ -213,20 +215,26 @@ onMounted(async () => {
       <!-- 3. Address Section -->
       <section class="pt-4 border-t border-appleCore-100">
         <label class="block text-[11px] font-semibold text-blueberry-700 mb-2.5">Permanent Address</label>
-        
+
         <div class="space-y-3">
           <div class="grid grid-cols-2 gap-3">
             <div class="min-w-0">
-              <Select v-model="localProvince" :options="provinceOptions" option-label="label" option-value="value" filter show-clear :loading="loadingProvinces" :placeholder="loadingProvinces ? 'Loading...' : 'Province (Optional)'" class="w-full !text-sm" />
+              <Select v-model="localProvince" :options="provinceOptions" option-label="label" option-value="value"
+                filter show-clear :loading="loadingProvinces"
+                :placeholder="loadingProvinces ? 'Loading...' : 'Province (Optional)'" class="w-full !text-sm" />
             </div>
             <div class="min-w-0">
-              <Select v-model="localCity" :options="cityOptions" option-label="label" option-value="value" filter show-clear :loading="loadingCities" :disabled="!localProvince || loadingCities" :placeholder="!localProvince ? 'Select Province' : 'City (Optional)'" class="w-full !text-sm" />
+              <Select v-model="localCity" :options="cityOptions" option-label="label" option-value="value" filter
+                show-clear :loading="loadingCities" :disabled="!localProvince || loadingCities"
+                :placeholder="!localProvince ? 'Select Province' : 'City (Optional)'" class="w-full !text-sm" />
             </div>
           </div>
 
-          <Textarea v-model="localStreet" rows="2" class="w-full !text-sm leading-relaxed" auto-resize placeholder="House/Street, Barangay..." />
+          <Textarea v-model="localStreet" rows="2" class="w-full !text-sm leading-relaxed" auto-resize
+            placeholder="House/Street, Barangay..." />
 
-          <div v-if="localProvince || localCity" class="px-3 py-2 bg-appleCore-50 border border-appleCore-100 rounded-lg">
+          <div v-if="localProvince || localCity"
+            class="px-3 py-2 bg-appleCore-50 border border-appleCore-100 rounded-lg">
             <p class="text-[10px] font-bold uppercase tracking-wider text-blueberry-500 mb-0.5">Address Preview</p>
             <p class="text-xs font-medium text-blueberry-800">{{ fullAddressPreview }}</p>
           </div>
@@ -248,7 +256,8 @@ onMounted(async () => {
             <div class="grid grid-cols-2 gap-3">
               <div class="min-w-0">
                 <label class="block text-[11px] font-medium text-blueberry-700 mb-1">Date Issued</label>
-                <DatePicker v-model="certDateValue" show-icon date-format="yy-mm-dd" class="w-full" input-class="!text-sm" placeholder="Pick Date" />
+                <DatePicker v-model="certDateValue" show-icon date-format="yy-mm-dd" class="w-full"
+                  input-class="!text-sm" placeholder="Pick Date" />
               </div>
               <div class="min-w-0">
                 <label class="block text-[11px] font-medium text-blueberry-700 mb-1">Place Issued</label>
@@ -264,10 +273,16 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-:deep(.p-inputtext), :deep(.p-select), :deep(.p-textarea), :deep(.p-datepicker) {
-  width: 100% !important; min-width: 0 !important;
+:deep(.p-inputtext),
+:deep(.p-select),
+:deep(.p-textarea),
+:deep(.p-datepicker) {
+  width: 100% !important;
+  min-width: 0 !important;
 }
+
 :deep(.p-select-label) {
-  overflow: visible; text-overflow: unset;
+  overflow: visible;
+  text-overflow: unset;
 }
 </style>
