@@ -27,8 +27,7 @@ const i = computed(() => store.internship)
   <div class="flex flex-col gap-6 p-6 max-w-5xl mx-auto">
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <Button icon="pi pi-arrow-left" text rounded
-          @click="router.push({ name: 'internships.index' })" />
+        <Button icon="pi pi-arrow-left" text rounded @click="router.push({ name: 'internships.index' })" />
         <div>
           <h1 class="text-2xl font-serif font-bold text-blueberry-800">Internship Details</h1>
           <p v-if="i" class="text-sm text-blueberry-500">
@@ -38,13 +37,10 @@ const i = computed(() => store.internship)
       </div>
 
       <div v-if="i" class="flex items-center gap-2">
-        <Button label="Generate MOA" icon="pi pi-file-pdf" severity="secondary" outlined
-          class="!text-emerald-700 !border-emerald-300 hover:!bg-emerald-50"
-          @click="showMoa = true" />
-        <Button v-if="i.can_change_company"
-          label="Change Company" icon="pi pi-refresh" severity="secondary" outlined
-          class="!text-indigo-700 !border-indigo-300 hover:!bg-indigo-50"
-          @click="showChange = true" />
+        <Button label="Generate MOA" icon="pi pi-file-word" severity="secondary" outlined
+          class="!text-emerald-700 !border-emerald-300 hover:!bg-emerald-50" @click="showMoa = true" />
+        <Button v-if="i.can_change_company" label="Change Company" icon="pi pi-refresh" severity="secondary" outlined
+          class="!text-indigo-700 !border-indigo-300 hover:!bg-indigo-50" @click="showChange = true" />
       </div>
     </div>
 
@@ -101,9 +97,8 @@ const i = computed(() => store.internship)
       <section v-if="i.documents?.length" class="bg-white rounded-2xl border border-appleCore-100 p-6">
         <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-3">Documents</h3>
         <div class="space-y-2">
-          <a v-for="d in i.documents" :key="d.id"
-             :href="d.download_url ?? '#'" target="_blank"
-             class="flex items-center justify-between border border-appleCore-100 rounded-lg px-4 py-2 hover:bg-appleCore-50/50">
+          <a v-for="d in i.documents" :key="d.id" :href="d.download_url ?? '#'" target="_blank"
+            class="flex items-center justify-between border border-appleCore-100 rounded-lg px-4 py-2 hover:bg-appleCore-50/50">
             <span class="text-sm font-medium text-blueberry-800">
               <i class="pi pi-file-pdf text-red-500 mr-2" />
               {{ d.document_no }} · {{ d.document_type }}
@@ -113,7 +108,9 @@ const i = computed(() => store.internship)
         </div>
       </section>
 
-      <GenerateMoaDialog v-model:visible="showMoa" :internship-id="i.id" />
+
+      <GenerateMoaDialog v-model:visible="showMoa" :internship-id="i.id"
+        :default-municipality="i.municipality ?? i.applicant?.city ?? 'Murcia'" />
       <ChangeCompanyDialog v-model:visible="showChange" :internship="i" />
     </template>
   </div>

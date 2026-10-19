@@ -105,7 +105,11 @@ export const useCompanyStore = defineStore('company', () => {
     activeFetchPromise = (async () => {
       try {
         // ⚡ Pass 1 (integer) instead of boolean true to satisfy backend validation
-        const records = await companyApi.listAll({ is_active: 1 as any })
+        const records = await companyApi.listAll({
+          is_active: 1 as any,
+          limit: 1000,
+          page: 1,
+        } as any)
         activeCompanies.value = records
         allCompanies.value = records
         hasFetchedActive.value = true

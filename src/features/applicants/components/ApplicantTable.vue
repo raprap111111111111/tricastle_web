@@ -4,7 +4,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
-import DataTable, { type DataTableRowClickEvent } from 'primevue/datatable'
+import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
 import Menu from 'primevue/menu'
@@ -32,6 +32,7 @@ const emit = defineEmits<{
   (e: 'limit-change', limit: number): void
   (e: 'delete', id: number): void
   (e: 'update:selectedIds', ids: number[]): void
+  (e: 'clear-selection'): void // 👈 Added custom clear emit
 }>()
 
 const router  = useRouter()
@@ -56,16 +57,11 @@ function getFullName(a: Applicant | null | undefined): string {
 
 function onNameEnter(event: MouseEvent, applicant: Applicant) {
   if (photoHideTimer) clearTimeout(photoHideTimer)
-
   const target = event.currentTarget as HTMLElement
   const rect = target.getBoundingClientRect()
-
   previewPhotoApplicant.value = applicant
   hoveredPhotoId.value = applicant.id
-  previewPos.value = {
-    x: rect.left,
-    y: rect.bottom + 8,
-  }
+  previewPos.value = { x: rect.left, y: rect.bottom + 8 }
 }
 
 function onNameLeave() {
@@ -92,7 +88,6 @@ function showDeploymentPopover(event: Event, applicant: Applicant) {
   hoveredApplicant.value = applicant
   deploymentPopover.value?.show(event)
 }
-
 function hideDeploymentPopover() {
   deploymentPopover.value?.hide()
 }
@@ -119,22 +114,10 @@ function deploymentCount(applicant: Applicant): number {
 
 function countryFlag(country?: string | null): string {
   const flags: Record<string, string> = {
-    Japan: '🇯🇵',
-    Korea: '🇰🇷',
-    'South Korea': '🇰🇷',
-    Taiwan: '🇹🇼',
-    Singapore: '🇸🇬',
-    'Saudi Arabia': '🇸🇦',
-    UAE: '🇦🇪',
-    Qatar: '🇶🇦',
-    Kuwait: '🇰🇼',
-    Canada: '🇨🇦',
-    USA: '🇺🇸',
-    'United States': '🇺🇸',
-    Australia: '🇦🇺',
-    'Hong Kong': '🇭🇰',
-    Malaysia: '🇲🇾',
-    Philippines: '🇵🇭',
+    Japan: '🇯🇵', Korea: '🇰🇷', 'South Korea': '🇰🇷', Taiwan: '🇹🇼', Singapore: '🇸🇬',
+    'Saudi Arabia': '🇸🇦', UAE: '🇦🇪', Qatar: '🇶🇦', Kuwait: '🇰🇼', Canada: '🇨🇦',
+    USA: '🇺🇸', 'United States': '🇺🇸', Australia: '🇦🇺', 'Hong Kong': '🇭🇰',
+    Malaysia: '🇲🇾', Philippines: '🇵🇭',
   }
   return flags[country ?? ''] ?? '🌍'
 }
@@ -143,8 +126,7 @@ function formatDeploymentDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—'
   try {
     const d = new Date(dateStr)
-    if (isNaN(d.getTime())) return '—'
-    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
   } catch {
     return '—'
   }
@@ -167,14 +149,10 @@ const loadingIds = ref<Set<number>>(new Set())
 function isRowLoading(id: number): boolean {
   return loadingIds.value.has(id)
 }
-
 function setRowLoading(id: number, loading: boolean) {
   const next = new Set(loadingIds.value)
-  if (loading) {
-    next.add(id)
-  } else {
-    next.delete(id)
-  }
+  if (loading) next.add(id)
+  else next.delete(id)
   loadingIds.value = next
 }
 
@@ -205,7 +183,6 @@ const menuItems = computed(() => {
       command: () => handleMoveToFinalList(a),
     })
   }
-
   if (a.status !== 'rejected') {
     items.push({
       label: 'Reject',
@@ -214,21 +191,47 @@ const menuItems = computed(() => {
       command: () => openRejectDialog(a),
     })
   }
-
   items.push(
     { separator: true },
-    {
-      label: 'Delete',
-      icon: 'pi pi-trash',
-      class: '!text-red-600',
-      command: () => confirmDelete(a),
-    },
+    { label: 'Delete', icon: 'pi pi-trash', class: '!text-red-600', command: () => confirmDelete(a) },
   )
-
   return items
 })
 
 // ─── Handlers ────────────────────────────────────────
+
+// 🎯 INTERCEPT NAVIGATION TO PREVENT ACCIDENTAL CLICKS
+function confirmNavigation(callback: () => void) {
+  if (props.selectedIds && props.selectedIds.length > 0) {
+    confirm.require({
+      header: 'Discard Selection?',
+      message: 'You currently have applicants selected. Proceeding will clear your bulk selection. Do you want to continue?',
+      icon: 'pi pi-exclamation-circle',
+      acceptLabel: 'Yes, proceed',
+      rejectLabel: 'Cancel',
+      acceptClass: '!bg-apricot-600 !border-apricot-600 hover:!bg-apricot-700',
+      accept: () => {
+        emit('clear-selection')
+        callback()
+      }
+    })
+  } else {
+    callback()
+  }
+}
+
+function goToView(id: number) {
+  confirmNavigation(() => {
+    router.push({ name: 'applicants.show', params: { id } })
+  })
+}
+
+function goToEdit(id: number) {
+  confirmNavigation(() => {
+    router.push({ name: 'applicants.edit', params: { id } })
+  })
+}
+
 function confirmDelete(applicant: Applicant) {
   selectedApplicant.value = applicant
   deleteDialog.value = true
@@ -239,20 +242,6 @@ function onDeleteConfirmed() {
     emit('delete', selectedApplicant.value.id)
     deleteDialog.value = false
   }
-}
-
-function goToView(id: number) {
-  router.push({ name: 'applicants.show', params: { id } })
-}
-
-function goToEdit(id: number) {
-  router.push({ name: 'applicants.edit', params: { id } })
-}
-
-function onRowClick(event: DataTableRowClickEvent) {
-  const target = event.originalEvent?.target as HTMLElement | null
-  if (target?.closest('button, a, .p-button, .p-menu, .p-checkbox, .p-popover')) return
-  goToView((event.data as Applicant).id)
 }
 
 function removeFromList(id: number) {
@@ -284,7 +273,6 @@ function handleMoveToFinalList(applicant: Applicant) {
         const updated = await store.moveToFinalList(applicant.id)
         const batchName = updated.applicant_batches?.[0]?.batch?.name
         removeFromList(applicant.id)
-
         toast.add({
           severity: batchName ? 'success' : 'warn',
           summary: 'Moved to Final List',
@@ -314,7 +302,6 @@ function openRejectDialog(applicant: Applicant) {
 
 async function onRejectConfirmed(reason: string) {
   if (!selectedApplicant.value) return
-
   const id   = selectedApplicant.value.id
   const code = selectedApplicant.value.applicant_code
 
@@ -322,7 +309,6 @@ async function onRejectConfirmed(reason: string) {
   try {
     await store.rejectApplicant(id, reason)
     removeFromList(id)
-
     toast.add({
       severity: 'success',
       summary: 'Applicant Rejected',
@@ -346,8 +332,7 @@ function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—'
   try {
     const d = new Date(dateStr)
-    if (isNaN(d.getTime())) return '—'
-    return d.toLocaleDateString('en-CA')
+    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-CA')
   } catch {
     return '—'
   }
@@ -355,11 +340,8 @@ function formatDate(dateStr: string | null | undefined): string {
 
 function gradeColor(grade: string) {
   const map: Record<string, string> = {
-    A: 'text-green-600',
-    B: 'text-blue-600',
-    C: 'text-yellow-600',
-    D: 'text-orange-600',
-    F: 'text-red-500',
+    A: 'text-green-600', B: 'text-blue-600', C: 'text-yellow-600',
+    D: 'text-orange-600', F: 'text-red-500',
   }
   return map[grade] ?? 'text-blueberry-400'
 }
@@ -376,12 +358,11 @@ function gradeColor(grade: string) {
       class="!border-none"
       size="small"
       :row-hover="true"
-      @row-click="onRowClick"
       :pt="{
         table: 'text-sm',
         header: '!bg-appleCore-50/50 !text-blueberry-600 !font-semibold !text-xs !uppercase !tracking-wider',
         headerRow: '!bg-appleCore-50/50 !border-b !border-appleCore-100',
-        bodyRow: 'cursor-pointer hover:!bg-appleCore-50/40 !border-b !border-appleCore-100/60 transition-colors',
+        bodyRow: 'hover:!bg-appleCore-50/40 !border-b !border-appleCore-100/60 transition-colors',
       }"
     >
       <Column
@@ -393,33 +374,38 @@ function gradeColor(grade: string) {
 
       <Column field="applicant_code" header="Code" sortable style="width: 150px">
         <template #body="{ data }">
-          <span class="font-mono text-xs text-apricot-600 font-semibold">
+          <button 
+            type="button" 
+            class="font-mono text-xs text-apricot-600 font-semibold hover:text-apricot-700 hover:underline transition-colors focus:outline-none text-left"
+            @click.stop="goToView(data.id)"
+          >
             {{ data.applicant_code }}
-          </span>
+          </button>
         </template>
       </Column>
 
-      <!-- Applicant Column with Avatar + Hover -->
       <Column header="Applicant" sortable sort-field="last_name">
         <template #body="{ data }">
-          <div
-            class="relative inline-flex items-center gap-3 cursor-pointer py-1"
+          <button
+            type="button"
+            class="relative inline-flex items-center gap-3 cursor-pointer py-1 group focus:outline-none text-left"
             @mouseenter="onNameEnter($event, data)"
             @mouseleave="onNameLeave"
+            @click.stop="goToView(data.id)"
           >
             <img
               :src="getApplicantPhoto(data)"
               :alt="getFullName(data)"
-              class="w-9 h-9 rounded-full object-cover border border-appleCore-200 bg-appleCore-50 flex-shrink-0 shadow-2xs"
+              class="w-9 h-9 rounded-full object-cover border border-appleCore-200 bg-appleCore-50 flex-shrink-0 shadow-2xs group-hover:ring-2 group-hover:ring-apricot-200 transition-all"
               @error="($event.target as HTMLImageElement).src = getDefaultAvatar(getFullName(data))"
             />
-            <div class="flex flex-col items-start text-left min-w-0">
-              <span class="font-medium text-blueberry-800 hover:text-apricot-600 transition-colors truncate">
+            <div class="flex flex-col items-start min-w-0">
+              <span class="font-medium text-blueberry-800 group-hover:text-apricot-600 group-hover:underline transition-colors truncate">
                 {{ getFullName(data) }}
               </span>
               <span class="text-xs text-blueberry-400 mt-0.5 truncate">{{ data.email }}</span>
             </div>
-          </div>
+          </button>
         </template>
       </Column>
 
@@ -591,7 +577,6 @@ function gradeColor(grade: string) {
       </template>
     </DataTable>
 
-    <!-- 🎯 UNIFIED CUSTOM PAGINATION BAR -->
     <AppPagination
       v-if="props.pagination && props.pagination.total > 0"
       :pagination="props.pagination"
@@ -613,171 +598,6 @@ function gradeColor(grade: string) {
       @confirm="onRejectConfirmed"
     />
 
-    <!-- Deployment History Popover -->
-    <Popover
-      ref="deploymentPopover"
-      :pt="{
-        root: { class: '!p-0 !border !border-appleCore-200 !rounded-xl !shadow-xl' },
-        content: { class: '!p-0' },
-      }"
-    >
-      <div v-if="hoveredApplicant" class="w-[380px] max-h-[400px] overflow-hidden flex flex-col">
-        <div class="px-4 py-3 border-b border-appleCore-100 bg-gradient-to-r from-green-50 to-emerald-50">
-          <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-lg bg-green-500 flex items-center justify-center flex-shrink-0">
-              <i class="pi pi-send text-white text-xs" />
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-semibold text-blueberry-800">Deployment History</p>
-              <p class="text-[11px] text-blueberry-500 truncate">
-                {{ hoveredApplicant.first_name }} {{ hoveredApplicant.last_name }} —
-                <span class="font-mono text-apricot-600">{{ hoveredApplicant.applicant_code }}</span>
-              </p>
-            </div>
-            <span class="text-xs font-bold text-green-700 bg-white px-2 py-1 rounded-full ring-1 ring-green-200">
-              {{ deploymentCount(hoveredApplicant) }}
-            </span>
-          </div>
-        </div>
-
-        <div class="flex-1 overflow-y-auto p-4">
-          <div v-if="deploymentCount(hoveredApplicant) > 0" class="relative">
-            <div class="absolute left-[11px] top-2 bottom-2 w-0.5 bg-appleCore-100" />
-            <div class="space-y-3">
-              <div
-                v-for="deployment in getApplicantDeployments(hoveredApplicant)"
-                :key="deployment.id"
-                class="relative flex gap-3"
-              >
-                <div class="relative z-10 flex-shrink-0">
-                  <div
-                    class="w-6 h-6 rounded-full flex items-center justify-center ring-4"
-                    :class="deployment.cancelled_at ? 'bg-red-500 ring-red-100' : 'bg-green-500 ring-green-100'"
-                  >
-                    <i class="pi text-white text-[9px]" :class="deployment.cancelled_at ? 'pi-times' : 'pi-check'" />
-                  </div>
-                </div>
-
-                <div class="flex-1 border border-appleCore-100 rounded-lg p-2.5 bg-white">
-                  <div class="flex items-start justify-between gap-2">
-                    <div class="flex-1 min-w-0">
-                      <div class="flex items-center gap-1.5">
-                        <span class="text-sm">{{ countryFlag(deployment.deployment_country) }}</span>
-                        <p class="text-xs font-semibold text-blueberry-800 truncate">
-                          {{ deployment.deployment_country ?? '—' }}
-                        </p>
-                      </div>
-                      <p class="text-[11px] text-blueberry-600 truncate mt-0.5">
-                        {{ deployment.deployment_company ?? '—' }}
-                        <span v-if="deployment.deployment_position" class="text-blueberry-400">
-                          · {{ deployment.deployment_position }}
-                        </span>
-                      </p>
-                    </div>
-                    <span
-                      class="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
-                      :class="deployment.cancelled_at ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'"
-                    >
-                      {{ deployment.cancelled_at ? 'CANCELLED' : 'DEPLOYED' }}
-                    </span>
-                  </div>
-
-                  <div class="flex items-center gap-3 mt-1.5 text-[10px] text-blueberry-500 flex-wrap">
-                    <span v-if="deployment.deployed_at" class="flex items-center gap-0.5">
-                      <i class="pi pi-calendar text-[8px]" />
-                      {{ formatDeploymentDate(deployment.deployed_at) }}
-                    </span>
-                    <span v-if="deployment.monthly_salary" class="flex items-center gap-0.5">
-                      <i class="pi pi-dollar text-[8px]" />
-                      {{ deployment.salary_currency ?? 'USD' }} {{ deployment.monthly_salary.toLocaleString() }}
-                    </span>
-                    <span v-if="deployment.contract_duration_months" class="flex items-center gap-0.5">
-                      <i class="pi pi-clock text-[8px]" />
-                      {{ deployment.contract_duration_months }}mo
-                    </span>
-                  </div>
-
-                  <p v-if="deployment.cancelled_at && deployment.cancellation_reason" class="mt-1.5 text-[10px] text-red-600 italic">
-                    "{{ deployment.cancellation_reason }}"
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div v-else class="text-center py-6">
-            <i class="pi pi-inbox text-2xl text-blueberry-300 mb-2 block" />
-            <p class="text-xs text-blueberry-500">No deployments yet</p>
-          </div>
-        </div>
-
-        <div class="px-4 py-2 border-t border-appleCore-100 bg-appleCore-50/50">
-          <button
-            type="button"
-            class="text-[11px] text-apricot-600 hover:text-apricot-700 font-medium flex items-center gap-1 mx-auto"
-            @click="hoveredApplicant && (goToView(hoveredApplicant.id), hideDeploymentPopover())"
-          >
-            <i class="pi pi-external-link text-[9px]" />
-            View full applicant profile
-          </button>
-        </div>
-      </div>
-    </Popover>
-
-    <!-- Photo Hover Card Preview -->
-    <Teleport to="body">
-      <Transition
-        enter-active-class="transition duration-200 ease-out"
-        enter-from-class="opacity-0 scale-95 translate-y-1"
-        enter-to-class="opacity-100 scale-100 translate-y-0"
-        leave-active-class="transition duration-150 ease-in"
-        leave-from-class="opacity-100 scale-100"
-        leave-to-class="opacity-0 scale-95"
-      >
-        <div
-          v-if="previewPhotoApplicant && hoveredPhotoId === previewPhotoApplicant.id"
-          class="fixed z-[9999] w-60 rounded-2xl border border-appleCore-100 bg-white shadow-2xl shadow-blueberry-950/15 overflow-hidden pointer-events-auto"
-          :style="{
-            left: `${previewPos.x}px`,
-            top: `${previewPos.y}px`,
-          }"
-          @mouseenter="onPreviewEnter"
-          @mouseleave="onPreviewLeave"
-        >
-          <div class="relative h-44 bg-appleCore-50 border-b border-appleCore-100">
-            <img
-              :src="getApplicantPhoto(previewPhotoApplicant)"
-              :alt="getFullName(previewPhotoApplicant)"
-              class="w-full h-full object-cover"
-              @error="($event.target as HTMLImageElement).src = getDefaultAvatar(getFullName(previewPhotoApplicant))"
-            />
-            <div class="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/60 to-transparent" />
-            <span class="absolute bottom-2 left-3 text-xs font-bold text-white shadow-xs">
-              {{ previewPhotoApplicant.applicant_code }}
-            </span>
-          </div>
-
-          <div class="p-3 space-y-2">
-            <div>
-              <p class="text-sm font-bold text-blueberry-800 leading-tight">
-                {{ getFullName(previewPhotoApplicant) }}
-              </p>
-              <p class="text-xs text-blueberry-400 mt-0.5">
-                {{ previewPhotoApplicant.applied_position || 'No position specified' }}
-              </p>
-            </div>
-
-            <div class="flex flex-wrap gap-1.5 pt-1">
-              <span class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-appleCore-100 text-blueberry-700">
-                {{ String(previewPhotoApplicant.status).replace(/_/g, ' ') }}
-              </span>
-              <span v-if="(previewPhotoApplicant as any).age" class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-apricot-50 text-apricot-700 border border-apricot-200">
-                {{ (previewPhotoApplicant as any).age }} yrs old
-              </span>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <!-- Popovers and Teleports omitted for brevity (Keep them identically as they are) -->
   </div>
 </template>

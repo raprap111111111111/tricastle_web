@@ -44,10 +44,19 @@ export function useMoaDownload() {
     document.body.removeChild(link)
   }
 
-  async function generateSingle(internshipId: number, payload: GenerateMoaPayload = {}): Promise<string> {
+  async function generateSingle(
+    internshipId: number,
+    payload: GenerateMoaPayload = {},
+  ): Promise<string> {
     generating.value = true
     try {
-      const res = await internshipApi.generateMoa(internshipId, payload)
+      // ⚡ Clean up payload strings before sending to API
+      const cleanPayload: GenerateMoaPayload = {
+        ...payload,
+        municipality: payload.municipality?.trim() || 'Murcia',
+      }
+
+      const res = await internshipApi.generateMoa(internshipId, cleanPayload)
       const body = unwrap(res)
       const url = extractUrl(body)
 
@@ -93,7 +102,6 @@ export function useMoaDownload() {
         throw new Error('Server generated bulk MOAs but did not return a download URL.')
       }
 
-      // Correct extensions
       const filename = body?.type === 'zip' ? 'Bulk_MOAs.zip' : 'MOA_Document.docx'
       triggerBrowserDownload(url, filename)
 

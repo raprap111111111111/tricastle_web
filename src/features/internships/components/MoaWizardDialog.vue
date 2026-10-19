@@ -164,6 +164,17 @@ async function loadExistingGuarantors(): Promise<boolean> {
 }
 
 // ─── Step 2: Internship ───────────────────────────────────────────────────────
+
+// ⚡ ADD THIS LIST HERE:
+const LOCATION_OPTIONS = [
+  { label: 'Municipality of Murcia', value: 'Municipality of Murcia' },
+  { label: 'City of Bacolod', value: 'City of Bacolod' },
+  { label: 'City of Talisay', value: 'City of Talisay' },
+  { label: 'City of Silay', value: 'City of Silay' },
+  { label: 'City of Bago', value: 'City of Bago' },
+]
+
+
 const internshipForm = ref<CreateInternshipPayload>({
   applicant_id: props.applicantId,
   program_type: 'titp',
@@ -173,7 +184,7 @@ const internshipForm = ref<CreateInternshipPayload>({
   contract_start: null, // internship period (CON_*)
   contract_years: 3,
   job_description: 'FRAME WORKING',
-  municipality: 'Murcia',
+  municipality: 'Municipality of Murcia',
   passport_number: props.applicant?.passport_number ?? null,
   passport_issuing_office_id: props.applicant?.passport_issuing_office_id ?? null,
   passport_issue_date: props.applicant?.passport_issue_date ?? null,
@@ -633,11 +644,12 @@ onMounted(() => {
 
               <div class="min-w-0">
                 <label class="block text-xs font-semibold text-blueberry-700 mb-1.5">
-                  Municipality <span class="text-red-500">*</span>
+                  Place of Signing <span class="text-red-500">*</span>
                 </label>
-                <InputText v-model="internshipForm.municipality" class="w-full" placeholder="e.g. Murcia" />
+                <Select v-model="internshipForm.municipality" :options="LOCATION_OPTIONS" option-label="label"
+                  option-value="value" class="w-full" placeholder="Select location" />
                 <p class="text-[10px] text-blueberry-400 mt-1">
-                  Used as <span v-pre>{{CITY}}</span> in MOA
+                  Prints on Page 1: "at the <strong>{{ internshipForm.municipality }}</strong>, Philippines"
                 </p>
               </div>
             </div>
@@ -740,9 +752,9 @@ onMounted(() => {
               </span>
             </div>
             <div class="flex px-5 py-3.5">
-              <span class="text-xs font-semibold text-blueberry-500 w-1/3">Municipality</span>
-              <span class="text-sm text-blueberry-800 font-medium">
-                {{ internshipForm.municipality ?? '—' }}
+              <span class="text-xs font-semibold text-blueberry-500 w-1/3">Place of Signing</span>
+              <span class="text-sm text-blueberry-800 font-bold text-apricot-700">
+                at the {{ internshipForm.municipality ?? 'Municipality of Murcia' }}, Philippines
               </span>
             </div>
           </div>

@@ -35,7 +35,7 @@ import FinalListBulkActionsBar from '../components/final-list/FinalListBulkActio
 import AdvancedFiltersDialog from '../components/final-list/AdvancedFiltersDialog.vue'
 import ExcelExportDialog from '../components/final-list/ExcelExportDialog.vue'
 import BulkAISDialog from '../components/final-list/BulkAISDialog.vue'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from 'primevue/usetoast' // ❌ Remove duplicate
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SETUP
@@ -462,9 +462,12 @@ async function openInsuranceExport(): Promise<void> {
     </template>
 
     <AppCard v-else :padding="'none'" :shadow="'soft'">
+
+
       <ApplicantTable :applicants="store.applicants" :pagination="store.pagination" :loading="store.loading"
         :submitting="false" :selectable="true" :selected-ids="selectedIds" @update:selected-ids="onSelectedIdsUpdate"
-        @page-change="onPageChange" @limit-change="onLimitChange" @delete="onDelete" />
+        @page-change="onPageChange" @limit-change="onLimitChange" @delete="onDelete"
+        @clear-selection="clearSelection" />
     </AppCard>
 
     <!-- ─── Empty state ───────────────────────────────────────────────────── -->

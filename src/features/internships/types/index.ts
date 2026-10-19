@@ -102,7 +102,7 @@ export interface Internship {
   can_change_company: boolean
   previous_internship_id: number | null
 
-  applicant?: Pick<Applicant, 'id' | 'applicant_code' | 'full_name' | 'passport_number'>
+  applicant?: Pick<Applicant, 'id' | 'applicant_code' | 'full_name' | 'passport_number' | 'city'>
   program?: InternshipProgram | null
   batch?: { id: number; batch_number: string | number; name: string } | null
 

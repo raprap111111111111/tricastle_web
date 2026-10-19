@@ -18,10 +18,10 @@ const { generating: downloadingMoa, generateSingle: downloadSingleMoa } = useMoa
 onMounted(() => store.fetchInternships())
 onActivated(() => store.fetchInternships())
 
-const totalCount    = computed(() => store.pagination?.total ?? 0)
-const activeCount   = computed(() => store.internships.filter(i => i.status === 'active').length)
-const currentCount  = computed(() => store.internships.filter(i => i.is_current).length)
-const sswCount      = computed(() => store.internships.filter(i => i.program_type === 'ssw' || i.program_type === 'ssw_transfer').length)
+const totalCount = computed(() => store.pagination?.total ?? 0)
+const activeCount = computed(() => store.internships.filter(i => i.status === 'active').length)
+const currentCount = computed(() => store.internships.filter(i => i.is_current).length)
+const sswCount = computed(() => store.internships.filter(i => i.program_type === 'ssw' || i.program_type === 'ssw_transfer').length)
 
 function onFilter(filters: Partial<IFilters>) {
   store.setFilters(filters)
@@ -37,11 +37,14 @@ function onLimitChange(limit: number) { store.setLimit(limit); store.fetchIntern
 async function onDelete(id: number) { await handleDelete(id) }
 
 const moaId = ref<number | null>(null)
+const moaMunicipality = ref<string | null>(null)
 const showMoa = ref(false)
 const checkingMoa = ref(false)
 
 function onGenerateMoa(id: number) {
+  const row = store.internships.find((i) => i.id === id)
   moaId.value = id
+  moaMunicipality.value = row?.municipality ?? row?.applicant?.city ?? 'Murcia'
   showMoa.value = true
 }
 
@@ -83,19 +86,11 @@ async function onQuickDownload(id: number) {
     </AppCard>
 
     <AppCard :padding="'none'" :shadow="'soft'">
-      <InternshipTable
-        :internships="store.internships"
-        :pagination="store.pagination"
-        :loading="store.loading"
-        :submitting="store.submitting || checkingMoa"
-        @page-change="onPageChange"
-        @limit-change="onLimitChange"
-        @delete="onDelete"
-        @generate-moa="onGenerateMoa"
-        @quick-moa="onQuickDownload"
-      />
+      <InternshipTable :internships="store.internships" :pagination="store.pagination" :loading="store.loading"
+        :submitting="store.submitting || checkingMoa" @page-change="onPageChange" @limit-change="onLimitChange"
+        @delete="onDelete" @generate-moa="onGenerateMoa" @quick-moa="onQuickDownload" />
     </AppCard>
 
-    <GenerateMoaDialog v-model:visible="showMoa" :internship-id="moaId" />
+    <GenerateMoaDialog v-model:visible="showMoa" :internship-id="moaId" :default-municipality="moaMunicipality" />
   </div>
 </template>
