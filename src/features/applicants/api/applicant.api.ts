@@ -76,23 +76,47 @@ export const applicantApi = {
 
   // ─── Document / Biodata Upload ─────────────────────────────────────────────
   async uploadBiodata(
-    applicantId:    number,
-    file:           File,
+    applicantId: number,
+    file: File,
     documentTypeId: number,
-    notes?:         string,
+    notes?: string,
   ): Promise<{ id: number; file_name: string; original_name: string }> {
     const form = new FormData()
-    form.append('applicant_id',     String(applicantId))
+    form.append('applicant_id', String(applicantId))
     form.append('document_type_id', String(documentTypeId))
-    form.append('file',             file)
-    form.append('priority',         'normal')
-    form.append('status',           'verified')
-    form.append('source',           'upload')
+    form.append('file', file)
+    form.append('priority', 'normal')
+    form.append('status', 'verified')
+    form.append('source', 'upload')
     if (notes?.trim()) form.append('notes', notes.trim())
 
     const res = await http.post('/applicant-documents', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     return (res.data as any).data ?? res.data
+  },
+
+  // ─── PDOS Batch Certificates ───────────────────────────────────────────────
+  async downloadPdosBatch(applicantIds: number[], pdosDate: string): Promise<void> {
+    const response = await http.post(
+      `${BASE}/generate-pdos`,
+      {
+        applicant_ids: applicantIds,
+        pdos_date: pdosDate,
+      },
+      { responseType: 'blob' },
+    )
+
+    const blob = new Blob([response.data], {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `PDOS_Certificates_${pdosDate}.docx`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
   },
 }

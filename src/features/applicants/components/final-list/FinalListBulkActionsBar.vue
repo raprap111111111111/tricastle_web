@@ -3,62 +3,88 @@
 import Button from 'primevue/button'
 
 defineProps<{
-  selectedCount:      number
-  deployableCount:    number
+  selectedCount: number
+  deployableCount: number
   nonDeployableCount: number
-  submitting?:        boolean
+  submitting?: boolean
 }>()
 
 defineEmits<{
-  clear:              []
-  deploy:             []
-  'export-insurance': []
+  (e: 'clear'): void
+  (e: 'deploy'): void
+  (e: 'export-insurance'): void
+  (e: 'export-pdos'): void
 }>()
 </script>
 
 <template>
-  <div v-if="selectedCount > 0"
-    class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4
-           bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200
-           rounded-xl shadow-sm">
-    <div class="flex items-center gap-3">
-      <div class="w-10 h-10 rounded-lg bg-green-500 flex items-center justify-center shadow-sm">
-        <i class="pi pi-check-square text-white" />
+  <div
+    v-if="selectedCount > 0"
+    class="flex items-center justify-between gap-4 p-4 bg-green-50 border border-green-200 rounded-xl shadow-sm"
+  >
+    <!-- Left -->
+    <div class="flex items-center gap-3 min-w-0">
+      <div class="w-10 h-10 rounded-lg bg-green-500 text-white flex items-center justify-center shrink-0">
+        <i class="pi pi-check text-base" />
       </div>
-      <div>
+
+      <div class="min-w-0">
         <p class="text-sm font-semibold text-green-900">
-          {{ selectedCount }} applicant{{ selectedCount > 1 ? 's' : '' }} selected
+          {{ selectedCount }} applicant{{ selectedCount === 1 ? '' : 's' }} selected
         </p>
-        <p class="text-xs text-green-700 mt-0.5">
-          <span v-if="deployableCount > 0">
-            <strong>{{ deployableCount }}</strong> ready to deploy
-          </span>
-          <span v-if="nonDeployableCount > 0" class="text-amber-700 ml-2">
-            ⚠️ {{ nonDeployableCount }} without batch (will be skipped)
+        <p class="text-xs text-green-700">
+          {{ deployableCount }} ready to deploy
+          <span v-if="nonDeployableCount > 0">
+            · {{ nonDeployableCount }} not deployable
           </span>
         </p>
       </div>
     </div>
-    <div class="flex items-center gap-2">
-      <Button label="Clear Selection" icon="pi pi-times" severity="secondary" text size="small" @click="$emit('clear')" />
-      
-      <!-- 🛡️ EXPORT INSURANCE BUTTON -->
+
+    <!-- Right actions -->
+    <div class="flex items-center gap-2 shrink-0">
+      <!-- Clear -->
+      <button
+        type="button"
+        class="px-2.5 py-1.5 text-xs font-medium text-green-700 hover:text-green-900 hover:bg-green-100 rounded-lg transition flex items-center gap-1.5"
+        @click="$emit('clear')"
+      >
+        <i class="pi pi-times text-[10px]" />
+        Clear Selection
+      </button>
+
+      <!-- 🎓 Generate PDOS -->
+      <Button
+        label="Generate PDOS"
+        icon="pi pi-file-word"
+        size="small"
+        severity="secondary"
+        outlined
+        class="!bg-white !border-slate-300 !text-slate-700 hover:!bg-slate-50"
+        @click="$emit('export-pdos')"
+      />
+
+      <!-- 🛡️ Export Insurance -->
       <Button
         label="Export Insurance"
         icon="pi pi-file-word"
+        size="small"
         severity="secondary"
         outlined
-        size="small"
-        class="!bg-white !border-green-300 hover:!bg-green-100/60 !text-green-800 !shadow-sm"
+        class="!bg-white !border-slate-300 !text-slate-700 hover:!bg-slate-50"
         @click="$emit('export-insurance')"
       />
 
-      <Button :label="`Deploy Selected (${deployableCount})`" icon="pi pi-send"
+      <!-- Deploy -->
+      <Button
+        v-if="deployableCount > 0"
+        :label="`Deploy Selected (${deployableCount})`"
+        icon="pi pi-send"
         size="small"
-        :disabled="deployableCount === 0"
+        severity="success"
         :loading="submitting"
-        class="!bg-green-600 hover:!bg-green-700 !border-green-600 !text-white !shadow-sm"
-        @click="$emit('deploy')" />
+        @click="$emit('deploy')"
+      />
     </div>
   </div>
 </template>

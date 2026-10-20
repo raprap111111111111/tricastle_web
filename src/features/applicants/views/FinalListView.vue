@@ -21,6 +21,10 @@ import type { DeployApplicantPayload } from '@features/deployments/types'
 import InsuranceExportDialog from '../components/insurance/InsuranceExportDialog.vue'
 import { useInsuranceExport } from '../composables/useInsuranceExport'
 
+// 🎓 PDOS Export (NEW)
+import PdosExportDialog from '../components/pdos/PdosExportDialog.vue'
+import { usePdosExport } from '../composables/usePdosExport'
+
 // 📚 Composables
 import { useFinalListFilters } from '../composables/useFinalListFilters'
 import { useFinalListStats } from '../composables/useFinalListStats'
@@ -35,7 +39,7 @@ import FinalListBulkActionsBar from '../components/final-list/FinalListBulkActio
 import AdvancedFiltersDialog from '../components/final-list/AdvancedFiltersDialog.vue'
 import ExcelExportDialog from '../components/final-list/ExcelExportDialog.vue'
 import BulkAISDialog from '../components/final-list/BulkAISDialog.vue'
-import { useToast } from 'primevue/usetoast' // ❌ Remove duplicate
+import { useToast } from 'primevue/usetoast'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SETUP
@@ -47,6 +51,7 @@ const companyStore = useCompanyStore()
 const deploymentStore = useDeploymentStore()
 const { handleBulkDeploy } = useDeployments()
 const insurance = useInsuranceExport()
+const pdos = usePdosExport()
 const toast = useToast()
 const router = useRouter()
 const route = useRoute()
@@ -430,6 +435,24 @@ async function openInsuranceExport(): Promise<void> {
 
   insurance.open(selectedApplicants as any)
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🎓 PDOS CERTIFICATE EXPORT
+// ═══════════════════════════════════════════════════════════════════════════
+
+function openPdosExport(): void {
+  if (selectedIds.value.length === 0) {
+    toast.add({
+      severity: 'warn',
+      summary: 'No applicants selected',
+      detail: 'Please select applicants from the table to generate PDOS certificates.',
+      life: 3000,
+    })
+    return
+  }
+  pdos.open(selectedIds.value)
+}
+
 </script>
 
 <template>
@@ -452,9 +475,16 @@ async function openInsuranceExport(): Promise<void> {
       @open-advanced="filters.showAdvanced.value = true" @reset-all="resetFilters" @remove-filter="removeFilter" />
 
     <!-- ─── Bulk Actions Bar ──────────────────────────────────────────────── -->
-    <FinalListBulkActionsBar :selected-count="selectedIds.length" :deployable-count="deployableCount"
-      :non-deployable-count="nonDeployableCount" :submitting="deploymentStore.submitting" @clear="clearSelection"
-      @deploy="openBulkDeploy" @export-insurance="openInsuranceExport" />
+    <FinalListBulkActionsBar 
+      :selected-count="selectedIds.length" 
+      :deployable-count="deployableCount"
+      :non-deployable-count="nonDeployableCount" 
+      :submitting="deploymentStore.submitting" 
+      @clear="clearSelection"
+      @deploy="openBulkDeploy" 
+      @export-insurance="openInsuranceExport" 
+      @export-pdos="openPdosExport"
+    />
 
     <!-- ─── Table ─────────────────────────────────────────────────────────── -->
     <template v-if="store.loading && store.applicants.length === 0">
@@ -523,13 +553,22 @@ async function openInsuranceExport(): Promise<void> {
       :applicant-batch-ids="selectedApplicantBatchIds" :submitting="deploymentStore.submitting"
       @submit="onBulkDeploySubmit" />
 
-    <!-- src/features/applicants/views/FinalListView.vue -->
-
     <!-- 🛡️ MIGRANT WORKER INSURANCE EXPORT DIALOG -->
     <InsuranceExportDialog v-if="insurance.isDialogOpen.value" v-model:visible="insurance.isDialogOpen.value"
       :is-exporting="insurance.isExporting.value" :is-loading-details="insurance.isLoadingDetails.value"
       v-model:departure-date="insurance.departureDate.value" v-model:sort-by="insurance.sortBy.value"
       :rows="insurance.rows.value" :missing-fields="insurance.missingFields.value" :is-valid="insurance.isValid.value"
       :error-message="insurance.errorMessage.value" @close="insurance.close" @submit="insurance.submit" />
+
+    <!-- 🎓 PDOS CERTIFICATE EXPORT DIALOG -->
+    <PdosExportDialog 
+      v-if="pdos.isDialogOpen.value" 
+      v-model:visible="pdos.isDialogOpen.value"
+      v-model:pdos-date="pdos.pdosDate.value"
+      :is-exporting="pdos.isExporting.value" 
+      :applicant-count="selectedIds.length"
+      @close="pdos.close" 
+      @submit="pdos.submit" 
+    />
   </div>
 </template>

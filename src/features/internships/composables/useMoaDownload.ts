@@ -1,11 +1,34 @@
 import { ref } from 'vue'
 import { useToast } from 'primevue/usetoast'
+import axios from 'axios'
 import { internshipApi } from '../api/internship.api'
 import type { BulkGenerateMoaPayload, GenerateMoaPayload } from '../types'
 
 export function useMoaDownload() {
   const toast = useToast()
   const generating = ref(false)
+
+  /** Trigger direct browser download from binary Blob data */
+  function triggerBlobDownload(
+    data: BlobPart,
+    filename: string,
+    mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ): string {
+    const blob = new Blob([data], { type: mimeType })
+    const localUrl = window.URL.createObjectURL(blob)
+
+    const link = document.createElement('a')
+    link.href = localUrl
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
+    // Revoke local object URL after download starts
+    setTimeout(() => window.URL.revokeObjectURL(localUrl), 1000)
+
+    return localUrl
+  }
 
   /** Safely unwrap response whether axios interceptor is active or not */
   function unwrap(res: any): any {
@@ -28,7 +51,7 @@ export function useMoaDownload() {
     )
   }
 
-  /** Force browser download bypassing popup blockers */
+  /** Force browser download for external URLs */
   function triggerBrowserDownload(url: string, filename = 'MOA_Document.docx') {
     const fullUrl = url.startsWith('http')
       ? url
@@ -56,27 +79,36 @@ export function useMoaDownload() {
         municipality: payload.municipality?.trim() || 'Murcia',
       }
 
-      const res = await internshipApi.generateMoa(internshipId, cleanPayload)
-      const body = unwrap(res)
-      const url = extractUrl(body)
+      // 🚀 Direct Blob stream from Laravel backend (Bypasses LAN r2.dev block)
+      const response = await axios.get(
+        `/api/v1/internships/${internshipId}/download-moa`,
+        {
+          params: cleanPayload,
+          responseType: 'blob', // 👈 Tells Axios to receive binary file stream
+        },
+      )
 
-      if (!url) {
-        console.error('[MOA] API response missing download_url:', body)
-        throw new Error('Server generated MOA but did not return a valid download URL.')
+      // Try to read custom filename from Content-Disposition header if available
+      let filename = `MOA_${internshipId}.docx`
+      const disposition = response.headers['content-disposition']
+      if (disposition) {
+        const match = disposition.match(/filename="?([^"]+)"?/)
+        if (match && match[1]) {
+          filename = match[1]
+        }
       }
 
-      // Correct extension → .docx
-      const docNo = body?.document_no ?? `MOA_${internshipId}`
-      triggerBrowserDownload(url, `${docNo}.docx`)
+      // Save file locally via Blob URL
+      const localUrl = triggerBlobDownload(response.data, filename)
 
       toast.add({
         severity: 'success',
         summary: 'MOA Generated',
-        detail: `MOA Word document download started (${docNo}).`,
+        detail: `MOA Word document download started (${filename}).`,
         life: 3500,
       })
 
-      return url
+      return localUrl
     } catch (err: any) {
       console.error('[MOA] generateSingle failed:', err)
       toast.add({

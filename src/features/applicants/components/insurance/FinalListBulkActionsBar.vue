@@ -13,6 +13,7 @@ defineEmits<{
   (e: 'clear'): void
   (e: 'deploy'): void
   (e: 'export-insurance'): void
+  (e: 'export-pdos'): void
 }>()
 </script>
 
@@ -51,6 +52,17 @@ defineEmits<{
         <i class="pi pi-times text-[10px]" />
         Clear Selection
       </button>
+
+      <!-- 🎓 PDOS Certificates (NEW BUTTON) -->
+      <Button
+        label="PDOS Certificates"
+        icon="pi pi-file-word"
+        size="small"
+        severity="secondary"
+        outlined
+        class="!bg-white !border-slate-300 !text-slate-700 hover:!bg-slate-50"
+        @click="$emit('export-pdos')"
+      />
 
       <!-- 🛡️ Export Insurance -->
       <Button
