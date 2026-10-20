@@ -1,4 +1,3 @@
-// src/features/companies/api/company.api.ts
 import http from '@shared/api/http'
 import type {
   Company,
@@ -11,14 +10,12 @@ const BASE = '/companies'
 
 export const companyApi = {
   async list(filters: CompanyFilters = {}): Promise<PaginatedResponse<Company>> {
-    // ⚡ Sanitize query parameters for backend validation compatibility
     const params: Record<string, any> = {}
 
     for (const [key, val] of Object.entries(filters)) {
       if (val === '' || val === null || val === undefined) continue
 
       if (key === 'is_active') {
-        // Convert boolean/strings to integer (1 / 0) for Laravel boolean validation rule
         params[key] =
           val === true || val === 1 || val === '1' || val === 'true' ? 1 : 0
       } else {
@@ -26,52 +23,79 @@ export const companyApi = {
       }
     }
 
+    // 🔍 DEBUG: Watch the exact parameters sent to Laravel
+    console.log('[companyApi.list] Outgoing Request Params:', params)
+
     const { data } = await http.get(BASE, { params })
 
+    // 🔍 DEBUG: Watch the exact response returning from Laravel
+    console.log('[companyApi.list] Raw Backend Response:', data)
+
+    const records = data.records ?? data.data ?? []
+    const total = data.total ?? data.meta?.total ?? records.length
+    const limit = data.limit ?? data.per_page ?? filters.limit ?? 15
+    const currentPage = data.current_page ?? data.page ?? filters.page ?? 1
+    
+    // 🎯 FIX: Correctly calculate total pages instead of defaulting to 1
+    const calculatedLastPage = Math.max(1, Math.ceil(total / limit))
+    const hasMore = data.has_more ?? data.meta?.has_more ?? (currentPage < calculatedLastPage)
+
+    // 🔍 DEBUG: Check the math for pagination looping
+    console.log('[companyApi.list] Normalized Pagination Math:', {
+      recordsFetched: records.length,
+      total,
+      limit,
+      currentPage,
+      calculatedLastPage,
+      hasMore
+    })
+
     return {
-      data: data.records ?? data.data ?? [],
-      meta: data.meta ?? data.pagination ?? {
-        total:        data.total ?? 0,
-        current_page: data.current_page ?? 1,
-        per_page:     data.per_page ?? data.limit ?? 15,
-        limit:        data.limit ?? data.per_page ?? 15,
-        offset:       data.offset ?? 0,
-        from:         data.from,
-        to:           data.to,
-        last_page:    data.last_page ?? 1,
-        has_more:     data.has_more ?? false,
+      data: records,
+      meta: {
+        total,
+        current_page: currentPage,
+        per_page:     limit,
+        limit,
+        offset:       data.offset ?? (currentPage - 1) * limit,
+        from:         data.from ?? null,
+        to:           data.to ?? null,
+        last_page:    calculatedLastPage,
+        has_more:     hasMore,
       },
     }
   },
 
   /**
-   * Fetches ALL companies in batches of 100 to safely stay within API limits.
+   * Fetches ALL companies across all pages.
    */
   async listAll(filters: CompanyFilters = {}): Promise<Company[]> {
     let allRecords: Company[] = []
     let page = 1
     let hasMore = true
 
+    console.log('[companyApi.listAll] Starting to fetch ALL companies...')
+
     while (hasMore) {
+      console.log(`[companyApi.listAll] Fetching Page ${page}...`)
+      
       const response = await this.list({
         ...filters,
         page,
-        limit: 100, // Safe batch size
+        limit: 100, // 🎯 Changed to 100 because your backend MAX_LIMIT is 100!
       })
 
       allRecords = allRecords.concat(response.data)
 
-      const meta = response.meta
-      if (meta && meta.last_page) {
-        hasMore = page < meta.last_page
-      } else {
-        hasMore = false
-      }
+      hasMore = response.meta?.has_more ?? (page < (response.meta?.last_page ?? 1))
+
+      console.log(`[companyApi.listAll] Page ${page} complete. Total gathered so far: ${allRecords.length}. hasMore: ${hasMore}`)
 
       if (response.data.length === 0) break
       page++
     }
 
+    console.log('[companyApi.listAll] Finished! Final Total Companies:', allRecords.length)
     return allRecords
   },
 

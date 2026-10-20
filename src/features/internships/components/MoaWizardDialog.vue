@@ -48,6 +48,9 @@ const applicantStore = useApplicantStore()
 const { activeCategories } = storeToRefs(categoryStore)
 const { passportOffices, loadingOffices } = storeToRefs(applicantStore)
 
+// ✅ FIX: Use the FULL list refs for dropdown (NOT paginated `companies`)
+const { activeCompanies, allCompanies, loadingActive } = storeToRefs(companyStore)
+
 const { generating: isDownloading, generateSingle: downloadMoa } = useMoaDownload()
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -165,7 +168,6 @@ async function loadExistingGuarantors(): Promise<boolean> {
 
 // ─── Step 2: Internship ───────────────────────────────────────────────────────
 
-// ⚡ ADD THIS LIST HERE:
 const LOCATION_OPTIONS = [
   { label: 'Municipality of Murcia', value: 'Municipality of Murcia' },
   { label: 'City of Bacolod', value: 'City of Bacolod' },
@@ -174,14 +176,13 @@ const LOCATION_OPTIONS = [
   { label: 'City of Bago', value: 'City of Bago' },
 ]
 
-
 const internshipForm = ref<CreateInternshipPayload>({
   applicant_id: props.applicantId,
   program_type: 'titp',
   receiving_company_id: null,
   internship_program_id: null,
-  agreement_date: null, // 🎯 Signing of Contract → DAY_S / MONTH_S / YEAR_S
-  contract_start: null, // internship period (CON_*)
+  agreement_date: null,
+  contract_start: null,
   contract_years: 3,
   job_description: 'FRAME WORKING',
   municipality: 'Municipality of Murcia',
@@ -190,9 +191,7 @@ const internshipForm = ref<CreateInternshipPayload>({
   passport_issue_date: props.applicant?.passport_issue_date ?? null,
 })
 
-// 🎯 Signing of Contract (MOA opening date)
 const agreementDate = ref<Date | null>(new Date())
-// Optional internship period start
 const startDate = ref<Date | null>(null)
 const passportIssueDate = ref<Date | null>(parseLocalDate(props.applicant?.passport_issue_date))
 
@@ -208,10 +207,30 @@ watch(passportIssueDate, (v) => {
   internshipForm.value.passport_issue_date = formatLocalDate(v)
 })
 
+// ✅ FIX: Build dropdown options from the FULL list, with fallback chain
 const companyOptions = computed(() => {
-  return companyStore.companies.map((c: any) => {
+  // Prefer activeCompanies (loaded via listAll), fallback through chain
+  const source =
+    activeCompanies.value.length > 0
+      ? activeCompanies.value
+      : allCompanies.value.length > 0
+        ? allCompanies.value
+        : companyStore.companies
+
+  console.log('[MoaWizard] companyOptions source count:', source.length, {
+    active: activeCompanies.value.length,
+    all: allCompanies.value.length,
+    paginated: companyStore.companies.length,
+  })
+
+  return source.map((c: any) => {
     const categoryId =
-      c.company_category_id ?? c.category_id ?? c.companyCategory?.id ?? c.company_category?.id ?? c.category?.id ?? null
+      c.company_category_id ??
+      c.category_id ??
+      c.companyCategory?.id ??
+      c.company_category?.id ??
+      c.category?.id ??
+      null
     const categoryName =
       c.companyCategory?.name ??
       c.company_category?.name ??
@@ -306,7 +325,6 @@ async function saveGuarantors() {
       guarantors: guarantors.value.map((g, i) => ({
         ...g,
         sequence: i + 1,
-        // 🎯 Ensure address ends with Philippines for G1_ADDR / G2_ADDR
         address: ensurePhAddress(g.address),
       })),
     })
@@ -353,7 +371,6 @@ async function handleDownload() {
   if (!currentInternship.value) return
 
   try {
-    // 🎯 Pass agreement_date so backend fills DAY_S / MONTH_S / YEAR_S
     await downloadMoa(currentInternship.value.id, {
       agreement_date:
         internshipForm.value.agreement_date ?? formatLocalDate(agreementDate.value),
@@ -435,8 +452,9 @@ watch(
 
     loading.value = true
     try {
+      // ✅ FIX: Load ALL companies via listAll (not paginated 15)
       Promise.all([
-        companyStore.companies.length === 0 ? companyStore.fetchCompanies() : Promise.resolve(),
+        companyStore.fetchActiveCompanies(),
         categoryStore.fetchActiveCategories(),
         applicantStore.fetchPassportOffices(),
       ]).catch((err) => console.warn('[MoaWizard] background load:', err))
@@ -458,8 +476,9 @@ watch(
 )
 
 onMounted(() => {
+  // ✅ FIX: Load ALL companies via listAll on mount too
   Promise.all([
-    companyStore.companies.length === 0 ? companyStore.fetchCompanies() : Promise.resolve(),
+    companyStore.fetchActiveCompanies(),
     categoryStore.fetchActiveCategories(),
     applicantStore.fetchPassportOffices(),
   ]).catch((err) => {
@@ -576,9 +595,12 @@ onMounted(() => {
             <div class="min-w-0">
               <label class="block text-xs font-semibold text-blueberry-700 mb-1.5">
                 Receiving Company <span class="text-red-500">*</span>
+                <span class="text-[10px] text-blueberry-400 font-normal ml-1">
+                  ({{ companyOptions.length }} available)
+                </span>
               </label>
               <Select v-model="internshipForm.receiving_company_id" :options="companyOptions" option-label="label"
-                option-value="value" filter show-clear :loading="companyStore.loading || categoryStore.loading"
+                option-value="value" filter show-clear :loading="loadingActive || categoryStore.loading"
                 placeholder="Search company or category..." class="w-full">
                 <template #value="slotProps">
                   <div v-if="slotProps.value && selectedCompany" class="flex items-center gap-2 truncate py-0.5">
@@ -626,7 +648,6 @@ onMounted(() => {
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <!-- 🎯 Signing of Contract → agreement_date → DAY_S MONTH_S YEAR_S -->
               <div class="min-w-0">
                 <label class="block text-xs font-semibold text-blueberry-700 mb-1.5">
                   Signing of Contract <span class="text-red-500">*</span>
@@ -654,7 +675,6 @@ onMounted(() => {
               </div>
             </div>
 
-            <!-- Optional period start (CON_*) -->
             <div class="min-w-0 max-w-xs">
               <label class="block text-xs font-semibold text-blueberry-700 mb-1.5">
                 Contract Period Start <span class="text-blueberry-400 font-normal">(optional)</span>
@@ -664,7 +684,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- Passport (unchanged structure) -->
+        <!-- Passport -->
         <div class="rounded-2xl border border-appleCore-100 bg-white p-5 shadow-sm mt-5">
           <div class="flex items-center justify-between mb-4">
             <p class="text-xs font-bold uppercase tracking-wider text-blueberry-500 flex items-center gap-1.5">

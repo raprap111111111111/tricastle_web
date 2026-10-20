@@ -33,7 +33,6 @@ export const useCompanyStore = defineStore('company', () => {
     order_dir: 'desc',
   })
 
-  // Fast O(1) lookup Map: companyMap.get(id)
   const companyMap = computed(() => {
     const map = new Map<number, Company>()
     allCompanies.value.forEach((c) => map.set(c.id, c))
@@ -72,6 +71,7 @@ export const useCompanyStore = defineStore('company', () => {
     company.value = null
   }
 
+  /** Paginated list for the Companies admin table (limit 15 is correct here). */
   async function fetchCompanies(force = false) {
     if (fetchCompaniesPromise && !force) return fetchCompaniesPromise
     if (loading.value && !force) return
@@ -81,9 +81,11 @@ export const useCompanyStore = defineStore('company', () => {
 
     fetchCompaniesPromise = (async () => {
       try {
+        console.log('[company.store] fetchCompanies filters:', { ...filters.value })
         const res = await companyApi.list(filters.value)
         companies.value = res.data
         pagination.value = res.meta ?? res.pagination ?? null
+        console.log('[company.store] fetchCompanies got:', companies.value.length, 'of', pagination.value?.total)
       } catch (e: any) {
         error.value = e?.message ?? 'Failed to load companies'
         companies.value = []
@@ -97,6 +99,10 @@ export const useCompanyStore = defineStore('company', () => {
     return fetchCompaniesPromise
   }
 
+  /**
+   * Full list for dropdowns / MOA / selects.
+   * Uses listAll() so we get all 39 companies, not page 1 only.
+   */
   async function fetchActiveCompanies(force = false): Promise<Company[]> {
     if (hasFetchedActive.value && !force) return activeCompanies.value
     if (activeFetchPromise && !force) return activeFetchPromise
@@ -104,17 +110,21 @@ export const useCompanyStore = defineStore('company', () => {
     loadingActive.value = true
     activeFetchPromise = (async () => {
       try {
-        // ⚡ Pass 1 (integer) instead of boolean true to satisfy backend validation
+        console.log('[company.store] fetchActiveCompanies → listAll')
         const records = await companyApi.listAll({
           is_active: 1 as any,
-          limit: 1000,
-          page: 1,
+          order_by: 'name',
+          order_dir: 'asc',
         } as any)
+
         activeCompanies.value = records
         allCompanies.value = records
         hasFetchedActive.value = true
+
+        console.log('[company.store] fetchActiveCompanies TOTAL:', records.length)
         return activeCompanies.value
-      } catch {
+      } catch (e) {
+        console.error('[company.store] fetchActiveCompanies failed:', e)
         activeCompanies.value = []
         return []
       } finally {
