@@ -1,4 +1,4 @@
-<!-- src/features/applicants/components/pdos/PdosExportDialog.vue -->
+
 <script setup lang="ts">
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
