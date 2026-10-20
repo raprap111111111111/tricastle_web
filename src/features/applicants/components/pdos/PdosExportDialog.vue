@@ -3,6 +3,7 @@
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import Calendar from 'primevue/calendar'
+import InputText from 'primevue/inputtext'
 import { computed } from 'vue'
 
 const props = defineProps<{
@@ -10,11 +11,13 @@ const props = defineProps<{
   isExporting: boolean
   applicantCount: number
   pdosDate: Date
+  certNo: string
 }>()
 
 const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
   (e: 'update:pdosDate', value: Date): void
+  (e: 'update:certNo', value: string): void
   (e: 'submit'): void
   (e: 'close'): void
 }>()
@@ -28,6 +31,11 @@ const localDate = computed({
   get: () => props.pdosDate,
   set: (val) => emit('update:pdosDate', val),
 })
+
+const localCertNo = computed({
+  get: () => props.certNo,
+  set: (val) => emit('update:certNo', val),
+})
 </script>
 
 <template>
@@ -35,7 +43,7 @@ const localDate = computed({
     v-model:visible="localVisible"
     modal
     header="Generate PDOS Certificates"
-    :style="{ width: '420px' }"
+    :style="{ width: '440px' }"
     :closable="!isExporting"
     class="bg-white rounded-xl"
   >
@@ -52,6 +60,24 @@ const localDate = computed({
         </div>
       </div>
 
+      <!-- Certificate Number Input -->
+      <div class="flex flex-col gap-1.5">
+        <label for="certNo" class="text-slate-700 font-medium text-xs">
+          Certificate Number (Starting / Prefix)
+        </label>
+        <InputText
+          id="certNo"
+          v-model="localCertNo"
+          placeholder="e.g. TC-2026-001"
+          class="w-full"
+          :disabled="isExporting"
+        />
+        <p class="text-[11px] text-slate-500">
+          Will auto-increment sequentially if ending with numbers.
+        </p>
+      </div>
+
+      <!-- Seminar Date Input -->
       <div class="flex flex-col gap-1.5">
         <label for="pdosDate" class="text-slate-700 font-medium text-xs">
           PDOS Seminar Date
