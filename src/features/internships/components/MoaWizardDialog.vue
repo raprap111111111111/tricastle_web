@@ -650,7 +650,7 @@ onMounted(() => {
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div class="min-w-0">
                 <label class="block text-xs font-semibold text-blueberry-700 mb-1.5">
-                  Signing of Contract <span class="text-red-500">*</span>
+                  Signing of MOA <span class="text-red-500">*</span>
                 </label>
                 <DatePicker v-model="agreementDate" show-icon class="w-full" placeholder="Select signing date" />
                 <p class="text-[10px] text-blueberry-400 mt-1 leading-snug">

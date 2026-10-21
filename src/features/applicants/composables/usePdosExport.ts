@@ -1,3 +1,5 @@
+// src/features/applicants/composables/usePdosExport.ts
+
 import { ref } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { applicantApi } from '../api/applicant.api'
@@ -15,11 +17,13 @@ export function usePdosExport() {
   const isDialogOpen = ref(false)
   const isExporting = ref(false)
   const pdosDate = ref<Date>(new Date())
+  const certNo = ref<string>('')
   const selectedApplicantIds = ref<number[]>([])
 
   function open(applicantIds: number[]) {
     selectedApplicantIds.value = [...applicantIds]
     pdosDate.value = new Date()
+    certNo.value = ''
     isDialogOpen.value = true
   }
 
@@ -36,6 +40,7 @@ export function usePdosExport() {
       await applicantApi.downloadPdosBatch(
         selectedApplicantIds.value,
         formatDate(pdosDate.value),
+        certNo.value,
       )
 
       toast.add({
@@ -63,6 +68,7 @@ export function usePdosExport() {
     isDialogOpen,
     isExporting,
     pdosDate,
+    certNo,
     open,
     close,
     submit,

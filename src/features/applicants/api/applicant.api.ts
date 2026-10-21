@@ -97,12 +97,17 @@ export const applicantApi = {
   },
 
   // ─── PDOS Batch Certificates ───────────────────────────────────────────────
-  async downloadPdosBatch(applicantIds: number[], pdosDate: string): Promise<void> {
+  async downloadPdosBatch(
+    applicantIds: number[],
+    pdosDate: string,
+    certNo?: string,
+  ): Promise<void> {
     const response = await http.post(
       `${BASE}/generate-pdos`,
       {
         applicant_ids: applicantIds,
         pdos_date: pdosDate,
+        cert_no: certNo,
       },
       { responseType: 'blob' },
     )

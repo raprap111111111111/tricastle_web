@@ -1,4 +1,4 @@
-
+<!-- src/features/applicants/components/pdos/PdosExportDialog.vue -->
 <script setup lang="ts">
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
@@ -6,13 +6,18 @@ import Calendar from 'primevue/calendar'
 import InputText from 'primevue/inputtext'
 import { computed } from 'vue'
 
-const props = defineProps<{
-  visible: boolean
-  isExporting: boolean
-  applicantCount: number
-  pdosDate: Date
-  certNo: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    visible: boolean
+    isExporting: boolean
+    applicantCount: number
+    pdosDate: Date
+    certNo?: string
+  }>(),
+  {
+    certNo: '',
+  }
+)
 
 const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
