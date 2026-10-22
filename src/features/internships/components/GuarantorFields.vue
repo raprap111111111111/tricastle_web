@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import DatePicker from 'primevue/datepicker'
@@ -17,7 +17,7 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: ApplicantGuarantor): void
 }>()
 
-// ─── Date Formatting Helpers (Timezone-Safe & ISO-Defensive) ──────────────────
+// ─── Date Formatting Helpers ──────────────────────────────────────────────────
 function formatLocalDate(d: Date | null): string | null {
   if (!d || !(d instanceof Date) || isNaN(d.getTime())) return null
   const year = d.getFullYear()
@@ -28,7 +28,7 @@ function formatLocalDate(d: Date | null): string | null {
 
 function parseLocalDate(str?: string | null): Date | null {
   if (!str) return null
-  const cleanStr = str.split('T')[0] // Safely handle ISO dates like "1990-05-15T00:00:00Z"
+  const cleanStr = str.split('T')[0]
   const [y, m, d] = cleanStr.split('-').map(Number)
   if (!y || !m || !d) return null
   return new Date(y, m - 1, d)
@@ -37,33 +37,6 @@ function parseLocalDate(str?: string | null): Date | null {
 // ─── 1. Local Reactive State ──────────────────────────────────────────────────
 const form = ref<ApplicantGuarantor>({ ...props.modelValue })
 
-// ─── 2. Sync External API Data -> Local Form ──────────────────────────────────
-watch(
-  () => props.modelValue,
-  (newVal) => {
-    if (JSON.stringify(form.value) !== JSON.stringify(newVal)) {
-      form.value = {
-        ...newVal,
-        civil_status: newVal.civil_status ? newVal.civil_status.toLowerCase() : 'single',
-      }
-      if (newVal.address && !localStreet.value) {
-        localStreet.value = newVal.address
-      }
-    }
-  },
-  { deep: true, immediate: true }
-)
-
-// ─── 3. Sync Local Form -> Parent Component ───────────────────────────────────
-watch(
-  form,
-  (newVal) => {
-    emit('update:modelValue', { ...newVal })
-  },
-  { deep: true }
-)
-
-// ─── Basic Fields Setup ───────────────────────────────────────────────────────
 const civilOptions = [
   { label: 'Single', value: 'single' },
   { label: 'Married', value: 'married' },
@@ -114,6 +87,7 @@ const cityOptions = computed(() => psgcCities.value.map(c => ({ label: c.name, v
 const localProvince = ref<string>('')
 const localCity = ref<string>('')
 const localStreet = ref<string>('')
+const isParsingAddress = ref<boolean>(false)
 
 const fullAddressPreview = computed(() => {
   const parts: string[] = []
@@ -127,7 +101,103 @@ const fullAddressPreview = computed(() => {
   return full
 })
 
+/** Parse "Street, City, Province, Philippines" from DB into form fields */
+async function parseAndSetAddress(fullAddress?: string | null) {
+  if (!fullAddress || isParsingAddress.value) return
+  isParsingAddress.value = true
+
+  try {
+    if (psgcProvinces.value.length === 0) {
+      await fetchAllProvinces()
+    }
+
+    let clean = fullAddress.trim()
+    clean = clean.replace(/,\s*Philippines$/i, '')
+
+    const parts = clean.split(',').map((p) => p.trim()).filter(Boolean)
+
+    if (parts.length >= 3) {
+      const streetPart = parts.slice(0, parts.length - 2).join(', ')
+      const cityPart = parts[parts.length - 2]
+      const provincePart = parts[parts.length - 1]
+
+      const matchedProv = psgcProvinces.value.find(
+        (p) => p.name.toLowerCase() === provincePart.toLowerCase()
+      )
+
+      if (matchedProv) {
+        localProvince.value = matchedProv.name
+        const cities = await fetchCitiesByProvince(matchedProv.code)
+        psgcCities.value = cities
+
+        const matchedCity = cities.find(
+          (c: any) => c.name.toLowerCase() === cityPart.toLowerCase()
+        )
+        localCity.value = matchedCity ? matchedCity.name : cityPart
+        localStreet.value = streetPart
+      } else {
+        localStreet.value = fullAddress
+      }
+    } else if (parts.length === 2) {
+      const cityPart = parts[0]
+      const provincePart = parts[1]
+
+      const matchedProv = psgcProvinces.value.find(
+        (p) => p.name.toLowerCase() === provincePart.toLowerCase()
+      )
+
+      if (matchedProv) {
+        localProvince.value = matchedProv.name
+        const cities = await fetchCitiesByProvince(matchedProv.code)
+        psgcCities.value = cities
+        const matchedCity = cities.find(
+          (c: any) => c.name.toLowerCase() === cityPart.toLowerCase()
+        )
+        localCity.value = matchedCity ? matchedCity.name : cityPart
+        localStreet.value = ''
+      } else {
+        localStreet.value = fullAddress
+      }
+    } else {
+      localStreet.value = fullAddress
+    }
+  } catch (e) {
+    console.warn('[GuarantorFields] Address parse error:', e)
+    localStreet.value = fullAddress
+  } finally {
+    isParsingAddress.value = false
+  }
+}
+
+// ─── 2. Sync External API Data -> Local Form ──────────────────────────────────
+watch(
+  () => props.modelValue,
+  async (newVal) => {
+    if (newVal) {
+      form.value = {
+        ...newVal,
+        civil_status: newVal.civil_status ? newVal.civil_status.toLowerCase() : 'single',
+      }
+      if (newVal.address && !localProvince.value && !localCity.value && !localStreet.value) {
+        await parseAndSetAddress(newVal.address)
+      }
+    }
+  },
+  { deep: true, immediate: true }
+)
+
+// ─── 3. Sync Local Form -> Parent Component ───────────────────────────────────
+watch(
+  form,
+  (newVal) => {
+    emit('update:modelValue', { ...newVal })
+  },
+  { deep: true }
+)
+
 watch(localProvince, async (newVal?: string) => {
+  if (isParsingAddress.value) return
+
   localCity.value = ''
   psgcCities.value = []
 
@@ -140,11 +210,16 @@ watch(localProvince, async (newVal?: string) => {
 })
 
 watch([localStreet, localCity, localProvince], () => {
-  form.value.address = fullAddressPreview.value
+  if (!isParsingAddress.value) {
+    form.value.address = fullAddressPreview.value
+  }
 })
 
 onMounted(async () => {
   await fetchAllProvinces()
+  if (props.modelValue?.address && !localProvince.value && !localCity.value && !localStreet.value) {
+    await parseAndSetAddress(props.modelValue.address)
+  }
 })
 </script>
 
