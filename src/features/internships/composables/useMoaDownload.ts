@@ -6,7 +6,7 @@ export function useMoaDownload() {
   const toast = useToast()
   const generating = ref(false)
 
-  /** Helper to trigger local browser download from Blob data (Same as PDOS) */
+  /** Helper to trigger local browser download from Blob data */
   function triggerBlobDownload(data: Blob, filename: string) {
     const localUrl = window.URL.createObjectURL(data)
     const link = document.createElement('a')
@@ -21,7 +21,6 @@ export function useMoaDownload() {
   async function generateSingle(internshipId: number, payload: any = {}): Promise<void> {
     generating.value = true
     try {
-      // 🚀 Direct backend file stream (bypasses Cloudflare *.r2.dev block completely!)
       const response = await http.get<Blob>(`/internships/${internshipId}/download-moa`, {
         params: payload,
         responseType: 'blob',
@@ -29,9 +28,12 @@ export function useMoaDownload() {
 
       const blob = response.data as unknown as Blob
 
-      // Parse filename from Content-Disposition header if present
+      // Parse filename from Content-Disposition header
       let filename = `MOA_${internshipId}.docx`
-      const disposition = response.headers?.['content-disposition'] as string | undefined
+      const disposition =
+        (response.headers?.['content-disposition'] as string | undefined) ||
+        (response.headers?.['Content-Disposition'] as string | undefined)
+
       if (disposition) {
         const match = disposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)"?/i)
         if (match?.[1]) filename = decodeURIComponent(match[1].trim())
