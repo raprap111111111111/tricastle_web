@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import DatePicker from 'primevue/datepicker'
@@ -17,7 +17,7 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: ApplicantGuarantor): void
 }>()
 
-// ─── Date Formatting Helpers ──────────────────────────────────────────────────
+// ─── Date Formatting Helpers (Timezone-Safe & ISO-Defensive) ──────────────────
 function formatLocalDate(d: Date | null): string | null {
   if (!d || !(d instanceof Date) || isNaN(d.getTime())) return null
   const year = d.getFullYear()
@@ -28,7 +28,7 @@ function formatLocalDate(d: Date | null): string | null {
 
 function parseLocalDate(str?: string | null): Date | null {
   if (!str) return null
-  const cleanStr = str.split('T')[0]
+  const cleanStr = str.split('T')[0] // Safely handle ISO dates like "1990-05-15T00:00:00Z"
   const [y, m, d] = cleanStr.split('-').map(Number)
   if (!y || !m || !d) return null
   return new Date(y, m - 1, d)
@@ -37,6 +37,69 @@ function parseLocalDate(str?: string | null): Date | null {
 // ─── 1. Local Reactive State ──────────────────────────────────────────────────
 const form = ref<ApplicantGuarantor>({ ...props.modelValue })
 
+const localProvince = ref<string>('')
+const localCity = ref<string>('')
+const localStreet = ref<string>('')
+const isSettingAddress = ref<boolean>(false)
+
+/**
+ * Instant Pure JS Address Parser
+ * Splits "Street, City, Province, Philippines" into individual fields
+ */
+function parseAndSetAddress(fullAddress?: string | null) {
+  if (!fullAddress?.trim()) return
+
+  isSettingAddress.value = true
+  try {
+    const clean = fullAddress.trim().replace(/,\s*Philippines$/i, '').trim()
+    const parts = clean.split(',').map((p) => p.trim()).filter(Boolean)
+
+    if (parts.length >= 3) {
+      localStreet.value = parts.slice(0, parts.length - 2).join(', ')
+      localCity.value = parts[parts.length - 2]
+      localProvince.value = parts[parts.length - 1]
+    } else if (parts.length === 2) {
+      localStreet.value = ''
+      localCity.value = parts[0]
+      localProvince.value = parts[1]
+    } else {
+      localStreet.value = clean
+      localCity.value = ''
+      localProvince.value = ''
+    }
+  } finally {
+    isSettingAddress.value = false
+  }
+}
+
+// ─── 2. Sync External API Data -> Local Form & Parse Address ─────────────────
+watch(
+  () => props.modelValue,
+  (newVal) => {
+    if (!newVal) return
+    if (JSON.stringify(form.value) !== JSON.stringify(newVal)) {
+      form.value = {
+        ...newVal,
+        civil_status: newVal.civil_status ? newVal.civil_status.toLowerCase() : 'single',
+      }
+      if (newVal.address && (!localStreet.value && !localCity.value && !localProvince.value)) {
+        parseAndSetAddress(newVal.address)
+      }
+    }
+  },
+  { deep: true, immediate: true }
+)
+
+// ─── 3. Sync Local Form -> Parent Component ───────────────────────────────────
+watch(
+  form,
+  (newVal) => {
+    emit('update:modelValue', { ...newVal })
+  },
+  { deep: true }
+)
+
+// ─── Basic Fields Setup ───────────────────────────────────────────────────────
 const civilOptions = [
   { label: 'Single', value: 'single' },
   { label: 'Married', value: 'married' },
@@ -81,6 +144,7 @@ const {
 
 const psgcCities = ref<any[]>([])
 
+// Inject existing values so Select always displays the label even before PSGC loads
 const provinceOptions = computed(() => {
   const list = psgcProvinces.value.map(p => ({ label: p.name, value: p.name }))
   if (localProvince.value && !list.some(p => p.value === localProvince.value)) {
@@ -97,11 +161,6 @@ const cityOptions = computed(() => {
   return list
 })
 
-const localProvince = ref<string>('')
-const localCity = ref<string>('')
-const localStreet = ref<string>('')
-const isSettingAddress = ref<boolean>(false)
-
 const fullAddressPreview = computed(() => {
   const parts: string[] = []
   if (localStreet.value) parts.push(localStreet.value.trim())
@@ -114,76 +173,26 @@ const fullAddressPreview = computed(() => {
   return full
 })
 
-/** ⚡ INSTANT PURE-JS ADDRESS PARSER (0 Network Requests, 100% Reliable) */
-function parseAndSetAddress(fullAddress?: string | null) {
-  if (!fullAddress) return
-  isSettingAddress.value = true
-
-  try {
-    let clean = fullAddress.trim().replace(/,\s*Philippines$/i, '')
-    const parts = clean.split(',').map((p) => p.trim()).filter(Boolean)
-
-    if (parts.length >= 3) {
-      // e.g. ["sadsada", "Bunawan", "Agusan Del Sur"]
-      localStreet.value = parts.slice(0, parts.length - 2).join(', ')
-      localCity.value = parts[parts.length - 2]
-      localProvince.value = parts[parts.length - 1]
-    } else if (parts.length === 2) {
-      // e.g. ["Bunawan", "Agusan Del Sur"]
-      localStreet.value = ''
-      localCity.value = parts[0]
-      localProvince.value = parts[1]
-    } else {
-      localStreet.value = clean;
-    }
-  } finally {
-    isSettingAddress.value = false
-  }
-}
-
-// ─── 2. Sync External API Data -> Local Form ──────────────────────────────────
-watch(
-  () => props.modelValue,
-  (newVal) => {
-    if (newVal) {
-      form.value = {
-        ...newVal,
-        civil_status: newVal.civil_status ? newVal.civil_status.toLowerCase() : 'single',
-      }
-      if (newVal.address && !localProvince.value && !localCity.value && !localStreet.value) {
-        parseAndSetAddress(newVal.address)
-      }
-    }
-  },
-  { deep: true, immediate: true }
-)
-
-// ─── 3. Sync Local Form -> Parent Component ───────────────────────────────────
-watch(
-  form,
-  (newVal) => {
-    emit('update:modelValue', { ...newVal })
-  },
-  { deep: true }
-)
-
-// Dynamic City fetch when user manually changes Province dropdown
+// Fetch cities when user changes Province manually
 watch(localProvince, async (newVal?: string) => {
   if (isSettingAddress.value) return
 
   psgcCities.value = []
   if (newVal && typeof newVal === 'string') {
-    try {
-      const p = psgcProvinces.value.find(x => x.name.toLowerCase() === newVal.toLowerCase() || x.code === newVal)
-      if (p && typeof p.code === 'string') {
+    const p = psgcProvinces.value.find(
+      x => x.name.toLowerCase() === newVal.toLowerCase() || x.code === newVal
+    )
+    if (p && typeof p.code === 'string') {
+      try {
         psgcCities.value = await fetchCitiesByProvince(p.code)
+      } catch (err) {
+        console.warn('[GuarantorFields] Non-critical city load warning:', err)
       }
-    } catch (e) {
-      console.warn('[GuarantorFields] Failed to load cities for province:', e)
     }
   }
 })
 
+// Auto-update address string
 watch([localStreet, localCity, localProvince], () => {
   if (!isSettingAddress.value) {
     form.value.address = fullAddressPreview.value
@@ -192,7 +201,7 @@ watch([localStreet, localCity, localProvince], () => {
 
 onMounted(() => {
   // Parse immediately in memory
-  if (props.modelValue?.address && !localProvince.value && !localCity.value && !localStreet.value) {
+  if (props.modelValue?.address) {
     parseAndSetAddress(props.modelValue.address)
   }
 
@@ -275,13 +284,13 @@ onMounted(() => {
           <div class="grid grid-cols-2 gap-3">
             <div class="min-w-0">
               <Select v-model="localProvince" :options="provinceOptions" option-label="label" option-value="value"
-                filter show-clear :loading="loadingProvinces" editable
+                filter show-clear editable :loading="loadingProvinces"
                 :placeholder="loadingProvinces ? 'Loading...' : 'Province (Optional)'" class="w-full !text-sm" />
             </div>
             <div class="min-w-0">
               <Select v-model="localCity" :options="cityOptions" option-label="label" option-value="value" filter
-                show-clear :loading="loadingCities" editable
-                :placeholder="!localProvince ? 'City / Municipality' : 'City (Optional)'" class="w-full !text-sm" />
+                show-clear editable :loading="loadingCities"
+                placeholder="City / Municipality" class="w-full !text-sm" />
             </div>
           </div>
 
