@@ -31,6 +31,7 @@ const props = defineProps<{
     passport_number?: string | null
     passport_issuing_office_id?: number | null
     passport_issue_date?: string | null
+    passport_office?: { id: number; name?: string; region?: string } | null
   } | null
 }>()
 
@@ -48,7 +49,7 @@ const applicantStore = useApplicantStore()
 const { activeCategories } = storeToRefs(categoryStore)
 const { passportOffices, loadingOffices } = storeToRefs(applicantStore)
 
-// ✅ FIX: Use the FULL list refs for dropdown (NOT paginated `companies`)
+// ✅ Use the FULL list refs for dropdown (NOT paginated `companies`)
 const { activeCompanies, allCompanies, loadingActive } = storeToRefs(companyStore)
 
 const { generating: isDownloading, generateSingle: downloadMoa } = useMoaDownload()
@@ -207,7 +208,7 @@ watch(passportIssueDate, (v) => {
   internshipForm.value.passport_issue_date = formatLocalDate(v)
 })
 
-// ✅ FIX: Build dropdown options from the FULL list, with fallback chain
+// ✅ Build dropdown options from the FULL list, with fallback chain
 const companyOptions = computed(() => {
   // Prefer activeCompanies (loaded via listAll), fallback through chain
   const source =
@@ -216,12 +217,6 @@ const companyOptions = computed(() => {
       : allCompanies.value.length > 0
         ? allCompanies.value
         : companyStore.companies
-
-  console.log('[MoaWizard] companyOptions source count:', source.length, {
-    active: activeCompanies.value.length,
-    all: allCompanies.value.length,
-    paginated: companyStore.companies.length,
-  })
 
   return source.map((c: any) => {
     const categoryId =
@@ -281,6 +276,26 @@ async function loadExistingInternship(): Promise<boolean> {
 
     if (current) {
       currentInternship.value = current
+
+      // ✅ Hydrate passport safely falling back from current intern -> applicant -> props
+      const applicantPassportNumber =
+        current.applicant?.passport_number ??
+        current.passport_number ??
+        props.applicant?.passport_number ??
+        null
+
+      const applicantOfficeId =
+        current.applicant?.passport_issuing_office_id ??
+        current.passport_issuing_office_id ??
+        props.applicant?.passport_issuing_office_id ??
+        null
+
+      const applicantIssueDate =
+        current.applicant?.passport_issue_date ??
+        current.passport_issue_date ??
+        props.applicant?.passport_issue_date ??
+        null
+
       internshipForm.value = {
         ...internshipForm.value,
         applicant_id: props.applicantId,
@@ -292,6 +307,9 @@ async function loadExistingInternship(): Promise<boolean> {
         contract_years: current.contract_years ?? 3,
         job_description: current.job_description ?? 'FRAME WORKING',
         municipality: current.municipality ?? 'Murcia',
+        passport_number: applicantPassportNumber,
+        passport_issuing_office_id: applicantOfficeId,
+        passport_issue_date: applicantIssueDate,
       }
 
       if (current.agreement_date) {
@@ -300,6 +318,10 @@ async function loadExistingInternship(): Promise<boolean> {
       if (current.contract_start) {
         startDate.value = parseLocalDate(current.contract_start)
       }
+      if (applicantIssueDate) {
+        passportIssueDate.value = parseLocalDate(applicantIssueDate)
+      }
+      
       return true
     }
   } catch (err) {
@@ -452,7 +474,7 @@ watch(
 
     loading.value = true
     try {
-      // ✅ FIX: Load ALL companies via listAll (not paginated 15)
+      // ✅ Load ALL companies via listAll (not paginated 15)
       Promise.all([
         companyStore.fetchActiveCompanies(),
         categoryStore.fetchActiveCategories(),
@@ -476,7 +498,7 @@ watch(
 )
 
 onMounted(() => {
-  // ✅ FIX: Load ALL companies via listAll on mount too
+  // ✅ Load ALL companies via listAll on mount too
   Promise.all([
     companyStore.fetchActiveCompanies(),
     categoryStore.fetchActiveCategories(),
