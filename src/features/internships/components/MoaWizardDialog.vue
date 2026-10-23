@@ -391,7 +391,7 @@ async function loadExistingInternship(): Promise<boolean> {
       if (applicantIssueDate) {
         passportIssueDate.value = parseLocalDate(applicantIssueDate)
       }
-      
+
       return true
     }
   } catch (err) {
@@ -583,7 +583,7 @@ onMounted(() => {
     content: { class: '!p-0' },
     mask: { class: 'backdrop-blur-sm bg-black/50' },
   }" @update:visible="emit('update:visible', $event)">
-    
+
     <!-- Header -->
     <div class="bg-apricot-500 px-6 py-5 text-white relative shadow-sm z-10">
       <button
@@ -592,7 +592,8 @@ onMounted(() => {
         <i class="pi pi-times text-white text-sm" />
       </button>
       <div class="flex items-center gap-4">
-        <div class="w-11 h-11 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center ring-1 ring-white/30">
+        <div
+          class="w-11 h-11 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center ring-1 ring-white/30">
           <i :class="`pi ${currentStepMeta.icon}`" class="text-xl text-white" />
         </div>
         <div>
@@ -694,7 +695,8 @@ onMounted(() => {
                 <template #value="slotProps">
                   <div v-if="slotProps.value && selectedCompany" class="flex items-center gap-2 truncate py-0.5">
                     <span class="font-semibold text-blueberry-800 text-sm">{{ selectedCompany.name }}</span>
-                    <span v-if="selectedCompany.code" class="text-xs text-blueberry-400">({{ selectedCompany.code }})</span>
+                    <span v-if="selectedCompany.code" class="text-xs text-blueberry-400">({{ selectedCompany.code
+                      }})</span>
                     <span v-if="selectedCompany.category_name"
                       class="px-2 py-0.5 rounded bg-apricot-50 text-apricot-700 text-[10px] font-bold border border-apricot-200 uppercase tracking-wider">
                       {{ selectedCompany.category_name }}
@@ -791,42 +793,29 @@ onMounted(() => {
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Passport Number -->
             <div class="min-w-0">
-              <label class="block text-xs font-semibold text-blueberry-700 mb-1.5">Passport Number</label>
+              <label class="block text-xs font-semibold text-blueberry-700 mb-1.5">
+                Passport Number
+              </label>
               <InputText v-model="internshipForm.passport_number" class="w-full" placeholder="e.g. P1234567A" />
             </div>
 
-            <!-- DFA Issuing Office Field with Quick Add Button -->
+            <!-- DFA Issuing Office -->
             <div class="min-w-0">
-              <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 flex items-center justify-between">
-                <span class="flex items-center gap-1">
+              <label class="block text-xs font-semibold text-blueberry-700 mb-1.5">
+                <span class="inline-flex items-center gap-1">
                   Issuing Office (DFA)
-                  <i v-if="loadingOffices || savingDfaOffice" class="pi pi-spin pi-spinner text-[10px] text-apricot-500" />
+                  <i v-if="loadingOffices || savingDfaOffice"
+                    class="pi pi-spin pi-spinner text-[10px] text-apricot-500" />
                 </span>
-                <button
-                  type="button"
-                  class="text-[11px] font-bold text-apricot-600 hover:text-apricot-700 flex items-center gap-1 cursor-pointer transition-colors"
-                  :disabled="!internshipForm.passport_number"
-                  @click="openAddDfaDialog"
-                >
-                  <i class="pi pi-plus-circle text-xs" />
-                  <span>Add New</span>
-                </button>
               </label>
 
-              <div class="flex items-center gap-1.5">
-                <Select
-                  v-model="internshipForm.passport_issuing_office_id"
-                  :options="flatPassportOffices"
-                  option-label="name"
-                  option-value="id"
-                  placeholder="Select DFA Location"
-                  :loading="loadingOffices"
-                  :disabled="!internshipForm.passport_number"
-                  filter
-                  show-clear
-                  class="w-full flex-1"
-                >
+              <div class="flex items-stretch gap-1.5">
+                <Select v-model="internshipForm.passport_issuing_office_id" :options="flatPassportOffices"
+                  option-label="name" option-value="id" :filter-fields="['name', 'region']"
+                  placeholder="Select DFA Location" :loading="loadingOffices"
+                  :disabled="!internshipForm.passport_number" filter show-clear class="w-full min-w-0 flex-1">
                   <template #option="slotProps">
                     <div class="flex flex-col py-0.5">
                       <span class="text-[10px] font-bold text-apricot-600 uppercase tracking-wider">
@@ -839,21 +828,19 @@ onMounted(() => {
                   </template>
                 </Select>
 
-                <!-- Plus Button -->
-                <Button
-                  icon="pi pi-plus"
-                  severity="secondary"
-                  outlined
-                  v-tooltip.top="'Add missing DFA location'"
-                  :disabled="!internshipForm.passport_number"
-                  class="!p-2.5 !w-10 !h-10 !flex-shrink-0 !border-gray-300 hover:!border-apricot-500 hover:!text-apricot-600"
-                  @click="openAddDfaDialog"
-                />
+                <!-- + only — stays inside this column -->
+                <Button icon="pi pi-plus" severity="secondary" outlined v-tooltip.top="'Add missing DFA location'"
+                  :disabled="!internshipForm.passport_number || savingDfaOffice"
+                  class="!w-10 !flex-shrink-0 !border-gray-300 hover:!border-apricot-500 hover:!text-apricot-600"
+                  @click="openAddDfaDialog" />
               </div>
             </div>
 
+            <!-- Date Issued -->
             <div class="min-w-0">
-              <label class="block text-xs font-semibold text-blueberry-700 mb-1.5">Date Issued</label>
+              <label class="block text-xs font-semibold text-blueberry-700 mb-1.5">
+                Date Issued
+              </label>
               <DatePicker v-model="passportIssueDate" show-icon date-format="yy-mm-dd" placeholder="YYYY-MM-DD"
                 class="w-full" :disabled="!internshipForm.passport_number" />
             </div>
@@ -879,7 +866,8 @@ onMounted(() => {
             <div class="flex px-5 py-3.5">
               <span class="text-xs font-semibold text-blueberry-500 w-1/3">Program</span>
               <span class="text-sm text-blueberry-800 font-bold">
-                {{ currentInternship?.program_type?.toUpperCase() ?? internshipForm.program_type?.toUpperCase() ?? '—' }}
+                {{ currentInternship?.program_type?.toUpperCase() ?? internshipForm.program_type?.toUpperCase() ?? '—'
+                }}
               </span>
             </div>
             <div class="flex px-5 py-3.5">
@@ -950,55 +938,30 @@ onMounted(() => {
     <!-- ═══════════════════════════════════════════════════
          QUICK ADD DFA LOCATION DIALOG
          ═══════════════════════════════════════════════════ -->
-    <Dialog
-      v-model:visible="showAddDfaDialog"
-      modal
-      header="Add New DFA Location"
-      :style="{ width: '400px' }"
-      :breakpoints="{ '640px': '90vw' }"
-    >
+    <Dialog v-model:visible="showAddDfaDialog" modal header="Add New DFA Location" :style="{ width: '400px' }"
+      :breakpoints="{ '640px': '90vw' }">
       <div class="space-y-4 pt-1">
         <div>
           <label class="block text-xs font-semibold text-blueberry-700 mb-1">
             Region
           </label>
-          <InputText
-            v-model="newDfaRegion"
-            class="w-full"
-            placeholder="e.g. NCR, Region VI, Others"
-          />
+          <InputText v-model="newDfaRegion" class="w-full" placeholder="e.g. NCR, Region VI, Others" />
         </div>
         <div>
           <label class="block text-xs font-semibold text-blueberry-700 mb-1">
             DFA Office Name *
           </label>
-          <InputText
-            v-model="newDfaName"
-            class="w-full"
-            placeholder="e.g. DFA Murcia, DFA Bacolod"
-            @keyup.enter="handleSaveNewDfaOffice"
-          />
+          <InputText v-model="newDfaName" class="w-full" placeholder="e.g. DFA Murcia, DFA Bacolod"
+            @keyup.enter="handleSaveNewDfaOffice" />
         </div>
       </div>
 
       <template #footer>
         <div class="flex items-center justify-end gap-2 pt-2">
-          <Button
-            label="Cancel"
-            severity="secondary"
-            text
-            size="small"
-            @click="showAddDfaDialog = false"
-          />
-          <Button
-            label="Save Location"
-            icon="pi pi-check"
-            size="small"
-            :loading="savingDfaOffice"
-            :disabled="!newDfaName.trim()"
-            class="!bg-apricot-500 hover:!bg-apricot-600 !border-apricot-500 !text-white"
-            @click="handleSaveNewDfaOffice"
-          />
+          <Button label="Cancel" severity="secondary" text size="small" @click="showAddDfaDialog = false" />
+          <Button label="Save Location" icon="pi pi-check" size="small" :loading="savingDfaOffice"
+            :disabled="!newDfaName.trim()" class="!bg-apricot-500 hover:!bg-apricot-600 !border-apricot-500 !text-white"
+            @click="handleSaveNewDfaOffice" />
         </div>
       </template>
     </Dialog>
