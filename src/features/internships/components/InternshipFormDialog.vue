@@ -129,18 +129,44 @@ function getOfficeDisplayName(o: any): string {
   return o?.name ?? o?.office_name ?? ''
 }
 
-// Flatten grouped DFA offices for Select
+// ✅ NEW SAFE CODE FOR InternshipFormDialog.vue:
 const flatPassportOffices = computed(() => {
-  return Object.entries(passportOffices.value).flatMap(([region, offices]) => {
-    const list = (offices ?? []) as PassportIssuingOffice[]
-    return list.map((o: any) => ({
-      id: o.id,
-      name: getOfficeDisplayName(o),
-      region,
-    }))
-  })
-})
+  const data = passportOffices.value as any
+  if (!data) return []
 
+  // 1. Array from GET /passport-offices
+  if (Array.isArray(data)) {
+    return data.map((o: any) => ({
+      id: o?.id,
+      name: getOfficeDisplayName(o),
+      region: o?.region ?? 'Others',
+    }))
+  }
+
+  // 2. Grouped object fallback { "NCR": [...], ... }
+  if (typeof data === 'object') {
+    return Object.entries(data).flatMap(([region, offices]) => {
+      if (Array.isArray(offices)) {
+        return offices.map((o: any) => ({
+          id: o?.id,
+          name: getOfficeDisplayName(o),
+          region: o?.region ?? region ?? 'Others',
+        }))
+      }
+      if (offices && typeof offices === 'object' && 'id' in (offices as any)) {
+        const o = offices as any
+        return [{
+          id: o.id,
+          name: getOfficeDisplayName(o),
+          region: o.region ?? region ?? 'Others',
+        }]
+      }
+      return []
+    })
+  }
+
+  return []
+})
 const hasPassportData = computed(() => {
   return !!(form.passport_number && String(form.passport_number).trim())
 })
@@ -235,27 +261,16 @@ async function submit() {
 </script>
 
 <template>
-  <Dialog
-    :visible="visible"
-    modal
-    :closable="true"
-    :style="{ width: '560px' }"
-    header="Create Internship"
-    @update:visible="emit('update:visible', $event)"
-  >
+  <Dialog :visible="visible" modal :closable="true" :style="{ width: '560px' }" header="Create Internship"
+    @update:visible="emit('update:visible', $event)">
     <div class="space-y-4 pt-1">
       <!-- Program Type -->
       <div>
         <label class="block text-xs font-medium text-blueberry-700 mb-1">
           Program Type *
         </label>
-        <Select
-          v-model="form.program_type"
-          :options="typeOptions"
-          option-label="label"
-          option-value="value"
-          class="w-full"
-        />
+        <Select v-model="form.program_type" :options="typeOptions" option-label="label" option-value="value"
+          class="w-full" />
       </div>
 
       <!-- Receiving Company Dropdown -->
@@ -263,17 +278,9 @@ async function submit() {
         <label class="block text-xs font-medium text-blueberry-700 mb-1">
           Receiving Company (Japan) *
         </label>
-        <Select
-          v-model="form.receiving_company_id"
-          :options="companyOptions"
-          option-label="label"
-          option-value="value"
-          filter
-          show-clear
-          :loading="companyStore.loading"
-          placeholder="Search and select receiving company..."
-          class="w-full"
-        >
+        <Select v-model="form.receiving_company_id" :options="companyOptions" option-label="label" option-value="value"
+          filter show-clear :loading="companyStore.loading" placeholder="Search and select receiving company..."
+          class="w-full">
           <template #option="slotProps">
             <div class="flex flex-col py-0.5">
               <span class="font-medium text-blueberry-800 text-sm">
@@ -282,10 +289,7 @@ async function submit() {
             </div>
           </template>
         </Select>
-        <p
-          v-if="!companyStore.loading && companyOptions.length === 0"
-          class="text-[11px] text-amber-600 mt-1"
-        >
+        <p v-if="!companyStore.loading && companyOptions.length === 0" class="text-[11px] text-amber-600 mt-1">
           No companies found. Please add companies in the Companies module first.
         </p>
       </div>
@@ -295,11 +299,8 @@ async function submit() {
         <label class="block text-xs font-medium text-blueberry-700 mb-1">
           Job Description / Trade *
         </label>
-        <InputText
-          v-model="form.job_description"
-          class="w-full"
-          placeholder="e.g. FRAME WORKING, CAREGIVING, SCAFFOLDING"
-        />
+        <InputText v-model="form.job_description" class="w-full"
+          placeholder="e.g. FRAME WORKING, CAREGIVING, SCAFFOLDING" />
       </div>
 
       <!-- Contract Dates & Duration -->
@@ -308,23 +309,13 @@ async function submit() {
           <label class="block text-xs font-medium text-blueberry-700 mb-1">
             Contract Start
           </label>
-          <DatePicker
-            v-model="startDate"
-            show-icon
-            class="w-full"
-            placeholder="Select date"
-          />
+          <DatePicker v-model="startDate" show-icon class="w-full" placeholder="Select date" />
         </div>
         <div>
           <label class="block text-xs font-medium text-blueberry-700 mb-1">
             Contract Years
           </label>
-          <InputNumber
-            v-model="form.contract_years"
-            class="w-full"
-            :min="1"
-            :max="5"
-          />
+          <InputNumber v-model="form.contract_years" class="w-full" :min="1" :max="5" />
         </div>
       </div>
 
@@ -333,11 +324,7 @@ async function submit() {
         <label class="block text-xs font-medium text-blueberry-700 mb-1">
           Municipality (MOA Execution Venue)
         </label>
-        <InputText
-          v-model="form.municipality"
-          class="w-full"
-          placeholder="e.g. Murcia"
-        />
+        <InputText v-model="form.municipality" class="w-full" placeholder="e.g. Murcia" />
       </div>
 
       <!-- ═══════════════════════════════════════════════════
@@ -351,34 +338,26 @@ async function submit() {
           </label>
 
           <!-- Status badges -->
-          <span
-            v-if="!hasPassportData"
-            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-semibold ring-1 ring-amber-200"
-          >
+          <span v-if="!hasPassportData"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-semibold ring-1 ring-amber-200">
             <i class="pi pi-exclamation-triangle text-[9px]" />
             No passport on file
           </span>
-          <span
-            v-else-if="!hasPassportLocation"
-            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-semibold ring-1 ring-amber-200"
-          >
+          <span v-else-if="!hasPassportLocation"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-semibold ring-1 ring-amber-200">
             <i class="pi pi-exclamation-triangle text-[9px]" />
             Missing DFA location
           </span>
-          <span
-            v-else
-            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-[10px] font-semibold ring-1 ring-green-200"
-          >
+          <span v-else
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-[10px] font-semibold ring-1 ring-green-200">
             <i class="pi pi-check text-[9px]" />
             Passport complete
           </span>
         </div>
 
         <!-- Info when no passport -->
-        <div
-          v-if="!hasPassportData"
-          class="mb-3 flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg"
-        >
+        <div v-if="!hasPassportData"
+          class="mb-3 flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
           <i class="pi pi-info-circle text-amber-600 text-xs mt-0.5" />
           <p class="text-[11px] text-amber-800 leading-relaxed">
             Applicant has no passport number on record. You can enter it here for this MOA,
@@ -392,11 +371,7 @@ async function submit() {
             <label class="block text-xs font-medium text-blueberry-700 mb-1">
               Passport Number
             </label>
-            <InputText
-              v-model="form.passport_number"
-              class="w-full"
-              placeholder="e.g. P1234567A"
-            />
+            <InputText v-model="form.passport_number" class="w-full" placeholder="e.g. P1234567A" />
             <p v-if="!hasPassportData" class="text-[10px] text-blueberry-400 mt-1">
               Leave blank if applicant has no passport yet
             </p>
@@ -406,24 +381,11 @@ async function submit() {
           <div>
             <label class="block text-xs font-medium text-blueberry-700 mb-1 flex items-center gap-1">
               Passport Issuing Location (DFA)
-              <i
-                v-if="loadingOffices || creatingOffice"
-                class="pi pi-spin pi-spinner text-[10px] text-apricot-500"
-              />
+              <i v-if="loadingOffices || creatingOffice" class="pi pi-spin pi-spinner text-[10px] text-apricot-500" />
             </label>
-            <Select
-              v-model="form.passport_issuing_office_id"
-              :options="flatPassportOffices"
-              option-label="name"
-              option-value="id"
-              placeholder="Select or type new DFA Location..."
-              :loading="loadingOffices"
-              :disabled="!hasPassportData"
-              filter
-              editable
-              show-clear
-              class="w-full"
-            >
+            <Select v-model="form.passport_issuing_office_id" :options="flatPassportOffices" option-label="name"
+              option-value="id" placeholder="Select or type new DFA Location..." :loading="loadingOffices"
+              :disabled="!hasPassportData" filter editable show-clear class="w-full">
               <template #option="slotProps">
                 <div class="flex flex-col py-0.5">
                   <span class="text-[10px] font-bold text-apricot-600 uppercase tracking-wider">
@@ -443,17 +405,11 @@ async function submit() {
             <p v-if="!hasPassportData" class="text-[10px] text-blueberry-400 mt-1">
               Enter a passport number first
             </p>
-            <p
-              v-else-if="isNewOfficeTyped"
-              class="text-[10px] text-emerald-600 mt-1 font-medium"
-            >
+            <p v-else-if="isNewOfficeTyped" class="text-[10px] text-emerald-600 mt-1 font-medium">
               <i class="pi pi-sparkles text-[9px] mr-0.5" />
               New location "{{ form.passport_issuing_office_id }}" will be auto-added on save
             </p>
-            <p
-              v-else-if="hasPassportData && !hasPassportLocation"
-              class="text-[10px] text-amber-600 mt-1"
-            >
+            <p v-else-if="hasPassportData && !hasPassportLocation" class="text-[10px] text-amber-600 mt-1">
               <i class="pi pi-exclamation-triangle text-[9px] mr-0.5" />
               Recommended for MOA generation — you can type if not listed
             </p>
@@ -464,21 +420,11 @@ async function submit() {
 
     <template #footer>
       <div class="flex items-center justify-end gap-2 pt-3">
-        <Button
-          label="Cancel"
-          severity="secondary"
-          text
-          :disabled="creatingOffice"
-          @click="emit('update:visible', false)"
-        />
-        <Button
-          label="Create Internship"
-          icon="pi pi-check"
-          :disabled="!form.receiving_company_id || creatingOffice"
-          :loading="creatingOffice"
-          class="!bg-apricot-500 hover:!bg-apricot-600 !border-apricot-500 !text-white"
-          @click="submit"
-        />
+        <Button label="Cancel" severity="secondary" text :disabled="creatingOffice"
+          @click="emit('update:visible', false)" />
+        <Button label="Create Internship" icon="pi pi-check" :disabled="!form.receiving_company_id || creatingOffice"
+          :loading="creatingOffice" class="!bg-apricot-500 hover:!bg-apricot-600 !border-apricot-500 !text-white"
+          @click="submit" />
       </div>
     </template>
   </Dialog>

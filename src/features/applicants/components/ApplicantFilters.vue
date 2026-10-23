@@ -124,28 +124,67 @@ const cityOptions = computed(() => [
 
 // ─── Flatten Grouped Passport Offices for Select Options ─────────────────────
 // 🎯 Fixed: Explicitly typed 'region' and 'offices' array elements to satisfy typescript compiler compiler warnings
+// ✅ NEW SAFE CODE FOR ApplicantFilters.vue:
 const flatPassportOffices = computed(() => {
-  return Object.entries(passportOffices.value).flatMap(([region, offices]) => {
-    const activeList = (offices ?? []) as PassportIssuingOffice[]
-    return activeList.map((o: PassportIssuingOffice) => ({
-      label: o.name,
-      value: o.id,
-      region: region,
-    }))
-  })
+  const data = passportOffices.value as any
+  if (!data) return []
+
+  const getName = (o: any) => o?.name ?? o?.office_name ?? ''
+  const getId = (o: any) => o?.id
+
+  // 1. Array from GET /passport-offices
+  if (Array.isArray(data)) {
+    return data
+      .filter((o: any) => getId(o) != null)
+      .map((o: any) => ({
+        label: getName(o),
+        value: getId(o),
+        region: o?.region ?? 'Others',
+      }))
+  }
+
+  // 2. Grouped object fallback { "NCR": [...], ... }
+  if (typeof data === 'object') {
+    return Object.entries(data).flatMap(([region, offices]) => {
+      if (Array.isArray(offices)) {
+        return offices
+          .filter((o: any) => getId(o) != null)
+          .map((o: any) => ({
+            label: getName(o),
+            value: getId(o),
+            region: o?.region ?? region ?? 'Others',
+          }))
+      }
+      if (offices && typeof offices === 'object' && 'id' in (offices as any)) {
+        const o = offices as any
+        return [{
+          label: getName(o),
+          value: getId(o),
+          region: o?.region ?? region ?? 'Others',
+        }]
+      }
+      return []
+    })
+  }
+
+  return []
 })
 
 const groupedPassportOfficeOptions = computed(() => {
-  const grouped = Object.entries(passportOffices.value).map(([region, offices]) => {
-    const activeList = (offices ?? []) as PassportIssuingOffice[]
-    return {
-      label: region,
-      items: activeList.map((o: PassportIssuingOffice) => ({
-        label: o.name,
-        value: o.id,
-      })),
-    }
-  })
+  const flat = flatPassportOffices.value
+  const byRegion = new Map<string, { label: string; value: number }[]>()
+
+  for (const o of flat) {
+    const reg = o.region || 'Others'
+    if (!byRegion.has(reg)) byRegion.set(reg, [])
+    byRegion.get(reg)!.push({ label: o.label, value: o.value })
+  }
+
+  const grouped = [...byRegion.entries()].map(([region, items]) => ({
+    label: region,
+    items,
+  }))
+
   return [{ label: 'All DFA Locations', value: null }, ...grouped]
 })
 
