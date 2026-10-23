@@ -179,7 +179,7 @@ const LOCATION_OPTIONS = [
 
 const internshipForm = ref<CreateInternshipPayload>({
   applicant_id: props.applicantId,
-  program_type: 'titp',
+  program_type: 'intern',
   receiving_company_id: null,
   internship_program_id: null,
   agreement_date: null,
@@ -299,7 +299,7 @@ async function loadExistingInternship(): Promise<boolean> {
       internshipForm.value = {
         ...internshipForm.value,
         applicant_id: props.applicantId,
-        program_type: current.program_type ?? 'titp',
+        program_type: current.program_type ?? 'intern',
         receiving_company_id: current.receiving_company_id ?? current.receiving_company?.id ?? null,
         internship_program_id: current.internship_program_id ?? null,
         agreement_date: current.agreement_date ?? internshipForm.value.agreement_date ?? null,

@@ -35,7 +35,7 @@ const { passportOffices, loadingOffices } = storeToRefs(applicantStore)
 
 const defaultForm = (): CreateInternshipPayload => ({
   applicant_id: props.applicantId,
-  program_type: 'titp',
+  program_type: 'intern',
   receiving_company_id: null,
   internship_program_id: null,
   contract_start: null,
