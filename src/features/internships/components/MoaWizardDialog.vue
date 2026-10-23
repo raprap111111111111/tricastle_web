@@ -113,32 +113,34 @@ const flatPassportOffices = computed(() => {
   const data = passportOffices.value as any
   if (!data) return []
 
-  const getName = (o: any) => o?.name ?? o?.office_name ?? ''
-
-  // Case 1: Backend returned a flat array
+  // 🎯 1. Direct flat array from GET /passport-offices (Primary Case)
   if (Array.isArray(data)) {
     return data.map((o: any) => ({
-      id: o.id,
-      name: getName(o),
-      region: o.region ?? 'Others',
+      id: o?.id,
+      name: o?.name ?? o?.office_name ?? '',
+      region: o?.region ?? 'Others',
     }))
   }
 
-  // Case 2: Backend returned a grouped object
+  // 🎯 2. Grouped object fallback { "NCR": [...], ... }
   if (typeof data === 'object') {
     return Object.entries(data).flatMap(([region, offices]) => {
-      // Catch single object leak
-      if (offices && !Array.isArray(offices) && typeof offices === 'object') {
-        const o = offices as any
-        return [{ id: o.id, name: getName(o), region: o.region ?? region ?? 'Others' }]
+      if (Array.isArray(offices)) {
+        return offices.map((o: any) => ({
+          id: o?.id,
+          name: o?.name ?? o?.office_name ?? '',
+          region: o?.region ?? region ?? 'Others',
+        }))
       }
-      if (!Array.isArray(offices)) return []
-      
-      return offices.map((o: any) => ({
-        id: o?.id,
-        name: getName(o),
-        region: o?.region ?? region ?? 'Others',
-      }))
+      if (offices && typeof offices === 'object' && 'id' in offices) {
+        const o = offices as any
+        return [{
+          id: o.id,
+          name: o.name ?? o.office_name ?? '',
+          region: o.region ?? region ?? 'Others',
+        }]
+      }
+      return []
     })
   }
 
