@@ -7,6 +7,7 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import DatePicker from 'primevue/datepicker'
+import { useToast } from 'primevue/usetoast'
 import { useInternships } from '../composables/useInternships'
 import { useCompanyStore } from '@features/companies/stores/company.store'
 import { useApplicantStore } from '@features/applicants/stores/applicant.store'
@@ -28,25 +29,28 @@ const emit = defineEmits<{
   (e: 'created'): void
 }>()
 
+const toast = useToast()
 const { handleCreate } = useInternships()
 const companyStore = useCompanyStore()
 const applicantStore = useApplicantStore()
 const { passportOffices, loadingOffices } = storeToRefs(applicantStore)
 
-const defaultForm = (): CreateInternshipPayload => ({
+const creatingOffice = ref(false)
+
+const defaultForm = () => ({
   applicant_id: props.applicantId,
-  program_type: 'intern',
-  receiving_company_id: null,
-  internship_program_id: null,
-  contract_start: null,
+  program_type: 'intern' as InternshipProgramType,
+  receiving_company_id: null as number | null,
+  internship_program_id: null as number | null,
+  contract_start: null as string | null,
   contract_years: 3,
   job_description: 'FRAME WORKING',
   municipality: 'Murcia',
   passport_number: props.applicant?.passport_number ?? null,
-  passport_issuing_office_id: props.applicant?.passport_issuing_office_id ?? null,
+  passport_issuing_office_id: (props.applicant?.passport_issuing_office_id ?? null) as number | string | null,
 })
 
-const form = reactive<CreateInternshipPayload>(defaultForm())
+const form = reactive(defaultForm())
 const startDate = ref<Date | null>(null)
 
 watch(startDate, (v) => {
@@ -121,13 +125,17 @@ const typeOptions = [
   { label: 'SSW Company Transfer', value: 'ssw_transfer' as InternshipProgramType },
 ]
 
+function getOfficeDisplayName(o: any): string {
+  return o?.name ?? o?.office_name ?? ''
+}
+
 // Flatten grouped DFA offices for Select
 const flatPassportOffices = computed(() => {
   return Object.entries(passportOffices.value).flatMap(([region, offices]) => {
     const list = (offices ?? []) as PassportIssuingOffice[]
-    return list.map((o: PassportIssuingOffice) => ({
+    return list.map((o: any) => ({
       id: o.id,
-      name: o.name,
+      name: getOfficeDisplayName(o),
       region,
     }))
   })
@@ -141,10 +149,88 @@ const hasPassportLocation = computed(() => {
   return !!form.passport_issuing_office_id
 })
 
+// Detect if user typed a brand-new office name
+const isNewOfficeTyped = computed(() => {
+  const val = form.passport_issuing_office_id as any
+  if (typeof val !== 'string' || !val.trim()) return false
+  const typed = val.trim().toLowerCase()
+  return !flatPassportOffices.value.some(
+    (o) => (o.name ?? '').toLowerCase() === typed,
+  )
+})
+
 async function submit() {
-  await handleCreate(form)
-  emit('created')
-  emit('update:visible', false)
+  if (creatingOffice.value) return
+
+  try {
+    creatingOffice.value = true
+
+    // ── 1. Resolve DFA ID (auto-create if typed new) ──
+    const dfaValue = form.passport_issuing_office_id as any
+    let finalOfficeId: number | null = null
+
+    if (typeof dfaValue === 'number') {
+      finalOfficeId = dfaValue
+    } else if (typeof dfaValue === 'string') {
+      const typedName = dfaValue.trim()
+      if (typedName) {
+        // Check if it already exists (case-insensitive)
+        const existingOffice = flatPassportOffices.value.find(
+          (o) => (o.name ?? '').toLowerCase() === typedName.toLowerCase(),
+        )
+
+        if (existingOffice) {
+          finalOfficeId = existingOffice.id
+        } else {
+          // ✨ AUTO-CREATE new DFA issuing office
+          const createdOffice = await applicantStore.autoCreatePassportOffice(
+            typedName,
+            'Others',
+          )
+          finalOfficeId = createdOffice?.id ?? null
+          toast.add({
+            severity: 'success',
+            summary: 'New DFA Location Added',
+            detail: `"${typedName}" was added and auto-selected.`,
+            life: 3500,
+          })
+        }
+      }
+    }
+
+    // Update form so retry won't duplicate
+    form.passport_issuing_office_id = finalOfficeId
+
+    // ── 2. Build clean payload with number | null ──
+    const payload: CreateInternshipPayload = {
+      applicant_id: form.applicant_id,
+      program_type: form.program_type,
+      receiving_company_id: form.receiving_company_id,
+      internship_program_id: form.internship_program_id,
+      contract_start: form.contract_start,
+      contract_years: form.contract_years,
+      job_description: form.job_description,
+      municipality: form.municipality,
+      passport_number: form.passport_number,
+      passport_issuing_office_id: finalOfficeId,
+    }
+
+    await handleCreate(payload)
+    emit('created')
+    emit('update:visible', false)
+  } catch (e: any) {
+    const msg =
+      e?.response?.data?.message ?? e?.message ?? 'Failed to create internship'
+    toast.add({
+      severity: 'error',
+      summary: 'Save Failed',
+      detail: msg,
+      life: 5000,
+    })
+    console.error('Internship create failed:', e)
+  } finally {
+    creatingOffice.value = false
+  }
 }
 </script>
 
@@ -321,7 +407,7 @@ async function submit() {
             <label class="block text-xs font-medium text-blueberry-700 mb-1 flex items-center gap-1">
               Passport Issuing Location (DFA)
               <i
-                v-if="loadingOffices"
+                v-if="loadingOffices || creatingOffice"
                 class="pi pi-spin pi-spinner text-[10px] text-apricot-500"
               />
             </label>
@@ -330,10 +416,11 @@ async function submit() {
               :options="flatPassportOffices"
               option-label="name"
               option-value="id"
-              placeholder="Select DFA Location"
+              placeholder="Select or type new DFA Location..."
               :loading="loadingOffices"
               :disabled="!hasPassportData"
               filter
+              editable
               show-clear
               class="w-full"
             >
@@ -347,16 +434,28 @@ async function submit() {
                   </span>
                 </div>
               </template>
+              <template #emptyfilter>
+                <div class="px-3 py-2 text-xs text-blueberry-600">
+                  No match found. Just save — typed name will be auto-added.
+                </div>
+              </template>
             </Select>
             <p v-if="!hasPassportData" class="text-[10px] text-blueberry-400 mt-1">
               Enter a passport number first
+            </p>
+            <p
+              v-else-if="isNewOfficeTyped"
+              class="text-[10px] text-emerald-600 mt-1 font-medium"
+            >
+              <i class="pi pi-sparkles text-[9px] mr-0.5" />
+              New location "{{ form.passport_issuing_office_id }}" will be auto-added on save
             </p>
             <p
               v-else-if="hasPassportData && !hasPassportLocation"
               class="text-[10px] text-amber-600 mt-1"
             >
               <i class="pi pi-exclamation-triangle text-[9px] mr-0.5" />
-              Recommended for MOA generation
+              Recommended for MOA generation — you can type if not listed
             </p>
           </div>
         </div>
@@ -369,12 +468,14 @@ async function submit() {
           label="Cancel"
           severity="secondary"
           text
+          :disabled="creatingOffice"
           @click="emit('update:visible', false)"
         />
         <Button
           label="Create Internship"
           icon="pi pi-check"
-          :disabled="!form.receiving_company_id"
+          :disabled="!form.receiving_company_id || creatingOffice"
+          :loading="creatingOffice"
           class="!bg-apricot-500 hover:!bg-apricot-600 !border-apricot-500 !text-white"
           @click="submit"
         />

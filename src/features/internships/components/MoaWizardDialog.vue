@@ -49,7 +49,6 @@ const applicantStore = useApplicantStore()
 const { activeCategories } = storeToRefs(categoryStore)
 const { passportOffices, loadingOffices } = storeToRefs(applicantStore)
 
-// ✅ Use the FULL list refs for dropdown (NOT paginated `companies`)
 const { activeCompanies, allCompanies, loadingActive } = storeToRefs(companyStore)
 
 const { generating: isDownloading, generateSingle: downloadMoa } = useMoaDownload()
@@ -109,13 +108,86 @@ function unwrapOne<T = any>(res: unknown): T | null {
   return (r?.data?.data ?? r?.data ?? r) as T
 }
 
+// ─── CRASH FIX: Defensive mapping for DFA array vs grouped object ─────────────
 const flatPassportOffices = computed(() => {
-  if (!passportOffices.value || typeof passportOffices.value !== 'object') return []
-  return Object.entries(passportOffices.value).flatMap(([region, offices]) => {
-    const list = (offices ?? []) as PassportIssuingOffice[]
-    return list.map((o) => ({ id: o.id, name: o.name, region }))
-  })
+  const data = passportOffices.value as any
+  if (!data) return []
+
+  const getName = (o: any) => o?.name ?? o?.office_name ?? ''
+
+  // Case 1: Backend returned a flat array
+  if (Array.isArray(data)) {
+    return data.map((o: any) => ({
+      id: o.id,
+      name: getName(o),
+      region: o.region ?? 'Others',
+    }))
+  }
+
+  // Case 2: Backend returned a grouped object
+  if (typeof data === 'object') {
+    return Object.entries(data).flatMap(([region, offices]) => {
+      // Catch single object leak
+      if (offices && !Array.isArray(offices) && typeof offices === 'object') {
+        const o = offices as any
+        return [{ id: o.id, name: getName(o), region: o.region ?? region ?? 'Others' }]
+      }
+      if (!Array.isArray(offices)) return []
+      
+      return offices.map((o: any) => ({
+        id: o?.id,
+        name: getName(o),
+        region: o?.region ?? region ?? 'Others',
+      }))
+    })
+  }
+
+  return []
 })
+
+// ─── QUICK ADD DFA MODAL STATE ────────────────────────────────────────────────
+const showAddDfaDialog = ref(false)
+const newDfaName = ref('')
+const newDfaRegion = ref('Others')
+const savingDfaOffice = ref(false)
+
+function openAddDfaDialog() {
+  newDfaName.value = ''
+  newDfaRegion.value = 'Others'
+  showAddDfaDialog.value = true
+}
+
+async function handleSaveNewDfaOffice() {
+  const name = newDfaName.value.trim()
+  if (!name) return
+
+  savingDfaOffice.value = true
+  try {
+    const created = await applicantStore.autoCreatePassportOffice(
+      name,
+      newDfaRegion.value.trim() || 'Others',
+    )
+    if (created?.id) {
+      internshipForm.value.passport_issuing_office_id = created.id
+      toast.add({
+        severity: 'success',
+        summary: 'DFA Location Saved',
+        detail: `"${name}" was created and automatically selected.`,
+        life: 3000,
+      })
+      showAddDfaDialog.value = false
+    }
+  } catch (e: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Save Failed',
+      detail: e?.message ?? 'Could not save new DFA location.',
+      life: 4000,
+    })
+  } finally {
+    savingDfaOffice.value = false
+  }
+}
 
 // ─── Step 1: Guarantors ───────────────────────────────────────────────────────
 const guarantors = ref<ApplicantGuarantor[]>([
@@ -168,7 +240,6 @@ async function loadExistingGuarantors(): Promise<boolean> {
 }
 
 // ─── Step 2: Internship ───────────────────────────────────────────────────────
-
 const LOCATION_OPTIONS = [
   { label: 'Municipality of Murcia', value: 'Municipality of Murcia' },
   { label: 'City of Bacolod', value: 'City of Bacolod' },
@@ -208,9 +279,7 @@ watch(passportIssueDate, (v) => {
   internshipForm.value.passport_issue_date = formatLocalDate(v)
 })
 
-// ✅ Build dropdown options from the FULL list, with fallback chain
 const companyOptions = computed(() => {
-  // Prefer activeCompanies (loaded via listAll), fallback through chain
   const source =
     activeCompanies.value.length > 0
       ? activeCompanies.value
@@ -277,7 +346,6 @@ async function loadExistingInternship(): Promise<boolean> {
     if (current) {
       currentInternship.value = current
 
-      // ✅ Hydrate passport safely falling back from current intern -> applicant -> props
       const applicantPassportNumber =
         current.applicant?.passport_number ??
         current.passport_number ??
@@ -306,7 +374,7 @@ async function loadExistingInternship(): Promise<boolean> {
         contract_start: current.contract_start ?? null,
         contract_years: current.contract_years ?? 3,
         job_description: current.job_description ?? 'FRAME WORKING',
-        municipality: current.municipality ?? 'Murcia',
+        municipality: current.municipality ?? 'Municipality of Murcia',
         passport_number: applicantPassportNumber,
         passport_issuing_office_id: applicantOfficeId,
         passport_issue_date: applicantIssueDate,
@@ -394,9 +462,8 @@ async function handleDownload() {
 
   try {
     await downloadMoa(currentInternship.value.id, {
-      agreement_date:
-        internshipForm.value.agreement_date ?? formatLocalDate(agreementDate.value),
-      municipality: internshipForm.value.municipality ?? 'Murcia',
+      agreement_date: internshipForm.value.agreement_date ?? formatLocalDate(agreementDate.value),
+      municipality: internshipForm.value.municipality ?? 'Municipality of Murcia',
       contract_start: internshipForm.value.contract_start,
       contract_years: internshipForm.value.contract_years,
       job_description: internshipForm.value.job_description,
@@ -474,7 +541,6 @@ watch(
 
     loading.value = true
     try {
-      // ✅ Load ALL companies via listAll (not paginated 15)
       Promise.all([
         companyStore.fetchActiveCompanies(),
         categoryStore.fetchActiveCategories(),
@@ -498,7 +564,6 @@ watch(
 )
 
 onMounted(() => {
-  // ✅ Load ALL companies via listAll on mount too
   Promise.all([
     companyStore.fetchActiveCompanies(),
     categoryStore.fetchActiveCategories(),
@@ -516,6 +581,7 @@ onMounted(() => {
     content: { class: '!p-0' },
     mask: { class: 'backdrop-blur-sm bg-black/50' },
   }" @update:visible="emit('update:visible', $event)">
+    
     <!-- Header -->
     <div class="bg-apricot-500 px-6 py-5 text-white relative shadow-sm z-10">
       <button
@@ -524,8 +590,7 @@ onMounted(() => {
         <i class="pi pi-times text-white text-sm" />
       </button>
       <div class="flex items-center gap-4">
-        <div
-          class="w-11 h-11 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center ring-1 ring-white/30">
+        <div class="w-11 h-11 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center ring-1 ring-white/30">
           <i :class="`pi ${currentStepMeta.icon}`" class="text-xl text-white" />
         </div>
         <div>
@@ -627,8 +692,7 @@ onMounted(() => {
                 <template #value="slotProps">
                   <div v-if="slotProps.value && selectedCompany" class="flex items-center gap-2 truncate py-0.5">
                     <span class="font-semibold text-blueberry-800 text-sm">{{ selectedCompany.name }}</span>
-                    <span v-if="selectedCompany.code" class="text-xs text-blueberry-400">({{ selectedCompany.code
-                      }})</span>
+                    <span v-if="selectedCompany.code" class="text-xs text-blueberry-400">({{ selectedCompany.code }})</span>
                     <span v-if="selectedCompany.category_name"
                       class="px-2 py-0.5 rounded bg-apricot-50 text-apricot-700 text-[10px] font-bold border border-apricot-200 uppercase tracking-wider">
                       {{ selectedCompany.category_name }}
@@ -675,9 +739,6 @@ onMounted(() => {
                   Signing of MOA <span class="text-red-500">*</span>
                 </label>
                 <DatePicker v-model="agreementDate" show-icon class="w-full" placeholder="Select signing date" />
-                <p class="text-[10px] text-blueberry-400 mt-1 leading-snug">
-                  MOA opening: “this day of month, year at Municipality of …”
-                </p>
               </div>
 
               <div class="min-w-0">
@@ -691,9 +752,6 @@ onMounted(() => {
                 </label>
                 <Select v-model="internshipForm.municipality" :options="LOCATION_OPTIONS" option-label="label"
                   option-value="value" class="w-full" placeholder="Select location" />
-                <p class="text-[10px] text-blueberry-400 mt-1">
-                  Prints on Page 1: "at the <strong>{{ internshipForm.municipality }}</strong>, Philippines"
-                </p>
               </div>
             </div>
 
@@ -735,15 +793,63 @@ onMounted(() => {
               <label class="block text-xs font-semibold text-blueberry-700 mb-1.5">Passport Number</label>
               <InputText v-model="internshipForm.passport_number" class="w-full" placeholder="e.g. P1234567A" />
             </div>
+
+            <!-- DFA Issuing Office Field with Quick Add Button -->
             <div class="min-w-0">
-              <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 flex items-center gap-1">
-                Issuing Office (DFA)
-                <i v-if="loadingOffices" class="pi pi-spin pi-spinner text-[10px] text-apricot-500" />
+              <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 flex items-center justify-between">
+                <span class="flex items-center gap-1">
+                  Issuing Office (DFA)
+                  <i v-if="loadingOffices || savingDfaOffice" class="pi pi-spin pi-spinner text-[10px] text-apricot-500" />
+                </span>
+                <button
+                  type="button"
+                  class="text-[11px] font-bold text-apricot-600 hover:text-apricot-700 flex items-center gap-1 cursor-pointer transition-colors"
+                  :disabled="!internshipForm.passport_number"
+                  @click="openAddDfaDialog"
+                >
+                  <i class="pi pi-plus-circle text-xs" />
+                  <span>Add New</span>
+                </button>
               </label>
-              <Select v-model="internshipForm.passport_issuing_office_id" :options="flatPassportOffices"
-                option-label="name" option-value="id" placeholder="Select DFA Location" :loading="loadingOffices"
-                :disabled="!internshipForm.passport_number" filter show-clear class="w-full" />
+
+              <div class="flex items-center gap-1.5">
+                <Select
+                  v-model="internshipForm.passport_issuing_office_id"
+                  :options="flatPassportOffices"
+                  option-label="name"
+                  option-value="id"
+                  placeholder="Select DFA Location"
+                  :loading="loadingOffices"
+                  :disabled="!internshipForm.passport_number"
+                  filter
+                  show-clear
+                  class="w-full flex-1"
+                >
+                  <template #option="slotProps">
+                    <div class="flex flex-col py-0.5">
+                      <span class="text-[10px] font-bold text-apricot-600 uppercase tracking-wider">
+                        {{ slotProps.option.region }}
+                      </span>
+                      <span class="text-sm font-medium text-blueberry-800">
+                        {{ slotProps.option.name }}
+                      </span>
+                    </div>
+                  </template>
+                </Select>
+
+                <!-- Plus Button -->
+                <Button
+                  icon="pi pi-plus"
+                  severity="secondary"
+                  outlined
+                  v-tooltip.top="'Add missing DFA location'"
+                  :disabled="!internshipForm.passport_number"
+                  class="!p-2.5 !w-10 !h-10 !flex-shrink-0 !border-gray-300 hover:!border-apricot-500 hover:!text-apricot-600"
+                  @click="openAddDfaDialog"
+                />
+              </div>
             </div>
+
             <div class="min-w-0">
               <label class="block text-xs font-semibold text-blueberry-700 mb-1.5">Date Issued</label>
               <DatePicker v-model="passportIssueDate" show-icon date-format="yy-mm-dd" placeholder="YYYY-MM-DD"
@@ -771,8 +877,7 @@ onMounted(() => {
             <div class="flex px-5 py-3.5">
               <span class="text-xs font-semibold text-blueberry-500 w-1/3">Program</span>
               <span class="text-sm text-blueberry-800 font-bold">
-                {{ currentInternship?.program_type?.toUpperCase() ?? internshipForm.program_type?.toUpperCase() ?? '—'
-                }}
+                {{ currentInternship?.program_type?.toUpperCase() ?? internshipForm.program_type?.toUpperCase() ?? '—' }}
               </span>
             </div>
             <div class="flex px-5 py-3.5">
@@ -839,5 +944,61 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- ═══════════════════════════════════════════════════
+         QUICK ADD DFA LOCATION DIALOG
+         ═══════════════════════════════════════════════════ -->
+    <Dialog
+      v-model:visible="showAddDfaDialog"
+      modal
+      header="Add New DFA Location"
+      :style="{ width: '400px' }"
+      :breakpoints="{ '640px': '90vw' }"
+    >
+      <div class="space-y-4 pt-1">
+        <div>
+          <label class="block text-xs font-semibold text-blueberry-700 mb-1">
+            Region
+          </label>
+          <InputText
+            v-model="newDfaRegion"
+            class="w-full"
+            placeholder="e.g. NCR, Region VI, Others"
+          />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-blueberry-700 mb-1">
+            DFA Office Name *
+          </label>
+          <InputText
+            v-model="newDfaName"
+            class="w-full"
+            placeholder="e.g. DFA Murcia, DFA Bacolod"
+            @keyup.enter="handleSaveNewDfaOffice"
+          />
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <Button
+            label="Cancel"
+            severity="secondary"
+            text
+            size="small"
+            @click="showAddDfaDialog = false"
+          />
+          <Button
+            label="Save Location"
+            icon="pi pi-check"
+            size="small"
+            :loading="savingDfaOffice"
+            :disabled="!newDfaName.trim()"
+            class="!bg-apricot-500 hover:!bg-apricot-600 !border-apricot-500 !text-white"
+            @click="handleSaveNewDfaOffice"
+          />
+        </div>
+      </template>
+    </Dialog>
   </Dialog>
 </template>

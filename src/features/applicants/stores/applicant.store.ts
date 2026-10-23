@@ -105,9 +105,10 @@ export const useApplicantStore = defineStore('applicants', () => {
   }
 
   // ─── Fetch Passport Offices ─────────────────────────────
-  async function fetchPassportOffices() {
+  async function fetchPassportOffices(force = false) {
     // 🎯 Defensive null check on passportOffices.value before calling Object.keys
     if (
+      !force &&
       passportOffices.value &&
       typeof passportOffices.value === 'object' &&
       Object.keys(passportOffices.value).length > 0
@@ -122,6 +123,28 @@ export const useApplicantStore = defineStore('applicants', () => {
     } catch (e: any) {
       passportOffices.value = {} // Ensure state stays an object on error
       console.error('Failed to load Passport Issuing Offices:', e)
+    } finally {
+      loadingOffices.value = false
+    }
+  }
+
+  // ─── Quick Add / Auto Create Passport Office ─────────────
+  async function autoCreatePassportOffice(officeName: string, region: string = 'Others') {
+    loadingOffices.value = true
+    try {
+      // 1. Send create payload to backend
+      const created = await passportOfficeApi.create({
+        office_name: officeName.trim(),
+        region: region.trim() || 'Others',
+      })
+
+      // 2. Refetch grouped offices so UI updates immediately
+      await fetchPassportOffices(true)
+
+      return created
+    } catch (e: any) {
+      console.error('Failed to auto-create Passport Office:', e)
+      throw e
     } finally {
       loadingOffices.value = false
     }
@@ -326,6 +349,7 @@ export const useApplicantStore = defineStore('applicants', () => {
     fetchApplicants,
     fetchApplicant,
     fetchPassportOffices,
+    autoCreatePassportOffice, 
     createApplicant,
     updateApplicant,
     deleteApplicant,
