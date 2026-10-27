@@ -8,7 +8,6 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
 import Menu from 'primevue/menu'
-import Popover from 'primevue/popover'
 import ApplicantStatusBadge from './ApplicantStatusBadge.vue'
 import ApplicantDeleteDialog from './ApplicantDeleteDialog.vue'
 import RejectApplicantDialog from './RejectApplicantDialog.vue'
@@ -32,7 +31,7 @@ const emit = defineEmits<{
   (e: 'limit-change', limit: number): void
   (e: 'delete', id: number): void
   (e: 'update:selectedIds', ids: number[]): void
-  (e: 'clear-selection'): void // 👈 Added custom clear emit
+  (e: 'clear-selection'): void
 }>()
 
 const router  = useRouter()
@@ -69,67 +68,6 @@ function onNameLeave() {
     hoveredPhotoId.value = null
     previewPhotoApplicant.value = null
   }, 150)
-}
-
-function onPreviewEnter() {
-  if (photoHideTimer) clearTimeout(photoHideTimer)
-}
-
-function onPreviewLeave() {
-  hoveredPhotoId.value = null
-  previewPhotoApplicant.value = null
-}
-
-// ─── 🚀 Deployment popover ─────────────────────────────
-const deploymentPopover = ref<InstanceType<typeof Popover> | null>(null)
-const hoveredApplicant  = ref<Applicant | null>(null)
-
-function showDeploymentPopover(event: Event, applicant: Applicant) {
-  hoveredApplicant.value = applicant
-  deploymentPopover.value?.show(event)
-}
-function hideDeploymentPopover() {
-  deploymentPopover.value?.hide()
-}
-
-function getApplicantDeployments(applicant: Applicant): any[] {
-  if (!applicant.applicant_batches) return []
-  return (applicant.applicant_batches as any[])
-    .filter((ab) => ab.deployment_country || ab.deployed_at)
-    .sort((a, b) => {
-      const da = new Date(a.deployed_at ?? 0).getTime()
-      const db = new Date(b.deployed_at ?? 0).getTime()
-      return db - da
-    })
-}
-
-function getLatestDeployment(applicant: Applicant): any | null {
-  const deployments = getApplicantDeployments(applicant)
-  return deployments[0] ?? null
-}
-
-function deploymentCount(applicant: Applicant): number {
-  return getApplicantDeployments(applicant).length
-}
-
-function countryFlag(country?: string | null): string {
-  const flags: Record<string, string> = {
-    Japan: '🇯🇵', Korea: '🇰🇷', 'South Korea': '🇰🇷', Taiwan: '🇹🇼', Singapore: '🇸🇬',
-    'Saudi Arabia': '🇸🇦', UAE: '🇦🇪', Qatar: '🇶🇦', Kuwait: '🇰🇼', Canada: '🇨🇦',
-    USA: '🇺🇸', 'United States': '🇺🇸', Australia: '🇦🇺', 'Hong Kong': '🇭🇰',
-    Malaysia: '🇲🇾', Philippines: '🇵🇭',
-  }
-  return flags[country ?? ''] ?? '🌍'
-}
-
-function formatDeploymentDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—'
-  try {
-    const d = new Date(dateStr)
-    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-  } catch {
-    return '—'
-  }
 }
 
 // ─── Selection support ─────────────────────────────
@@ -200,7 +138,6 @@ const menuItems = computed(() => {
 
 // ─── Handlers ────────────────────────────────────────
 
-// 🎯 INTERCEPT NAVIGATION TO PREVENT ACCIDENTAL CLICKS
 function confirmNavigation(callback: () => void) {
   if (props.selectedIds && props.selectedIds.length > 0) {
     confirm.require({
@@ -337,14 +274,6 @@ function formatDate(dateStr: string | null | undefined): string {
     return '—'
   }
 }
-
-function gradeColor(grade: string) {
-  const map: Record<string, string> = {
-    A: 'text-green-600', B: 'text-blue-600', C: 'text-yellow-600',
-    D: 'text-orange-600', F: 'text-red-500',
-  }
-  return map[grade] ?? 'text-blueberry-400'
-}
 </script>
 
 <template>
@@ -365,6 +294,7 @@ function gradeColor(grade: string) {
         bodyRow: 'hover:!bg-appleCore-50/40 !border-b !border-appleCore-100/60 transition-colors',
       }"
     >
+      <!-- Checkbox Column -->
       <Column
         v-if="selectable"
         selection-mode="multiple"
@@ -372,7 +302,8 @@ function gradeColor(grade: string) {
         :exportable="false"
       />
 
-      <Column field="applicant_code" header="Code" sortable style="width: 150px">
+      <!-- Code Column -->
+      <Column field="applicant_code" header="Code" sortable style="width: 120px">
         <template #body="{ data }">
           <button 
             type="button" 
@@ -384,6 +315,7 @@ function gradeColor(grade: string) {
         </template>
       </Column>
 
+      <!-- Applicant Column -->
       <Column header="Applicant" sortable sort-field="last_name">
         <template #body="{ data }">
           <button
@@ -409,80 +341,34 @@ function gradeColor(grade: string) {
         </template>
       </Column>
 
-      <Column header="Deployment" style="width: 190px">
+      <!-- Address (Barangay) -->
+      <Column field="current_address" header="Address (Barangay)">
         <template #body="{ data }">
-          <div
-            v-if="getLatestDeployment(data)"
-            class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg
-                   bg-green-50 ring-1 ring-green-200 cursor-pointer
-                   hover:bg-green-100 hover:ring-green-300 transition-all group"
-            @mouseenter="showDeploymentPopover($event, data)"
-            @mouseleave="hideDeploymentPopover"
-            @click.stop
-          >
-            <span class="text-sm">{{ countryFlag(getLatestDeployment(data)?.deployment_country) }}</span>
-            <div class="flex flex-col items-start min-w-0">
-              <span class="text-xs font-semibold text-green-700 truncate max-w-[100px]">
-                {{ getLatestDeployment(data)?.deployment_country ?? '—' }}
-              </span>
-              <span class="text-[10px] text-green-600 truncate max-w-[100px]">
-                {{ getLatestDeployment(data)?.deployment_company ?? '' }}
-              </span>
-            </div>
-            <span
-              v-if="deploymentCount(data) > 1"
-              class="text-[9px] font-bold text-white bg-green-600 rounded-full
-                     w-4 h-4 flex items-center justify-center flex-shrink-0"
-              v-tooltip.top="`${deploymentCount(data)} total deployments`"
-            >
-              {{ deploymentCount(data) }}
-            </span>
-            <i class="pi pi-info-circle text-[9px] text-green-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
-
-          <span v-else class="text-xs text-blueberry-300 italic">
-            Not deployed
-          </span>
+          <span class="text-sm text-blueberry-700">{{ data.current_address || '—' }}</span>
         </template>
       </Column>
 
-      <Column field="nationality" header="Nationality" style="width: 130px">
-        <template #body="{ data }">
-          <span class="text-sm text-blueberry-600">{{ data.nationality ?? '—' }}</span>
-        </template>
-      </Column>
-
+      <!-- ✅ Status Column (restored) -->
       <Column field="status" header="Status" style="width: 140px">
         <template #body="{ data }">
           <ApplicantStatusBadge :status="data.status" />
         </template>
       </Column>
 
-      <Column header="Score" style="width: 110px">
-        <template #body="{ data }">
-          <div class="flex items-baseline gap-1.5">
-            <span class="text-sm font-medium text-blueberry-700">
-              {{ data.quality_score }}%
-            </span>
-            <span class="text-xs font-bold" :class="gradeColor(data.quality_grade)">
-              {{ data.quality_grade }}
-            </span>
-          </div>
-        </template>
-      </Column>
-
+      <!-- Passport Expiry -->
       <Column field="passport_expiry" header="Passport Expiry" style="width: 150px">
         <template #body="{ data }">
           <span
             class="text-sm"
-            :class="!data.passport_expiry ? 'text-blueberry-300' : 'text-blueberry-600'"
+            :class="!data.passport_expiry ? 'text-blueberry-300' : 'text-blueberry-700'"
           >
             {{ formatDate(data.passport_expiry) }}
           </span>
         </template>
       </Column>
 
-      <Column header="Actions" style="width: 220px">
+      <!-- Actions Column -->
+      <Column header="Actions" style="width: 180px">
         <template #body="{ data }">
           <div class="flex items-center gap-0.5" @click.stop>
             <Button
@@ -507,6 +393,7 @@ function gradeColor(grade: string) {
               @click="goToEdit(data.id)"
             />
 
+            <!-- ✅ Move to Final List (kept) -->
             <Button
               v-if="data.status !== 'final_list' && data.status !== 'rejected'"
               icon="pi pi-check-circle"
@@ -519,6 +406,7 @@ function gradeColor(grade: string) {
               @click="handleMoveToFinalList(data)"
             />
 
+            <!-- ✅ Deploy for final_list applicants (kept) -->
             <DeployButton
               v-if="data.status === 'final_list' && data.applicant_batches?.[0]?.id"
               :applicant-batch-id="data.applicant_batches[0].id"
@@ -564,8 +452,7 @@ function gradeColor(grade: string) {
           <div class="w-16 h-16 rounded-full bg-appleCore-50 flex items-center justify-center">
             <i class="pi pi-inbox text-2xl text-blueberry-300" />
           </div>
-          <p class="text-sm text-blueberry-500 font-medium">No applicants in review</p>
-          <p class="text-xs text-blueberry-400">All applicants have been processed</p>
+          <p class="text-sm text-blueberry-500 font-medium">No applicants found</p>
         </div>
       </template>
 
@@ -597,7 +484,5 @@ function gradeColor(grade: string) {
       :loading="selectedApplicant ? isRowLoading(selectedApplicant.id) : false"
       @confirm="onRejectConfirmed"
     />
-
-    <!-- Popovers and Teleports omitted for brevity (Keep them identically as they are) -->
   </div>
 </template>
