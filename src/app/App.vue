@@ -1,38 +1,85 @@
-<template>
-  <ThemeProvider />
-  <RouterView />
-  <Toast position="top-right" />
-  <ConfirmDialog />
-</template>
-
+<!-- src/app/App.vue -->
 <script setup lang="ts">
-import { watch } from 'vue'
-import { RouterView } from 'vue-router'
+import { watch, computed, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 import Toast from 'primevue/toast'
 import ConfirmDialog from 'primevue/confirmdialog'
-import ThemeProvider from '@features/settings/theme/ThemeProvider.vue'
-
 import { useAuthStore } from '@features/auth/stores/auth.store'
 import { useNotificationStore } from '@features/notifications/stores/notification.store'
-import { useNotificationRealtime } from '@shared/pubnub/useNotificationRealtime'
 
-const authStore         = useAuthStore()
+const route = useRoute()
+const authStore = useAuthStore()
 const notificationStore = useNotificationStore()
 
-// 🔔 Global real-time listener — works app-wide (bell badge updates from any page)
-useNotificationRealtime()
+/**
+ * Portal detection:
+ * Pauses staff notification polling while viewing applicant portal pages
+ */
+const isPortalRoute = computed(() => {
+  return route.path.startsWith('/portal') || route.meta.layout === 'portal'
+})
 
-// 🎯 Fetch unread count whenever user logs in
-watch(
-  () => authStore.isAuthenticated,
-  async (isAuth) => {
-    if (isAuth) {
-      await notificationStore.fetchUnreadCount()
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
+function startNotificationPolling() {
+  stopNotificationPolling()
+  // Run staff polling ONLY when logged in as staff and NOT on a portal route
+  if (!authStore.isAuthenticated || isPortalRoute.value) return
+
+  notificationStore.fetchUnreadCount()
+  pollTimer = setInterval(() => {
+    if (authStore.isAuthenticated && !isPortalRoute.value) {
+      notificationStore.fetchUnreadCount()
+    }
+  }, 60_000)
+}
+
+function stopNotificationPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+function safeResetNotifications() {
+  try {
+    if (typeof notificationStore.$reset === 'function') {
+      notificationStore.$reset()
     } else {
-      // Clear when logged out
-      notificationStore.$reset?.()
+      notificationStore.notifications = []
+      notificationStore.unreadCount = 0
+    }
+  } catch {
+    // Prevent app shell crashes
+  }
+}
+
+// Watch staff authentication & route changes
+watch(
+  [() => authStore.isAuthenticated, isPortalRoute],
+  ([isAuth, isPortal]) => {
+    if (isPortal) {
+      stopNotificationPolling()
+      return
+    }
+
+    if (isAuth) {
+      startNotificationPolling()
+    } else {
+      stopNotificationPolling()
+      safeResetNotifications()
     }
   },
   { immediate: true },
 )
+
+onUnmounted(() => {
+  stopNotificationPolling()
+})
 </script>
+
+<template>
+  <Toast position="top-right" />
+  <ConfirmDialog />
+  <router-view />
+</template>

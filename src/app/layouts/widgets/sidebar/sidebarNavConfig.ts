@@ -38,13 +38,21 @@ export function buildNavSections(_ctx: PermissionContext): NavSection[] {
           to: '/applicants/rejected',
           permissions: [Perm.applicantViewAny],
         },
+
+        // ✅ NEW: Staff review queue for applicant self-service updates
+        {
+          icon: 'pi pi-user-edit',
+          title: 'Profile Updates',
+          to: '/profile-update-requests',
+          permissions: [Perm.applicantViewAny], // or Perm.profileUpdateRequestViewAny when you seed it
+        },
+
         {
           icon: 'pi pi-graduation-cap',
           title: 'Batches',
           to: '/batches',
           permissions: [Perm.batchViewAny],
         },
-        // 🚀 NEW: Deployments
         {
           icon: 'pi pi-send',
           title: 'Deployments',
@@ -76,33 +84,8 @@ export function buildNavSections(_ctx: PermissionContext): NavSection[] {
           to: '/document-expiry-alerts',
           permissions: [Perm.documentExpiryAlertViewAny],
         },
-        // {
-        //   icon: 'pi pi-briefcase',
-        //   title: 'Internships',
-        //   to: '/internships',
-        //   permissions: [Perm.internshipViewAny],
-        // },
       ],
     },
-
-    // // ─── REPORTS ───────────────────────────────────────────
-    // {
-    //   title: 'REPORTS',
-    //   items: [
-    //     {
-    //       icon: 'pi pi-chart-line',
-    //       title: 'Analytics',
-    //       to: '/analytics',
-    //       permissions: [Perm.analyticsView],
-    //     },
-    //     {
-    //       icon: 'pi pi-file-pdf',
-    //       title: 'Reports',
-    //       to: '/reports',
-    //       permissions: [Perm.reportView],
-    //     },
-    //   ],
-    // },
 
     // ─── CONFIGURATION ─────────────────────────────────────
     {

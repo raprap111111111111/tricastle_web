@@ -2,110 +2,117 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { notificationApi } from '../api/notification.api'
-import type { Notification, NotificationFilters, Pagination } from '../types'
+import type {
+  Notification,
+  NotificationFilters,
+} from '../types'
+
+export interface NotificationPagination {
+  total: number
+  offset: number
+  limit: number
+  current_page: number
+  last_page: number
+  has_more: boolean
+}
 
 export const useNotificationStore = defineStore('notification', () => {
-  // ─── State ─────────────────────────────────────────
+  // ─── State ──────────────────────────────────────────────────────────────────
   const notifications = ref<Notification[]>([])
-  const pagination = ref<Pagination | null>(null)
+  const pagination = ref<NotificationPagination | null>(null)
   const loading = ref(false)
   const submitting = ref(false)
   const unreadCount = ref(0)
 
-  const filters = ref<NotificationFilters>({
-    search: '',
-    is_read: null,
-    module: '',
-    order_by: 'created_at',
-    order_dir: 'desc',
+  const filters = ref<{
+    offset: number
+    limit: number
+    order_by?: string
+    order_dir?: 'asc' | 'desc'
+    search?: string
+    is_read?: boolean | null
+  }>({
     offset: 0,
     limit: 15,
+    order_by: 'created_at',
+    order_dir: 'desc',
+    is_read: null,
   })
 
-  // ─── Computed ──────────────────────────────────────
+  // ─── Getters ────────────────────────────────────────────────────────────────
   const hasUnread = computed(() => unreadCount.value > 0)
-  const unreadOnly = computed(() => notifications.value.filter((n) => !n.read_at))
 
-  // ─── Helper: extract Laravel paginator from response ─────────
-  // ─── Helper: extract Laravel paginator from response ─────────
-  function extractPaginator(response: any) {
-    // Your http.ts interceptor UNWRAPS the { success, message, data } envelope
-    // So response.data = the paginator directly: { current_page, data: [], total }
-    const paginator = response?.data ?? {}
-    const records = paginator?.data ?? paginator?.records ?? []
+  const unreadBadge = computed(() => {
+    if (unreadCount.value <= 0) return ''
+    return unreadCount.value > 99 ? '99+' : String(unreadCount.value)
+  })
 
-    return { paginator, records }
-  }
-
-  // ─── Actions ───────────────────────────────────────
+  // ─── Actions ────────────────────────────────────────────────────────────────
   async function fetchNotifications() {
     loading.value = true
     try {
-      // Strip empty/null values from filters
-      const cleanFilters: Record<string, any> = {}
-      for (const [key, val] of Object.entries(filters.value)) {
-        if (val !== '' && val !== null && val !== undefined) {
-          cleanFilters[key] = val
-        }
+      const activeFilters: NotificationFilters = {
+        offset: filters.value.offset,
+        limit: filters.value.limit,
+        order_by: filters.value.order_by,
+        order_dir: filters.value.order_dir,
+        search: filters.value.search || undefined,
+        is_read: filters.value.is_read ?? undefined,
       }
 
-      const response = await notificationApi.list(cleanFilters)
-      const { paginator, records } = extractPaginator(response)
+      const res = await notificationApi.list(activeFilters)
+      const data = res.data?.data ?? res.data ?? {}
 
-      console.log('📊 Fetched notifications:', records.length, 'of', paginator.total)
-
-      notifications.value = records
-
+      notifications.value = (data.records ?? data.data ?? []) as Notification[]
+      
       pagination.value = {
-        total: paginator.total ?? 0,
-        offset: paginator.offset ?? 0,
-        limit: paginator.per_page ?? paginator.limit ?? 15,
-        current_page: paginator.current_page ?? 1,
-        last_page: paginator.last_page ?? 1,
-        per_page: paginator.per_page ?? paginator.limit ?? 15,
-        has_more: paginator.next_page_url != null
-          || paginator.has_more
-          || (paginator.current_page ?? 1) < (paginator.last_page ?? 1),
-        from: paginator.from,
-        to: paginator.to,
+        total: data.total ?? 0,
+        offset: data.offset ?? 0,
+        limit: data.limit ?? 15,
+        current_page: data.current_page ?? 1,
+        last_page: data.last_page ?? 1,
+        has_more: data.has_more ?? false,
       }
 
-      // Recount unread from current page
-      unreadCount.value = notifications.value.filter((n) => !n.read_at).length
-    } catch (e) {
-      console.error('❌ Failed to fetch notifications:', e)
+      if (typeof data.unread_count === 'number') {
+        unreadCount.value = data.unread_count
+      }
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err)
+      notifications.value = []
+      pagination.value = null
     } finally {
       loading.value = false
     }
   }
 
-  /** 🔔 Fetch just the unread count — for bell badge */
   async function fetchUnreadCount() {
     try {
-      const response = await notificationApi.list({
-        is_read: false,
-        limit: 1,
-      })
-      const { paginator } = extractPaginator(response)
-
-      unreadCount.value = paginator.total ?? 0
-      console.log('🔴 Unread count:', unreadCount.value)
-    } catch (e) {
-      console.error('❌ Failed to fetch unread count:', e)
+      const res = await notificationApi.list({ is_read: false, limit: 1 })
+      const data = res.data?.data ?? res.data ?? {}
+      unreadCount.value = data.total ?? data.unread_count ?? 0
+    } catch {
+      unreadCount.value = 0
     }
   }
 
-  async function markAsRead(id: string) {
-    submitting.value = true
+  async function markAsRead(id: number | string) {
     try {
-      await notificationApi.markAsRead(id)
-      const notif = notifications.value.find((n) => n.id === id)
-      if (notif && !notif.read_at) {
-        notif.read_at = new Date().toISOString()
-        unreadCount.value = Math.max(0, unreadCount.value - 1)
+      const idStr = String(id)
+      await notificationApi.markAsRead(idStr)
+      const index = notifications.value.findIndex((n: Notification) => String(n.id) === idStr)
+      if (index !== -1) {
+        const wasUnread = !notifications.value[index].read_at
+        notifications.value[index] = {
+          ...notifications.value[index],
+          read_at: new Date().toISOString(),
+        }
+        if (wasUnread && unreadCount.value > 0) {
+          unreadCount.value--
+        }
       }
-    } finally {
-      submitting.value = false
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err)
     }
   }
 
@@ -113,87 +120,77 @@ export const useNotificationStore = defineStore('notification', () => {
     submitting.value = true
     try {
       await notificationApi.markAllAsRead()
-      notifications.value.forEach((n) => {
-        if (!n.read_at) n.read_at = new Date().toISOString()
-      })
+      notifications.value = notifications.value.map((n: Notification) => ({
+        ...n,
+        read_at: n.read_at ?? new Date().toISOString(),
+      }))
       unreadCount.value = 0
+    } catch (err) {
+      console.error('Failed to mark all as read:', err)
     } finally {
       submitting.value = false
     }
   }
 
-  async function deleteNotification(id: string) {
-    submitting.value = true
+  async function removeNotification(id: number | string) {
     try {
-      await notificationApi.destroy(id)
-      const idx = notifications.value.findIndex((n) => n.id === id)
-      if (idx !== -1) {
-        const wasUnread = !notifications.value[idx].read_at
-        notifications.value.splice(idx, 1)
-        if (wasUnread) unreadCount.value = Math.max(0, unreadCount.value - 1)
+      const idStr = String(id)
+      const target = notifications.value.find((n: Notification) => String(n.id) === idStr)
+      await notificationApi.destroy(idStr)
+      notifications.value = notifications.value.filter((n: Notification) => String(n.id) !== idStr)
+      if (target && !target.read_at && unreadCount.value > 0) {
+        unreadCount.value--
       }
-    } finally {
-      submitting.value = false
-    }
-  }
-
-  /** 📡 Called by PubNub when new notification arrives */
-  function pushNotification(notification: Notification) {
-    // Avoid duplicates
-    if (notifications.value.some((n) => n.id === notification.id)) return
-
-    notifications.value.unshift(notification)
-    if (!notification.read_at) unreadCount.value++
-  }
-
-  // ─── Filter helpers ────────────────────────────────
-  function setFilters(patch: Partial<NotificationFilters>) {
-    filters.value = { ...filters.value, ...patch }
-    if (!('offset' in patch)) filters.value.offset = 0
-  }
-
-  function resetFilters() {
-    filters.value = {
-      search: '',
-      is_read: null,
-      module: '',
-      order_by: 'created_at',
-      order_dir: 'desc',
-      offset: 0,
-      limit: 15,
+      if (pagination.value) {
+        pagination.value.total = Math.max(0, pagination.value.total - 1)
+      }
+    } catch (err) {
+      console.error('Failed to delete notification:', err)
     }
   }
 
   function setPage(page: number) {
-    filters.value.offset = (page - 1) * (filters.value.limit ?? 15)
+    const limit = filters.value.limit ?? 15
+    filters.value.offset = (page - 1) * limit
+    fetchNotifications()
   }
 
-  function setLimit(limit: number) {
-    filters.value.limit = limit
-    filters.value.offset = 0
+  function resetFilters() {
+    filters.value = {
+      offset: 0,
+      limit: 15,
+      order_by: 'created_at',
+      order_dir: 'desc',
+      is_read: null,
+    }
+  }
+
+  // ✅ Explicit $reset implementation for Pinia Setup Stores
+  function $reset() {
+    notifications.value = []
+    pagination.value = null
+    loading.value = false
+    submitting.value = false
+    unreadCount.value = 0
+    resetFilters()
   }
 
   return {
-    // state
     notifications,
     pagination,
     loading,
     submitting,
     unreadCount,
     filters,
-    // computed
     hasUnread,
-    unreadOnly,
-    // actions
+    unreadBadge,
     fetchNotifications,
     fetchUnreadCount,
     markAsRead,
     markAllAsRead,
-    deleteNotification,
-    pushNotification,
-    setFilters,
-    resetFilters,
+    removeNotification,
     setPage,
-    setLimit,
+    resetFilters,
+    $reset,
   }
 })

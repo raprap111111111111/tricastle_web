@@ -1,4 +1,3 @@
-<!-- src/features/applicants/components/final-list/FinalListBulkActionsBar.vue -->
 <script setup lang="ts">
 import Button from 'primevue/button'
 
@@ -12,6 +11,7 @@ defineProps<{
 defineEmits<{
   (e: 'clear'): void
   (e: 'deploy'): void
+  (e: 'assign-group'): void
   (e: 'export-insurance'): void
   (e: 'export-pdos'): void
 }>()
@@ -52,6 +52,17 @@ defineEmits<{
         <i class="pi pi-times text-[10px]" />
         Clear Selection
       </button>
+
+      <!-- 🏷️ Assign Group (NEW BUTTON) -->
+      <Button
+        label="Assign Group"
+        icon="pi pi-users"
+        size="small"
+        severity="secondary"
+        outlined
+        class="!bg-white !border-slate-300 !text-slate-700 hover:!bg-slate-50"
+        @click="$emit('assign-group')"
+      />
 
       <!-- 🎓 Generate PDOS -->
       <Button

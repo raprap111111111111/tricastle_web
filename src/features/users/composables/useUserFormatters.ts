@@ -1,3 +1,4 @@
+// src/features/users/composables/useUserFormatters.ts
 import { computed, type Ref } from 'vue'
 import type { User } from '../schemas/user.schema'
 
@@ -47,8 +48,9 @@ export function useUserFormatters(user: Ref<User | null | undefined>) {
     const normalized = raw.replace(/\\/g, '/')
 
     // 3. Resolve API origin (Vite ENV or fallback to current origin)
-    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8086'
-    let origin = 'http://localhost:8086'
+    // FIX: Changed VITE_API_BASE_URL to VITE_API_URL to match env.d.ts
+    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8089'
+    let origin = 'http://localhost:8089'
     try {
       origin = new URL(apiBase).origin
     } catch {

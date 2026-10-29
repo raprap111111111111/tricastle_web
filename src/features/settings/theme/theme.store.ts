@@ -23,8 +23,23 @@ export const useThemeStore = defineStore('theme', () => {
   const activeTheme = computed<ThemeDefinition>(() => getTheme(activeThemeName.value))
   const availableThemes = computed(() => Object.values(THEMES))
 
+  function isPortalOrUnauthenticated(): boolean {
+    const path = window.location.pathname
+    if (path.startsWith('/portal') || path.startsWith('/auth')) {
+      return true
+    }
+    const token = localStorage.getItem('token') || localStorage.getItem('auth_token')
+    return !token
+  }
+
   // ─── Load theme (per-user) + branding (global) ─────────
   async function loadTheme() {
+    // If on portal or auth login screen without token, skip API calls to prevent 401
+    if (isPortalOrUnauthenticated()) {
+      applyTheme()
+      return
+    }
+
     // 1) Load user preferences from /auth/profile
     try {
       const { data } = await http.get('/auth/profile')
@@ -32,8 +47,7 @@ export const useThemeStore = defineStore('theme', () => {
 
       activeThemeName.value = (user?.theme_preference as ThemeName) ?? 'default'
       effectsEnabled.value  = user?.effects_enabled !== false
-    } catch (e) {
-      console.warn('Could not load user preferences, using default:', e)
+    } catch {
       activeThemeName.value = 'default'
       effectsEnabled.value  = true
     }
@@ -42,16 +56,18 @@ export const useThemeStore = defineStore('theme', () => {
     try {
       const { data } = await http.get('/settings', { params: { limit: 100 } })
       const settings = data?.data ?? data ?? []
-      const map = new Map(settings.map((s: any) => [s.key, s.value]))
+      if (Array.isArray(settings)) {
+        const map = new Map(settings.map((s: any) => [s.key, s.value]))
 
-      branding.value = {
-        logo:        (map.get('branding.logo') as string)        ?? '/tricastle.jpg',
-        logo_login:  (map.get('branding.logo_login') as string)  ?? '/tricastle.jpg',
-        app_name:    (map.get('branding.app_name') as string)    ?? 'Tricastle',
-        app_tagline: (map.get('branding.app_tagline') as string) ?? 'BACOLOD',
+        branding.value = {
+          logo:        (map.get('branding.logo') as string)        ?? '/tricastle.jpg',
+          logo_login:  (map.get('branding.logo_login') as string)  ?? '/tricastle.jpg',
+          app_name:    (map.get('branding.app_name') as string)    ?? 'Tricastle',
+          app_tagline: (map.get('branding.app_tagline') as string) ?? 'BACOLOD',
+        }
       }
-    } catch (e) {
-      console.error('Failed to load branding:', e)
+    } catch {
+      // Ignore background settings load error
     }
 
     applyTheme()
@@ -96,6 +112,7 @@ export const useThemeStore = defineStore('theme', () => {
   // ─── Save theme PER-USER ──────────────────────────────
   async function saveTheme(name: ThemeName) {
     setTheme(name)
+    if (isPortalOrUnauthenticated()) return
     try {
       await http.put('/auth/preferences', { theme_preference: name })
     } catch (e) {
@@ -105,6 +122,7 @@ export const useThemeStore = defineStore('theme', () => {
 
   async function saveEffectsEnabled(enabled: boolean) {
     effectsEnabled.value = enabled
+    if (isPortalOrUnauthenticated()) return
     try {
       await http.put('/auth/preferences', { effects_enabled: enabled })
     } catch (e) {
@@ -115,25 +133,30 @@ export const useThemeStore = defineStore('theme', () => {
   // ─── Save branding (global, admin only) ───────────────
   async function saveBranding(patch: Partial<BrandingConfig>) {
     branding.value = { ...branding.value, ...patch }
+    if (isPortalOrUnauthenticated()) return
 
     for (const [key, value] of Object.entries(patch)) {
       const settingKey = `branding.${key}`
       try {
-        await http.put(`/settings/${await findSettingId(settingKey)}`, {
-          value,
-        })
+        const id = await findSettingId(settingKey)
+        if (id) {
+          await http.put(`/settings/${id}`, { value })
+        }
       } catch (e) {
         console.error(`Failed to save ${settingKey}:`, e)
       }
     }
   }
 
-  async function findSettingId(key: string): Promise<number> {
-    const { data } = await http.get('/settings', { params: { search: key, limit: 5 } })
-    const settings = data?.data ?? data ?? []
-    const found = settings.find((s: any) => s.key === key)
-    if (!found) throw new Error(`Setting ${key} not found`)
-    return found.id
+  async function findSettingId(key: string): Promise<number | null> {
+    try {
+      const { data } = await http.get('/settings', { params: { search: key, limit: 5 } })
+      const settings = data?.data ?? data ?? []
+      const found = settings.find((s: any) => s.key === key)
+      return found ? found.id : null
+    } catch {
+      return null
+    }
   }
 
   return {

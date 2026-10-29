@@ -1,7 +1,6 @@
-// src/app/router/index.ts
-
 import { createRouter, createWebHistory } from 'vue-router'
 import { authGuard } from './guards/auth.guard'
+
 import { authRoutes } from './routes/auth.routes'
 import { dashboardRoutes } from './routes/dashboard.routes'
 import { profileRoutes } from './routes/profile.routes'
@@ -26,13 +25,18 @@ import { activityLogRoutes } from './routes/activity-log.routes'
 import { notificationsRoutes } from './routes/notifications.routes'
 import { deploymentRoutes } from './routes/deployment.routes'
 import { internshipRoutes } from './routes/internship.routes'
+import { profileUpdatesRoutes } from './routes/profile-updates.routes'
 
-
+// Portal router & guard
+import portalRoutes from '@/portal/router/portal.routes'
+import { portalGuard } from '@/portal/router/portal.guard'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     { path: '/', redirect: '/dashboard' },
+
+    // Staff Routes
     ...authRoutes,
     ...dashboardRoutes,
     ...profileRoutes,
@@ -56,12 +60,25 @@ const router = createRouter({
     ...activityLogRoutes,
     ...notificationsRoutes,
     ...deploymentRoutes,
-    ...internshipRoutes, 
+    ...internshipRoutes,
+    ...profileUpdatesRoutes,
+
+    // Applicant Portal Routes
+    ...portalRoutes,
 
     { path: '/:pathMatch(.*)*', name: 'NotFound', redirect: '/dashboard' },
   ],
 })
 
-router.beforeEach(authGuard)
+router.beforeEach((to, from) => {
+  // 1) Let portalGuard handle /portal/* routes
+  const portalResult = portalGuard(to)
+  if (portalResult !== null) {
+    return portalResult
+  }
+
+  // 2) Let authGuard handle Staff routes
+  return authGuard(to, from)
+})
 
 export default router

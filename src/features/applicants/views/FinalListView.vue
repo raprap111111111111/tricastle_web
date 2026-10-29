@@ -1,15 +1,20 @@
 <!-- src/features/applicants/views/FinalListView.vue -->
 <script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import axios from 'axios'
+
 import Skeleton from 'primevue/skeleton'
 import Button from 'primevue/button'
+import { useToast } from 'primevue/usetoast'
 import { AppCard } from '@shared/ui'
+
+import { useAuthStore } from '@/features/auth/stores/auth.store'
 import { useApplicantStore } from '../stores/applicant.store'
 import { useBatchStore } from '@features/batches/stores/batch.store'
 import { useCompanyStore } from '@features/companies/stores/company.store'
 import ApplicantTable from '../components/ApplicantTable.vue'
 import type { BatchSummary } from '../types'
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
 
 // 🚀 Deployment
 import BulkDeployDialog from '@features/deployments/components/BulkDeployDialog.vue'
@@ -17,11 +22,14 @@ import { useDeployments } from '@features/deployments/composables/useDeployments
 import { useDeploymentStore } from '@features/deployments/stores/deployment.store'
 import type { DeployApplicantPayload } from '@features/deployments/types'
 
+// 🏷️ Batch Group Assignment
+import AssignGroupDialog from '../components/final-list/AssignGroupDialog.vue'
+
 // 🛡️ Insurance Export
 import InsuranceExportDialog from '../components/insurance/InsuranceExportDialog.vue'
 import { useInsuranceExport } from '../composables/useInsuranceExport'
 
-// 🎓 PDOS Export (NEW)
+// 🎓 PDOS Export
 import PdosExportDialog from '../components/pdos/PdosExportDialog.vue'
 import { usePdosExport } from '../composables/usePdosExport'
 
@@ -39,12 +47,12 @@ import FinalListBulkActionsBar from '../components/final-list/FinalListBulkActio
 import AdvancedFiltersDialog from '../components/final-list/AdvancedFiltersDialog.vue'
 import ExcelExportDialog from '../components/final-list/ExcelExportDialog.vue'
 import BulkAISDialog from '../components/final-list/BulkAISDialog.vue'
-import { useToast } from 'primevue/usetoast'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SETUP
 // ═══════════════════════════════════════════════════════════════════════════
 
+const authStore = useAuthStore()
 const store = useApplicantStore()
 const batchStore = useBatchStore()
 const companyStore = useCompanyStore()
@@ -56,11 +64,14 @@ const toast = useToast()
 const router = useRouter()
 const route = useRoute()
 
+// ⚡ Resolve base API URL (e.g. http://localhost:8089/api/v1)
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8089/api/v1').replace(/\/+$/, '')
+
 // ─── Filters composable ─────────────────────────────────────────────────────
 const filters = useFinalListFilters()
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MULTI-PAGE SELECTION (Smart Merge - Prevents losing other pages)
+// MULTI-PAGE SELECTION
 // ═══════════════════════════════════════════════════════════════════════════
 
 const selectedIds = ref<number[]>([])
@@ -95,10 +106,47 @@ function clearSelection(): void {
   selectedApplicantsById.value = {}
 }
 
-/** Selects all loaded applicants across all loaded pages */
-function selectAllLoaded(): void {
-  const allIds = store.applicants.map((a) => a.id)
-  onSelectedIdsUpdate(allIds)
+// ═══════════════════════════════════════════════════════════════════════════
+// GROUP OPTIONS (depends on selected batch)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const groupFilterOptions = ref<{ label: string; value: number | null; color?: string }[]>([
+  { label: 'All Groups', value: null },
+])
+
+async function loadGroupsForBatch(
+  batchId: number | null,
+  { clearGroup = true } = {},
+): Promise<void> {
+  if (clearGroup) filters.selectedGroupId.value = null
+
+  if (!batchId) {
+    groupFilterOptions.value = [{ label: 'All Groups', value: null }]
+    return
+  }
+
+  try {
+    const token = authStore.token || localStorage.getItem('access_token') || ''
+    const res = await axios.get(`${API_BASE}/batches/${batchId}/groups`, {
+      headers: {
+        Authorization: token ? `Bearer ${token}` : '',
+        Accept: 'application/json',
+      },
+    })
+
+    const rows = res.data?.data ?? res.data ?? []
+    groupFilterOptions.value = [
+      { label: 'All Groups', value: null },
+      ...rows.map((g: any) => ({
+        label: g.name,
+        value: g.id,
+        color: g.color ?? '#94a3b8',
+      })),
+    ]
+  } catch (e) {
+    console.error('Failed to load groups for filter', e)
+    groupFilterOptions.value = [{ label: 'All Groups', value: null }]
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -116,6 +164,7 @@ async function fetchFinalList(targetPage?: number | null): Promise<void> {
     exclude_statuses: '',
     search: filters.searchQuery.value.trim(),
     batch_id: filters.selectedBatchId.value ?? undefined,
+    group_id: filters.selectedGroupId.value ?? undefined,
     gender: adv.gender,
     civil_status: adv.civil_status,
     nationality: adv.nationality,
@@ -125,15 +174,9 @@ async function fetchFinalList(targetPage?: number | null): Promise<void> {
     address: adv.address,
     skill_category: adv.skill_category,
     jlpt_level: adv.jlpt_level,
-    willing_to_be_deployed: adv.willing_to_be_deployed
-      ? adv.willing_to_be_deployed === 'true'
-      : '',
-    japan_deployment_ready: adv.japan_deployment_ready
-      ? adv.japan_deployment_ready === 'true'
-      : '',
-    previous_japan_experience: adv.previous_japan_experience
-      ? adv.previous_japan_experience === 'true'
-      : '',
+    willing_to_be_deployed: adv.willing_to_be_deployed ? adv.willing_to_be_deployed === 'true' : '',
+    japan_deployment_ready: adv.japan_deployment_ready ? adv.japan_deployment_ready === 'true' : '',
+    previous_japan_experience: adv.previous_japan_experience ? adv.previous_japan_experience === 'true' : '',
     ssw_eligible: adv.ssw_eligible ? adv.ssw_eligible === 'true' : '',
 
     limit: limitToFetch,
@@ -163,17 +206,15 @@ async function loadAllCompanies(): Promise<void> {
 }
 
 onMounted(async () => {
-  if (route.query.search) {
-    filters.searchQuery.value = String(route.query.search)
-  }
-  if (route.query.batch_id) {
-    filters.selectedBatchId.value = Number(route.query.batch_id)
-  }
-  if (route.query.gender) {
-    filters.appliedAdvanced.value.gender = String(route.query.gender)
-  }
-  if (route.query.province) {
-    filters.appliedAdvanced.value.province = String(route.query.province)
+  if (route.query.search) filters.searchQuery.value = String(route.query.search)
+  if (route.query.batch_id) filters.selectedBatchId.value = Number(route.query.batch_id)
+  if (route.query.gender) filters.appliedAdvanced.value.gender = String(route.query.gender)
+  if (route.query.province) filters.appliedAdvanced.value.province = String(route.query.province)
+
+  // Load groups for the restored batch WITHOUT wiping group_id from the URL
+  await loadGroupsForBatch(filters.selectedBatchId.value, { clearGroup: false })
+  if (route.query.group_id) {
+    filters.selectedGroupId.value = Number(route.query.group_id)
   }
 
   await Promise.all([
@@ -184,9 +225,17 @@ onMounted(async () => {
   ])
 })
 
-// ⚡ FIX: Do NOT clear selections when searching or changing filters
+// When batch changes AFTER mount → reload groups and clear group
 watch(
-  [filters.searchQuery, filters.selectedBatchId, filters.appliedAdvanced],
+  () => filters.selectedBatchId.value,
+  (batchId, prev) => {
+    if (batchId === prev) return
+    loadGroupsForBatch(batchId, { clearGroup: true })
+  },
+)
+
+watch(
+  [filters.searchQuery, filters.selectedBatchId, filters.selectedGroupId, filters.appliedAdvanced],
   () => {
     store.setPage(1)
 
@@ -195,6 +244,7 @@ watch(
         ...route.query,
         search: filters.searchQuery.value.trim() || undefined,
         batch_id: filters.selectedBatchId.value ?? undefined,
+        group_id: filters.selectedGroupId.value ?? undefined,
         gender: filters.appliedAdvanced.value.gender || undefined,
         province: filters.appliedAdvanced.value.province || undefined,
       },
@@ -217,7 +267,7 @@ async function onLimitChange(limit: number): Promise<void> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// BATCH OPTIONS
+// BATCH OPTIONS & AUTO DEFAULT TARGET BATCH
 // ═══════════════════════════════════════════════════════════════════════════
 
 const availableBatches = computed<BatchSummary[]>(
@@ -250,6 +300,13 @@ const batchOptions = computed(() => {
   ]
 })
 
+// Auto-detect batch ID for assign group modal when no batch filter is selected
+const defaultAssignBatchId = computed<number | null>(() => {
+  if (filters.selectedBatchId.value) return filters.selectedBatchId.value
+  const firstApp = Object.values(selectedApplicantsById.value)[0] as any
+  return firstApp?.applicant_batches?.[0]?.batch_id ?? null
+})
+
 // ═══════════════════════════════════════════════════════════════════════════
 // STATS & FILTERS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -265,6 +322,10 @@ const activeFilters = computed(() => {
   if (filters.selectedBatchId.value !== null) {
     const found = batchOptions.value.find((o) => o.value === filters.selectedBatchId.value)
     if (found) list.push({ key: 'batch', label: 'Batch', value: found.label })
+  }
+  if (filters.selectedGroupId.value !== null) {
+    const found = groupFilterOptions.value.find((o) => o.value === filters.selectedGroupId.value)
+    if (found) list.push({ key: 'group', label: 'Group', value: found.label })
   }
 
   const adv = filters.appliedAdvanced.value
@@ -288,7 +349,11 @@ const activeFilters = computed(() => {
 function removeFilter(key: string): void {
   switch (key) {
     case 'search': filters.searchQuery.value = ''; break
-    case 'batch': filters.selectedBatchId.value = null; break
+    case 'batch':
+      filters.selectedBatchId.value = null
+      // group watch will reset itself via watch on selectedBatchId
+      break
+    case 'group': filters.selectedGroupId.value = null; break
     case 'gender': filters.gender.value = ''; break
     case 'civil_status': filters.civilStatus.value = ''; break
     case 'nationality': filters.nationality.value = ''; break
@@ -327,10 +392,12 @@ function goBack(): void {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// BULK DEPLOY
+// BULK DEPLOY & ASSIGN GROUP
 // ═══════════════════════════════════════════════════════════════════════════
 
 const bulkDeployDialog = ref(false)
+const showAssignGroupDialog = ref(false)
+const assigningGroup = ref(false)
 
 const selectedApplicantBatchIds = computed<number[]>(() =>
   Object.values(selectedApplicantsById.value)
@@ -344,6 +411,73 @@ const nonDeployableCount = computed(() => selectedIds.value.length - deployableC
 function openBulkDeploy(): void {
   if (selectedApplicantBatchIds.value.length === 0) return
   bulkDeployDialog.value = true
+}
+
+function openAssignGroup(): void {
+  if (selectedIds.value.length === 0) {
+    toast.add({
+      severity: 'warn',
+      summary: 'No applicants selected',
+      detail: 'Please select applicants from the table first.',
+      life: 3000,
+    })
+    return
+  }
+  if (selectedApplicantBatchIds.value.length === 0) {
+    toast.add({
+      severity: 'warn',
+      summary: 'No Batch Membership',
+      detail: 'Selected applicants must belong to a batch before grouping.',
+      life: 3500,
+    })
+    return
+  }
+  showAssignGroupDialog.value = true
+}
+
+async function handleAssignGroup(payload: { batchId: number; groupId: number }): Promise<void> {
+  assigningGroup.value = true
+  try {
+    const token = authStore.token || localStorage.getItem('access_token') || ''
+    const url = `${API_BASE}/batches/${payload.batchId}/groups/${payload.groupId}/assign`
+
+    const res = await axios.post(
+      url,
+      {
+        applicant_batch_ids: selectedApplicantBatchIds.value,
+      },
+      {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : '',
+          Accept: 'application/json',
+        },
+      },
+    )
+
+    toast.add({
+      severity: 'success',
+      summary: 'Group Assigned',
+      detail: res.data?.message ?? 'Applicants assigned to group successfully.',
+      life: 3000,
+    })
+
+    showAssignGroupDialog.value = false
+    clearSelection()
+
+    // Refresh group options (counts/newly created) + list
+    await loadGroupsForBatch(payload.batchId, { clearGroup: false })
+    await fetchFinalList()
+  } catch (err: any) {
+    const message = err.response?.data?.message || err.message || 'Could not assign group.'
+    toast.add({
+      severity: 'error',
+      summary: 'Assignment Failed',
+      detail: message,
+      life: 4000,
+    })
+  } finally {
+    assigningGroup.value = false
+  }
 }
 
 async function onBulkDeploySubmit(payload: DeployApplicantPayload): Promise<void> {
@@ -406,7 +540,7 @@ const bulkAIS = useBulkAISDialog(
 )
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 🛡️ MIGRANT WORKER INSURANCE EXPORT
+// MIGRANT WORKER INSURANCE & PDOS
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function openInsuranceExport(): Promise<void> {
@@ -415,12 +549,7 @@ async function openInsuranceExport(): Promise<void> {
   }
 
   const selectedApplicants = selectedIds.value.map((id) => {
-    return (
-      selectedApplicantsById.value[id] ?? {
-        id,
-        full_name: `Applicant #${id}`,
-      }
-    )
+    return selectedApplicantsById.value[id] ?? { id, full_name: `Applicant #${id}` }
   })
 
   if (selectedApplicants.length === 0) {
@@ -457,36 +586,31 @@ function openPdosExport(): void {
 
 <template>
   <div class="flex flex-col gap-6 p-8 max-w-[1400px] mx-auto">
-
-    <!-- ─── Header ────────────────────────────────────────────────────────── -->
+    <!-- Header -->
     <FinalListHeader :loading="store.loading" :has-applicants="store.applicants.length > 0" @back="goBack"
       @refresh="fetchFinalList()" @export="excel.openExportDialog" @bulk-a-i-s="bulkAIS.openBulkAISDialog" />
 
-    <!-- ─── Stats ─────────────────────────────────────────────────────────── -->
+    <!-- Stats -->
     <FinalListStats :total="stats.totalFinalList.value" :month="stats.thisMonthCount.value"
       :week="stats.thisWeekCount.value" :japan-ready="stats.japanReadyCount.value" />
 
-    <!-- ─── Filter Bar ────────────────────────────────────────────────────── -->
+    <!-- Filter Bar -->
     <FinalListFilterBar :search-query="filters.searchQuery.value" :selected-batch-id="filters.selectedBatchId.value"
-      :batch-options="batchOptions" :applied-advanced-count="filters.appliedAdvancedCount.value"
+      :batch-options="batchOptions" :selected-group-id="filters.selectedGroupId.value"
+      :group-options="groupFilterOptions" :applied-advanced-count="filters.appliedAdvancedCount.value"
       :has-filters="filters.hasFilters.value" :active-filters="activeFilters"
       @update:search-query="filters.searchQuery.value = $event"
-      @update:selected-batch-id="filters.selectedBatchId.value = $event" @search="fetchFinalList(1)"
+      @update:selected-batch-id="filters.selectedBatchId.value = $event"
+      @update:selected-group-id="filters.selectedGroupId.value = $event" @search="fetchFinalList(1)"
       @open-advanced="filters.showAdvanced.value = true" @reset-all="resetFilters" @remove-filter="removeFilter" />
 
-    <!-- ─── Bulk Actions Bar ──────────────────────────────────────────────── -->
-    <FinalListBulkActionsBar 
-      :selected-count="selectedIds.length" 
-      :deployable-count="deployableCount"
-      :non-deployable-count="nonDeployableCount" 
-      :submitting="deploymentStore.submitting" 
-      @clear="clearSelection"
-      @deploy="openBulkDeploy" 
-      @export-insurance="openInsuranceExport" 
-      @export-pdos="openPdosExport"
-    />
+    <!-- Bulk Actions Bar -->
+    <FinalListBulkActionsBar :selected-count="selectedIds.length" :deployable-count="deployableCount"
+      :non-deployable-count="nonDeployableCount" :submitting="deploymentStore.submitting" @clear="clearSelection"
+      @deploy="openBulkDeploy" @assign-group="openAssignGroup" @export-insurance="openInsuranceExport"
+      @export-pdos="openPdosExport" />
 
-    <!-- ─── Table ─────────────────────────────────────────────────────────── -->
+    <!-- Table -->
     <template v-if="store.loading && store.applicants.length === 0">
       <Skeleton height="400px" border-radius="16px" />
     </template>
@@ -500,7 +624,7 @@ function openPdosExport(): void {
         @clear-selection="clearSelection" />
     </AppCard>
 
-    <!-- ─── Empty state ───────────────────────────────────────────────────── -->
+    <!-- Empty state -->
     <div v-if="store.applicants.length === 0 && !store.loading && filters.hasFilters.value"
       class="text-center py-8 bg-white border border-dashed border-appleCore-200 rounded-xl">
       <i class="pi pi-filter-slash text-3xl text-blueberry-300 mb-2" />
@@ -508,10 +632,7 @@ function openPdosExport(): void {
       <Button label="Clear Filters" icon="pi pi-times" text @click="resetFilters" />
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         DIALOGS
-    ═══════════════════════════════════════════════════════════════════════ -->
-
+    <!-- Dialogs -->
     <AdvancedFiltersDialog v-if="filters.showAdvanced.value" v-model:visible="filters.showAdvanced.value"
       v-model:gender="filters.gender.value" v-model:civil-status="filters.civilStatus.value"
       v-model:nationality="filters.nationality.value" v-model:quality-grade="filters.qualityGrade.value"
@@ -553,22 +674,21 @@ function openPdosExport(): void {
       :applicant-batch-ids="selectedApplicantBatchIds" :submitting="deploymentStore.submitting"
       @submit="onBulkDeploySubmit" />
 
-    <!-- 🛡️ MIGRANT WORKER INSURANCE EXPORT DIALOG -->
+    <!-- 🏷️ ASSIGN BATCH GROUP DIALOG -->
+    <AssignGroupDialog v-if="showAssignGroupDialog" v-model:visible="showAssignGroupDialog"
+      :selected-count="selectedIds.length" :batch-options="batchOptions" :default-batch-id="defaultAssignBatchId"
+      :submitting="assigningGroup" @submit="handleAssignGroup" />
+
+    <!-- Insurance Dialog -->
     <InsuranceExportDialog v-if="insurance.isDialogOpen.value" v-model:visible="insurance.isDialogOpen.value"
       :is-exporting="insurance.isExporting.value" :is-loading-details="insurance.isLoadingDetails.value"
       v-model:departure-date="insurance.departureDate.value" v-model:sort-by="insurance.sortBy.value"
       :rows="insurance.rows.value" :missing-fields="insurance.missingFields.value" :is-valid="insurance.isValid.value"
       :error-message="insurance.errorMessage.value" @close="insurance.close" @submit="insurance.submit" />
 
-    <!-- 🎓 PDOS CERTIFICATE EXPORT DIALOG -->
-    <PdosExportDialog 
-      v-if="pdos.isDialogOpen.value" 
-      v-model:visible="pdos.isDialogOpen.value"
-      v-model:pdos-date="pdos.pdosDate.value"
-      :is-exporting="pdos.isExporting.value" 
-      :applicant-count="selectedIds.length"
-      @close="pdos.close" 
-      @submit="pdos.submit" 
-    />
+    <!-- PDOS Dialog -->
+    <PdosExportDialog v-if="pdos.isDialogOpen.value" v-model:visible="pdos.isDialogOpen.value"
+      v-model:pdos-date="pdos.pdosDate.value" :is-exporting="pdos.isExporting.value"
+      :applicant-count="selectedIds.length" @close="pdos.close" @submit="pdos.submit" />
   </div>
 </template>

@@ -23,6 +23,7 @@ export function useFinalListFilters() {
   // ─── Main filters ─────────────────────────────────────────────────────────
   const searchQuery     = ref('')
   const selectedBatchId = ref<number | null>(null)
+  const selectedGroupId = ref<number | null>(null)
 
   // ─── PSGC ─────────────────────────────────────────────────────────────────
   const {
@@ -190,8 +191,9 @@ export function useFinalListFilters() {
   function onSearch(v: string) { searchQuery.value = v.trim() }
 
   function resetAll() {
-    searchQuery.value    = ''
+    searchQuery.value     = ''
     selectedBatchId.value = null
+    selectedGroupId.value = null
     clearAdvanced()
   }
 
@@ -199,7 +201,10 @@ export function useFinalListFilters() {
   const appliedAdvancedCount = computed(() => Object.keys(appliedAdvanced.value).length)
 
   const hasFilters = computed(() =>
-    searchQuery.value !== '' || selectedBatchId.value !== null || appliedAdvancedCount.value > 0,
+    searchQuery.value !== '' || 
+    selectedBatchId.value !== null || 
+    selectedGroupId.value !== null || 
+    appliedAdvancedCount.value > 0
   )
 
   const stagedAdvancedCount = computed(() => {
@@ -242,7 +247,7 @@ export function useFinalListFilters() {
 
   return {
     // main
-    searchQuery, selectedBatchId,
+    searchQuery, selectedBatchId, selectedGroupId,
     // psgc
     psgcProvinces, psgcCities, loadingProvinces, loadingCities, fetchAllProvinces,
     // staged

@@ -9,6 +9,8 @@ const props = defineProps<{
   searchQuery: string
   selectedBatchId: number | null
   batchOptions: any[]
+  selectedGroupId: number | null
+  groupOptions: any[] // { label: string, value: number|null, color?: string }
   appliedAdvancedCount: number
   hasFilters: boolean
   activeFilters: { key: string; label: string; value: string }[]
@@ -17,6 +19,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:searchQuery': [v: string]
   'update:selectedBatchId': [v: number | null]
+  'update:selectedGroupId': [v: number | null]
   search: [v: string]
   openAdvanced: []
   resetAll: []
@@ -51,51 +54,62 @@ function clearSearch() {
   <div class="flex flex-col gap-3 p-4 bg-white border border-appleCore-100 rounded-xl">
     <div class="flex flex-wrap items-center gap-3">
 
-      <!-- 🔍 Search (same structure/colors as AppSearchBar) -->
+      <!-- 🔍 Search -->
       <div class="flex items-center gap-2 flex-1 min-w-[280px]">
         <div class="relative flex-1">
-          <!-- Leading icon -->
-          <i
-            class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-blueberry-400 text-sm pointer-events-none" />
-
-          <InputText v-model="draft" placeholder="Search by name, email, code, or trade..." class="w-full !pl-10"
-            :class="draft ? '!pr-10' : ''" @keydown.enter="triggerSearch" />
-
-          <!-- Clear (X) -->
-          <button v-if="draft" type="button"
+          <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-blueberry-400 text-sm pointer-events-none" />
+          <InputText 
+            v-model="draft" 
+            placeholder="Search by name, email, code, or trade..." 
+            class="w-full !pl-10"
+            :class="draft ? '!pr-10' : ''" 
+            @keydown.enter="triggerSearch" 
+          />
+          <button 
+            v-if="draft" 
+            type="button"
             class="absolute right-3 top-1/2 -translate-y-1/2 text-blueberry-400 hover:text-blueberry-600 transition-colors"
-            aria-label="Clear search" @click="clearSearch">
+            aria-label="Clear search" 
+            @click="clearSearch"
+          >
             <i class="pi pi-times-circle text-sm" />
           </button>
         </div>
-
-        <!-- Search button (apricot, icon only — matches screenshot) -->
-        <Button icon="pi pi-search"
+        <Button 
+          icon="pi pi-search"
           class="!bg-apricot-500 !border-apricot-500 hover:!bg-apricot-600 hover:!border-apricot-600 !text-white !w-10 !h-10 !p-0 shrink-0"
-          v-tooltip.top="'Search'" @click="triggerSearch" />
+          v-tooltip.top="'Search'" 
+          @click="triggerSearch" 
+        />
       </div>
 
-      <!-- Batch filter -->
-      <div class="min-w-[240px]">
-        <Select :model-value="selectedBatchId" :options="batchOptions" option-label="label" option-value="value"
-          placeholder="Filter by batch..." class="w-full" show-clear filter
-          filter-placeholder="Type batch name or number (e.g. 46)..." filter-match-mode="contains"
-          :auto-filter-focus="true" @update:model-value="$emit('update:selectedBatchId', $event)">
+      <!-- Batch Filter -->
+      <div class="min-w-[200px]">
+        <Select 
+          :model-value="selectedBatchId" 
+          :options="batchOptions" 
+          option-label="label" 
+          option-value="value"
+          placeholder="Filter by batch..." 
+          class="w-full" 
+          show-clear 
+          filter
+          filter-placeholder="Type batch name or number..." 
+          filter-match-mode="contains"
+          :auto-filter-focus="true" 
+          @update:model-value="$emit('update:selectedBatchId', $event)"
+        >
           <template #option="{ option }">
             <div class="flex items-center gap-2 w-full">
               <i v-if="option.value === null" class="pi pi-list text-blueberry-400 text-xs" />
-              <i v-else class="pi pi-graduation-cap text-xs"
-                :class="option.isActive ? 'text-green-500' : 'text-blueberry-400'" />
+              <i v-else class="pi pi-graduation-cap text-xs" :class="option.isActive ? 'text-green-500' : 'text-blueberry-400'" />
               <span class="flex-1 truncate">{{ option.label }}</span>
               <span v-if="option.value !== null"
-                class="text-[10px] px-1.5 py-0.5 rounded-full font-bold min-w-[24px] text-center" :class="option.applicantCount > 0
-                    ? 'bg-apricot-100 text-apricot-700'
-                    : 'bg-blueberry-50 text-blueberry-400'
-                  ">
+                class="text-[10px] px-1.5 py-0.5 rounded-full font-bold min-w-[24px] text-center" 
+                :class="option.applicantCount > 0 ? 'bg-apricot-100 text-apricot-700' : 'bg-blueberry-50 text-blueberry-400'">
                 {{ option.applicantCount }}
               </span>
-              <span v-if="option.isActive"
-                class="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
+              <span v-if="option.isActive" class="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
                 ACTIVE
               </span>
             </div>
@@ -103,13 +117,39 @@ function clearSearch() {
 
           <template #value="{ value, placeholder }">
             <div v-if="value !== null && value !== undefined" class="flex items-center gap-2">
-              <i class="pi pi-graduation-cap text-xs" :class="batchOptions.find((o: any) => o.value === value)?.isActive
-                  ? 'text-green-500'
-                  : 'text-blueberry-400'
-                " />
-              <span class="truncate">
-                {{batchOptions.find((o: any) => o.value === value)?.label}}
-              </span>
+              <i class="pi pi-graduation-cap text-xs" :class="batchOptions.find((o: any) => o.value === value)?.isActive ? 'text-green-500' : 'text-blueberry-400'" />
+              <span class="truncate">{{ batchOptions.find((o: any) => o.value === value)?.label }}</span>
+            </div>
+            <span v-else class="text-blueberry-400">{{ placeholder }}</span>
+          </template>
+        </Select>
+      </div>
+
+      <!-- Group Filter (Dependent on Batch) -->
+      <div class="min-w-[200px]" v-tooltip.top="!selectedBatchId ? 'Select a batch first to filter by group' : ''">
+        <Select 
+          :model-value="selectedGroupId" 
+          :options="groupOptions" 
+          option-label="label" 
+          option-value="value"
+          placeholder="Filter by group..." 
+          class="w-full" 
+          show-clear 
+          :disabled="!selectedBatchId"
+          @update:model-value="$emit('update:selectedGroupId', $event)"
+        >
+          <template #option="{ option }">
+            <div class="flex items-center gap-2 w-full">
+              <i v-if="option.value === null" class="pi pi-users text-blueberry-400 text-xs" />
+              <div v-else class="w-3 h-3 rounded-full" :style="{ backgroundColor: option.color || '#94a3b8' }"></div>
+              <span class="flex-1 truncate">{{ option.label }}</span>
+            </div>
+          </template>
+
+          <template #value="{ value, placeholder }">
+            <div v-if="value !== null && value !== undefined" class="flex items-center gap-2">
+              <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: groupOptions.find((o: any) => o.value === value)?.color || '#94a3b8' }"></div>
+              <span class="truncate">{{ groupOptions.find((o: any) => o.value === value)?.label }}</span>
             </div>
             <span v-else class="text-blueberry-400">{{ placeholder }}</span>
           </template>
