@@ -9,7 +9,7 @@ import { usePortalAuth } from '../composables/usePortalAuth'
 const router = useRouter()
 const { verifyClaim, loading } = usePortalAuth()
 
-// ✅ Strictly Date | null to satisfy PrimeVue Calendar v-model types
+// Strictly Date | null for PrimeVue Calendar
 const form = ref({
   first_name: '',
   last_name: '',
@@ -17,7 +17,6 @@ const form = ref({
 })
 const errors = ref<Record<string, string>>({})
 
-// Converts the Date object into the 'YYYY-MM-DD' string required by the API
 function formatDateString(val: Date | null): string | null {
   if (!val || !(val instanceof Date) || isNaN(val.getTime())) return null
   const y = val.getFullYear()
@@ -30,18 +29,16 @@ async function handleVerify() {
   errors.value = {}
 
   const dobFormatted = formatDateString(form.value.date_of_birth)
+  const firstName = form.value.first_name.trim()
+  const lastName = form.value.last_name.trim()
 
-  if (!form.value.first_name || !form.value.last_name || !dobFormatted) {
-    errors.value = { general: 'Please complete all fields to verify your identity.' }
+  if (!firstName || !lastName || !dobFormatted) {
+    errors.value = { general: 'Please complete all required fields to verify your identity.' }
     return
   }
 
   try {
-    const result = await verifyClaim(
-      form.value.first_name,
-      form.value.last_name,
-      dobFormatted,
-    )
+    const result = await verifyClaim(firstName, lastName, dobFormatted)
 
     if (!result.verified) {
       errors.value = {
@@ -57,9 +54,9 @@ async function handleVerify() {
         path: '/portal/register',
         query: {
           applicant_id: result.applicant_id,
-          first_name: form.value.first_name,
-          last_name: form.value.last_name,
-          date_of_birth: dobFormatted, // Passing formatted string in URL
+          first_name: firstName,
+          last_name: lastName,
+          date_of_birth: dobFormatted,
         },
       })
     }
@@ -78,7 +75,6 @@ function goToLogin() {
 <template>
   <div class="max-w-md mx-auto relative z-10 w-full animate-fadeIn">
 
-    <!-- Back to Login -->
     <button
       type="button"
       class="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-blueberry-500 hover:text-apricot-500 transition-colors group"
@@ -88,7 +84,6 @@ function goToLogin() {
       <span>Back to Sign In</span>
     </button>
 
-    <!-- Header -->
     <div class="text-center mb-6">
       <div class="w-16 h-16 rounded-2xl bg-blueberry-100 flex items-center justify-center mx-auto mb-4">
         <i class="pi pi-shield text-blueberry-600 text-2xl" />
@@ -98,25 +93,18 @@ function goToLogin() {
       </h1>
     </div>
 
-    <!-- Card -->
     <div class="bg-white/95 backdrop-blur-md p-8 rounded-[1.5rem] shadow-medium border border-appleCore-100">
       
-      <!-- Instructions -->
       <div class="mb-6 text-sm text-blueberry-700 bg-blueberry-50/50 p-4 rounded-xl border border-blueberry-100">
-        <p class="font-bold mb-2">
-          To protect your data, we need to confirm you are the registered applicant.
+        <p class="font-bold mb-1">
+          To protect your data, confirm your registered details.
         </p>
-        <p class="mb-2">
-          Please enter your First Name, Last Name, and Date of Birth exactly as they appear on your records with Tricastle.
+        <p class="text-xs text-blueberry-600">
+          Enter your First Name (include 2nd name if applicable), Last Name, and Date of Birth.
         </p>
-        <ul class="list-disc pl-5 space-y-1 text-blueberry-600 font-medium">
-          <li>Use the name on your application / passport</li>
-          <li>This does not create an account yet — it only checks if you exist in our system</li>
-        </ul>
       </div>
 
       <form class="space-y-4" @submit.prevent="handleVerify">
-        <!-- Error -->
         <div
           v-if="errors.general"
           class="flex items-start gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"
@@ -126,25 +114,25 @@ function goToLogin() {
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-blueberry-700 mb-1.5">First Name</label>
+          <label class="block text-sm font-medium text-blueberry-700 mb-1.5">First Name <span class="text-red-500">*</span></label>
           <InputText
             v-model="form.first_name"
             class="w-full"
-            placeholder="Juan"
+            placeholder="e.g. Juan or Mark Anthony"
           />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-blueberry-700 mb-1.5">Last Name</label>
+          <label class="block text-sm font-medium text-blueberry-700 mb-1.5">Last Name <span class="text-red-500">*</span></label>
           <InputText
             v-model="form.last_name"
             class="w-full"
-            placeholder="Dela Cruz"
+            placeholder="e.g. Dela Cruz"
           />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-blueberry-700 mb-1.5">Date of Birth</label>
+          <label class="block text-sm font-medium text-blueberry-700 mb-1.5">Date of Birth <span class="text-red-500">*</span></label>
           <Calendar
             v-model="form.date_of_birth"
             showIcon
@@ -158,14 +146,13 @@ function goToLogin() {
           <Button
             type="submit"
             label="Verify Identity"
-            class="w-full !bg-apricot-500 hover:!bg-apricot-600 !border-none !rounded-xl !py-3.5 !font-bold"
+            class="w-full !bg-apricot-500 hover:!bg-apricot-600 !border-none !rounded-xl !py-3.5 !font-bold text-white shadow-sm"
             :loading="loading"
           />
         </div>
       </form>
     </div>
 
-    <!-- Bottom link (secondary) -->
     <p class="text-center text-sm text-blueberry-500 mt-6">
       Already have an account?
       <button
@@ -188,22 +175,18 @@ function goToLogin() {
   animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* UNIFIED STYLING TO MATCH !bg-[#eef3f7] THEME */
 :deep(.p-inputtext) {
   background-color: #eef3f7 !important;
   border: 1px solid transparent !important;
   border-radius: 0.75rem !important;
   padding: 0.75rem 1rem !important;
   color: #334155 !important;
-  transition: all 0.2s ease-in-out;
 }
 :deep(.p-inputtext:focus) {
-  border-color: #fb923c !important; /* apricot-400 */
+  border-color: #fb923c !important;
   outline: none !important;
-  box-shadow: none !important;
 }
 
-/* CALENDAR SPECIFIC STYLING */
 :deep(.portal-calendar) {
   display: flex;
   width: 100%;
@@ -219,8 +202,5 @@ function goToLogin() {
   border-top-right-radius: 0.75rem !important;
   border-bottom-right-radius: 0.75rem !important;
   width: 3.5rem;
-}
-:deep(.portal-calendar .p-button:hover) {
-  background-color: #cbd5e1 !important;
 }
 </style>
