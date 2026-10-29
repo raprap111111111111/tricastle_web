@@ -30,6 +30,9 @@ const { fetchAllProvinces, fetchCitiesByProvince, findProvinceByName } = usePsgc
 
 const provincesList = ref<PsgcProvince[]>([])
 const citiesList = ref<PsgcCity[]>([])
+const permanentCitiesList = ref<PsgcCity[]>([]) // Cities list for permanent address
+
+const isSameAsCurrent = ref(false)
 
 onMounted(async () => {
   await fetchMe()
@@ -103,10 +106,17 @@ const fieldGroups = [
       { key: 'weight_kg', label: 'Weight (kg)', type: 'number', required: true },
       { key: 'dominant_hand', label: 'Dominant Hand', type: 'select', options: handOptions, required: true },
       { key: 'blood_type', label: 'Blood Type', type: 'select', options: bloodTypeOptions, required: true },
-      { key: 'province', label: 'Province', type: 'psgc-province', required: true },
-      { key: 'city', label: 'City / Municipality', type: 'psgc-city', required: true },
+      
+      { key: 'province', label: 'Current Province', type: 'psgc-province', required: true },
+      { key: 'city', label: 'Current City / Municipality', type: 'psgc-city', required: true },
       { key: 'current_address', label: 'Current Address (Bldg/Street/Brgy)', type: 'textarea', required: true },
-      { key: 'permanent_address', label: 'Permanent Address', type: 'textarea', required: true },
+      
+      { key: 'same_as_current', label: '', type: 'same-address-checkbox', required: false },
+      
+      { key: 'permanent_province', label: 'Permanent Province', type: 'psgc-province-perm', required: true },
+      { key: 'permanent_city', label: 'Permanent City / Municipality', type: 'psgc-city-perm', required: true },
+      { key: 'permanent_address', label: 'Permanent Address (Bldg/Street/Brgy)', type: 'textarea', required: true },
+      
       { key: 'postal_code', label: 'Postal Code', type: 'text', required: true },
     ],
   },
@@ -177,21 +187,26 @@ function initForm() {
         form.value[f.key] = parseDate(applicant.value![f.key])
       } else if (f.type === 'boolean') {
         form.value[f.key] = applicant.value![f.key] ?? false
-      } else if (f.key === 'dominant_hand') {
-        const hand = applicant.value![f.key]
-        form.value[f.key] = hand === 'ambidextrous' ? 'both' : (hand ?? '')
-      } else if (f.key === 'gender') {
-        const g = applicant.value![f.key]
-        form.value[f.key] = g === 'other' ? '' : (g ?? '')
-      } else {
+      } else if (f.type !== 'same-address-checkbox') {
         form.value[f.key] = applicant.value![f.key] ?? ''
       }
     })
   })
+
+  // Detect if permanent address initially matches current address
+  if (
+    form.value.province &&
+    form.value.province === form.value.permanent_province &&
+    form.value.city === form.value.permanent_city &&
+    form.value.current_address === form.value.permanent_address
+  ) {
+    isSameAsCurrent.value = true
+  }
 }
 
 watch(applicant, initForm, { immediate: true })
 
+// Watch Current Province
 watch(() => form.value.province, async (newProvName, oldProvName) => {
   if (!newProvName) {
     citiesList.value = []
@@ -208,6 +223,35 @@ watch(() => form.value.province, async (newProvName, oldProvName) => {
   }
 }, { immediate: true })
 
+// Watch Permanent Province
+watch(() => form.value.permanent_province, async (newProvName, oldProvName) => {
+  if (!newProvName) {
+    permanentCitiesList.value = []
+    return
+  }
+  const prov = findProvinceByName(newProvName)
+  if (prov) {
+    permanentCitiesList.value = await fetchCitiesByProvince(prov.code)
+    if (oldProvName && oldProvName !== newProvName && !isSameAsCurrent.value) {
+      form.value.permanent_city = ''
+    }
+  } else {
+    permanentCitiesList.value = []
+  }
+}, { immediate: true })
+
+// Sync Permanent Address when "Same as Current" is checked
+watch(
+  [isSameAsCurrent, () => form.value.province, () => form.value.city, () => form.value.current_address],
+  ([same, prov, cit, addr]) => {
+    if (same) {
+      form.value.permanent_province = prov
+      form.value.permanent_city = cit
+      form.value.permanent_address = addr
+    }
+  }
+)
+
 function isEmptyValue(val: any): boolean {
   if (val === null || val === undefined) return true
   if (typeof val === 'boolean') return false
@@ -216,6 +260,8 @@ function isEmptyValue(val: any): boolean {
 }
 
 function isMissing(key: string): boolean {
+  if (key === 'same_as_current') return false
+  
   const currentVal = form.value[key]
   if (!isEmptyValue(currentVal)) return false
 
@@ -237,7 +283,7 @@ const incompleteRequiredFields = computed(() => {
   const list: { key: string; label: string; groupIndex: number; groupTitle: string }[] = []
   fieldGroups.forEach((group, groupIndex) => {
     group.fields.forEach((f) => {
-      if (f.type === 'readonly') return
+      if (f.type === 'readonly' || f.type === 'same-address-checkbox') return
       if (!f.required) return
       if (isEmptyValue(form.value[f.key])) {
         list.push({ key: f.key, label: f.label, groupIndex, groupTitle: group.shortTitle })
@@ -253,7 +299,7 @@ const hasChanges = computed(() => {
   if (!applicant.value) return false
   return fieldGroups.some((group) =>
     group.fields.some((f) => {
-      if (f.type === 'readonly') return false
+      if (f.type === 'readonly' || f.type === 'same-address-checkbox') return false
       const orig = applicant.value![f.key] ?? (f.type === 'boolean' ? false : '')
       let curr = form.value[f.key]
       if (f.type === 'date') curr = formatDate(curr)
@@ -267,7 +313,7 @@ const submitPayload = computed(() => {
   const payload: Record<string, any> = {}
   fieldGroups.forEach((group) => {
     group.fields.forEach((f) => {
-      if (f.type === 'readonly') return
+      if (f.type === 'readonly' || f.type === 'same-address-checkbox') return
       let val = form.value[f.key]
 
       if (f.type === 'date') val = formatDate(val)
@@ -483,166 +529,151 @@ function tabButtonClass(group: typeof fieldGroups[0], index: number) {
           {{ fieldGroups[activeTabIndex].title }}
         </h3>
 
-              <!-- ═════════════════════════════════════════════════ -->
-        <!-- FACEBOOK DEDICATED TAB UI                         -->
-        <!-- ═════════════════════════════════════════════════ -->
+        <!-- FACEBOOK DEDICATED TAB UI -->
         <div v-if="fieldGroups[activeTabIndex].shortTitle === 'Facebook'" class="flex flex-col items-center pt-2 pb-6 w-full">
-
-          <!-- Subtitle / Intro -->
           <div class="text-center mb-10">
-            <p class="text-sm text-blueberry-500 font-medium">
-              Follow these simple steps to find and paste your Facebook profile link.
-            </p>
+            <p class="text-sm text-blueberry-500 font-medium">Follow these simple steps to find and paste your Facebook profile link.</p>
           </div>
-
-          <!-- Visual Guide (Steps 1–3) -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-4xl mb-12">
-            
             <!-- Step 1 -->
             <div class="bg-appleCore-50/60 rounded-2xl p-6 pt-8 border border-appleCore-100 flex flex-col items-center text-center relative transition-transform hover:-translate-y-1 duration-300">
-              <div class="absolute -top-4 w-9 h-9 rounded-full bg-blueberry-900 text-white flex items-center justify-center font-bold text-sm shadow-md border-2 border-white">
-                1
-              </div>
+              <div class="absolute -top-4 w-9 h-9 rounded-full bg-blueberry-900 text-white flex items-center justify-center font-bold text-sm shadow-md border-2 border-white">1</div>
               <h5 class="font-semibold text-blueberry-900 text-sm mb-3">Go to your Profile</h5>
               <div class="h-64 flex items-center justify-center w-full my-2">
                 <img src="/instructions/1st_step.png" alt="Step 1" class="max-h-full max-w-full object-contain rounded-xl shadow-sm border border-black/5" />
               </div>
-              <p class="text-xs text-blueberry-600 mt-3 leading-relaxed">
-                Open Facebook and tap on your <b>profile name</b>.
-              </p>
+              <p class="text-xs text-blueberry-600 mt-3 leading-relaxed">Open Facebook and tap on your <b>profile name</b>.</p>
             </div>
 
             <!-- Step 2 -->
             <div class="bg-appleCore-50/60 rounded-2xl p-6 pt-8 border border-appleCore-100 flex flex-col items-center text-center relative transition-transform hover:-translate-y-1 duration-300">
-              <div class="absolute -top-4 w-9 h-9 rounded-full bg-blueberry-900 text-white flex items-center justify-center font-bold text-sm shadow-md border-2 border-white">
-                2
-              </div>
+              <div class="absolute -top-4 w-9 h-9 rounded-full bg-blueberry-900 text-white flex items-center justify-center font-bold text-sm shadow-md border-2 border-white">2</div>
               <h5 class="font-semibold text-blueberry-900 text-sm mb-3">Open the Menu</h5>
               <div class="h-64 flex items-center justify-center w-full my-2">
                 <img src="/instructions/2nd_step.png" alt="Step 2" class="max-h-full max-w-full object-contain rounded-xl shadow-sm border border-black/5" />
               </div>
-              <p class="text-xs text-blueberry-600 mt-3 leading-relaxed">
-                Tap the <b>⋯ (three dots)</b> button next to Edit Profile.
-              </p>
+              <p class="text-xs text-blueberry-600 mt-3 leading-relaxed">Tap the <b>⋯ (three dots)</b> button next to Edit Profile.</p>
             </div>
 
             <!-- Step 3 -->
             <div class="bg-appleCore-50/60 rounded-2xl p-6 pt-8 border border-appleCore-100 flex flex-col items-center text-center relative transition-transform hover:-translate-y-1 duration-300">
-              <div class="absolute -top-4 w-9 h-9 rounded-full bg-blueberry-900 text-white flex items-center justify-center font-bold text-sm shadow-md border-2 border-white">
-                3
-              </div>
+              <div class="absolute -top-4 w-9 h-9 rounded-full bg-blueberry-900 text-white flex items-center justify-center font-bold text-sm shadow-md border-2 border-white">3</div>
               <h5 class="font-semibold text-blueberry-900 text-sm mb-3">Copy the Link</h5>
               <div class="h-64 flex items-center justify-center w-full my-2">
                 <img src="/instructions/3rd_step.png" alt="Step 3" class="max-h-full max-w-full object-contain rounded-xl shadow-sm border border-black/5" />
               </div>
-              <p class="text-xs text-blueberry-600 mt-3 leading-relaxed">
-                Tap <b>"Copy link to profile"</b> at the bottom.
-              </p>
+              <p class="text-xs text-blueberry-600 mt-3 leading-relaxed">Tap <b>"Copy link to profile"</b> at the bottom.</p>
             </div>
-
           </div>
 
-          <!-- Action Area (Step 4) -->
           <div class="w-full max-w-xl bg-white rounded-2xl p-8 border border-appleCore-200 shadow-[0_8px_24px_rgba(0,0,0,0.04)] relative mt-4">
-            <div class="absolute -top-4 left-1/2 -translate-x-1/2 w-9 h-9 rounded-full bg-apricot-500 text-white flex items-center justify-center font-bold text-sm shadow-md border-2 border-white">
-              4
-            </div>
-
+            <div class="absolute -top-4 left-1/2 -translate-x-1/2 w-9 h-9 rounded-full bg-apricot-500 text-white flex items-center justify-center font-bold text-sm shadow-md border-2 border-white">4</div>
             <div class="text-center mb-6 mt-1">
               <h4 class="text-base font-serif font-bold text-blueberry-900">Paste your link here</h4>
               <p class="text-xs text-blueberry-500 mt-1">Return to this page and paste your copied Facebook link below.</p>
             </div>
-
             <div class="flex flex-col gap-2">
-              <!-- Non-overlapping Input Group -->
-              <div 
-                class="flex items-stretch rounded-xl border overflow-hidden shadow-sm transition-all focus-within:ring-2 focus-within:ring-apricot-500/20"
-                :class="isMissing('facebook_url') && showValidation ? 'border-red-400' : 'border-appleCore-200 focus-within:border-apricot-500'"
-              >
-                <!-- Facebook Badge Prefix -->
+              <div class="flex items-stretch rounded-xl border overflow-hidden shadow-sm transition-all focus-within:ring-2 focus-within:ring-apricot-500/20"
+                :class="isMissing('facebook_url') && showValidation ? 'border-red-400' : 'border-appleCore-200 focus-within:border-apricot-500'">
                 <div class="bg-blue-50 px-4 flex items-center justify-center border-r border-appleCore-200 text-blue-600 select-none">
                   <i class="pi pi-facebook text-xl"></i>
                 </div>
-
-                <!-- Input without overlapping icon -->
-                <InputText
-                  v-model="form.facebook_url"
-                  type="url"
-                  placeholder="https://www.facebook.com/your.username"
-                  class="w-full !border-0 !rounded-none !bg-appleCore-50/40 px-4 py-3.5 text-sm text-blueberry-900 placeholder:text-appleCore-400 focus:!ring-0 focus:!outline-none"
-                />
+                <InputText v-model="form.facebook_url" type="url" placeholder="https://www.facebook.com/your.username"
+                  class="w-full !border-0 !rounded-none !bg-appleCore-50/40 px-4 py-3.5 text-sm text-blueberry-900 placeholder:text-appleCore-400 focus:!ring-0 focus:!outline-none" />
               </div>
-
-              <!-- Error & Hint text -->
-              <small v-if="isMissing('facebook_url') && showValidation" class="text-red-500 text-center font-medium mt-1">
-                Facebook Profile URL is required
-              </small>
-              <p v-else class="text-[11px] text-center text-blueberry-400 mt-1">
-                Example: https://www.facebook.com/your.username
-              </p>
+              <small v-if="isMissing('facebook_url') && showValidation" class="text-red-500 text-center font-medium mt-1">Facebook Profile URL is required</small>
+              <p v-else class="text-[11px] text-center text-blueberry-400 mt-1">Example: https://www.facebook.com/your.username</p>
             </div>
           </div>
         </div>
 
-        <!-- ═════════════════════════════════════════════════ -->
-        <!-- NORMAL FIELDS GRID (All other tabs)               -->
-        <!-- ═════════════════════════════════════════════════ -->
+        <!-- NORMAL FIELDS GRID -->
         <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div v-for="field in fieldGroups[activeTabIndex].fields" :key="field.key" class="flex flex-col gap-1">
-            <label class="text-sm font-medium text-blueberry-700">
-              {{ field.label }}
-              <span v-if="field.required" class="text-red-500">*</span>
-            </label>
-
-            <!-- Readonly -->
-            <InputText v-if="field.type === 'readonly'" :model-value="form[field.key]" readonly
-              class="w-full bg-appleCore-50 border border-appleCore-200 text-blueberry-600 rounded-lg px-3 py-2 text-sm" />
-
-            <!-- PSGC Province -->
-            <Dropdown v-else-if="field.type === 'psgc-province'" v-model="form[field.key]" :options="provincesList"
-              option-label="name" option-value="name" placeholder="Select Province" filter
-              class="w-full bg-white border border-appleCore-200 focus:border-apricot-500 rounded-lg text-sm"
-              :class="{ 'p-invalid !border-red-400': isMissing(field.key) && showValidation }" />
-
-            <!-- PSGC City -->
-            <Dropdown v-else-if="field.type === 'psgc-city'" v-model="form[field.key]" :options="citiesList"
-              option-label="name" option-value="name" placeholder="Select City" filter :disabled="!form.province"
-              class="w-full bg-white border border-appleCore-200 focus:border-apricot-500 rounded-lg text-sm"
-              :class="{ 'p-invalid !border-red-400': isMissing(field.key) && showValidation }" />
-
-            <!-- Date -->
-            <Calendar v-else-if="field.type === 'date'" v-model="form[field.key]" date-format="yy-mm-dd"
-              placeholder="YYYY-MM-DD" show-icon icon-display="input" :manual-input="true"
-              :max-date="field.key === 'date_of_birth' ? new Date() : undefined" class="w-full portal-calendar"
-              input-class="w-full !bg-white border !border-appleCore-200 focus:!border-apricot-500 !rounded-lg !px-3 !py-2 !text-sm"
-              :class="{ 'p-invalid': isMissing(field.key) && showValidation }" />
-
-            <!-- Textarea -->
-            <Textarea v-else-if="field.type === 'textarea'" v-model="form[field.key]" rows="2"
-              class="w-full bg-white border border-appleCore-200 focus:border-apricot-500 rounded-lg px-3 py-2 text-sm"
-              :class="{ 'p-invalid !border-red-400': isMissing(field.key) && showValidation }" />
-
-            <!-- Select -->
-            <Dropdown v-else-if="field.type === 'select'" v-model="form[field.key]" :options="field.options"
-              placeholder="Select..."
-              class="w-full bg-white border border-appleCore-200 focus:border-apricot-500 rounded-lg text-sm"
-              :class="{ 'p-invalid !border-red-400': isMissing(field.key) && showValidation }" />
-
-            <!-- Boolean -->
-            <div v-else-if="field.type === 'boolean'" class="flex items-center gap-2 pt-1 h-[38px]">
-              <Checkbox v-model="form[field.key]" :binary="true" :input-id="field.key" />
-              <label :for="field.key" class="text-sm text-blueberry-700 cursor-pointer select-none m-0">Yes /
-                Applicable</label>
+          <div 
+            v-for="field in fieldGroups[activeTabIndex].fields" 
+            :key="field.key" 
+            class="flex flex-col gap-1"
+            :class="{'md:col-span-3': field.type === 'same-address-checkbox'}"
+          >
+            <!-- CHECKBOX (Same as Current) -->
+            <div v-if="field.type === 'same-address-checkbox'" class="flex items-center gap-2 pt-4 pb-2 border-b border-appleCore-100">
+              <Checkbox v-model="isSameAsCurrent" :binary="true" input-id="same_as_curr_box" />
+              <label for="same_as_curr_box" class="text-sm font-semibold text-blueberry-800 cursor-pointer select-none m-0">
+                Permanent Address is the same as Current Address
+              </label>
             </div>
 
-            <!-- Standard Text / Number -->
-            <InputText v-else v-model="form[field.key]" :type="field.type"
-              class="w-full bg-white border border-appleCore-200 focus:border-apricot-500 rounded-lg px-3 py-2 text-sm"
-              :class="{ 'p-invalid !border-red-400': isMissing(field.key) && showValidation }" />
+            <template v-else>
+              <label class="text-sm font-medium text-blueberry-700">
+                {{ field.label }}
+                <span v-if="field.required" class="text-red-500">*</span>
+              </label>
 
-            <!-- Error -->
-            <small v-if="field.required && isMissing(field.key) && showValidation" class="text-red-500">{{ field.label
-              }} is required</small>
+              <!-- Readonly -->
+              <InputText v-if="field.type === 'readonly'" :model-value="form[field.key]" readonly
+                class="w-full bg-appleCore-50 border border-appleCore-200 text-blueberry-600 rounded-lg px-3 py-2 text-sm" />
+
+              <!-- PSGC Province (Current) -->
+              <Dropdown v-else-if="field.type === 'psgc-province'" v-model="form[field.key]" :options="provincesList"
+                option-label="name" option-value="name" placeholder="Select Province" filter
+                class="w-full bg-white border border-appleCore-200 focus:border-apricot-500 rounded-lg text-sm"
+                :class="{ 'p-invalid !border-red-400': isMissing(field.key) && showValidation }" />
+
+              <!-- PSGC City (Current) -->
+              <Dropdown v-else-if="field.type === 'psgc-city'" v-model="form[field.key]" :options="citiesList"
+                option-label="name" option-value="name" placeholder="Select City" filter :disabled="!form.province"
+                class="w-full bg-white border border-appleCore-200 focus:border-apricot-500 rounded-lg text-sm"
+                :class="{ 'p-invalid !border-red-400': isMissing(field.key) && showValidation }" />
+                
+              <!-- PSGC Province (Permanent) -->
+              <Dropdown v-else-if="field.type === 'psgc-province-perm'" v-model="form[field.key]" :options="provincesList"
+                option-label="name" option-value="name" placeholder="Select Permanent Province" filter
+                :disabled="isSameAsCurrent"
+                class="w-full bg-white border border-appleCore-200 focus:border-apricot-500 rounded-lg text-sm"
+                :class="{ 'p-invalid !border-red-400': isMissing(field.key) && showValidation, 'bg-appleCore-50 text-blueberry-500': isSameAsCurrent }" />
+
+              <!-- PSGC City (Permanent) -->
+              <Dropdown v-else-if="field.type === 'psgc-city-perm'" v-model="form[field.key]" :options="permanentCitiesList"
+                option-label="name" option-value="name" placeholder="Select Permanent City" filter 
+                :disabled="!form.permanent_province || isSameAsCurrent"
+                class="w-full bg-white border border-appleCore-200 focus:border-apricot-500 rounded-lg text-sm"
+                :class="{ 'p-invalid !border-red-400': isMissing(field.key) && showValidation, 'bg-appleCore-50 text-blueberry-500': isSameAsCurrent }" />
+
+              <!-- Date -->
+              <Calendar v-else-if="field.type === 'date'" v-model="form[field.key]" date-format="yy-mm-dd"
+                placeholder="YYYY-MM-DD" show-icon icon-display="input" :manual-input="true"
+                :max-date="field.key === 'date_of_birth' ? new Date() : undefined" class="w-full portal-calendar"
+                input-class="w-full !bg-white border !border-appleCore-200 focus:!border-apricot-500 !rounded-lg !px-3 !py-2 !text-sm"
+                :class="{ 'p-invalid': isMissing(field.key) && showValidation }" />
+
+              <!-- Textarea -->
+              <Textarea v-else-if="field.type === 'textarea'" v-model="form[field.key]" rows="2"
+                :disabled="isSameAsCurrent && field.key === 'permanent_address'"
+                class="w-full bg-white border border-appleCore-200 focus:border-apricot-500 rounded-lg px-3 py-2 text-sm"
+                :class="{ 'p-invalid !border-red-400': isMissing(field.key) && showValidation, 'bg-appleCore-50 text-blueberry-500': isSameAsCurrent && field.key === 'permanent_address' }" />
+
+              <!-- Select -->
+              <Dropdown v-else-if="field.type === 'select'" v-model="form[field.key]" :options="field.options"
+                placeholder="Select..."
+                class="w-full bg-white border border-appleCore-200 focus:border-apricot-500 rounded-lg text-sm"
+                :class="{ 'p-invalid !border-red-400': isMissing(field.key) && showValidation }" />
+
+              <!-- Boolean -->
+              <div v-else-if="field.type === 'boolean'" class="flex items-center gap-2 pt-1 h-[38px]">
+                <Checkbox v-model="form[field.key]" :binary="true" :input-id="field.key" />
+                <label :for="field.key" class="text-sm text-blueberry-700 cursor-pointer select-none m-0">Yes /
+                  Applicable</label>
+              </div>
+
+              <!-- Standard Text / Number -->
+              <InputText v-else v-model="form[field.key]" :type="field.type"
+                class="w-full bg-white border border-appleCore-200 focus:border-apricot-500 rounded-lg px-3 py-2 text-sm"
+                :class="{ 'p-invalid !border-red-400': isMissing(field.key) && showValidation }" />
+
+              <!-- Error -->
+              <small v-if="field.required && isMissing(field.key) && showValidation" class="text-red-500">{{ field.label
+                }} is required</small>
+            </template>
           </div>
         </div>
       </div>
