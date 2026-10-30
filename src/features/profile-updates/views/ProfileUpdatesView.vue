@@ -1,3 +1,4 @@
+<!-- src/features/profile-updates/views/ProfileUpdatesView.vue -->
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
@@ -54,7 +55,7 @@ async function onDecline(id: number, reason: string) {
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-4 p-6 max-w-7xl mx-auto">
+  <div class="min-h-full flex flex-col space-y-4 p-6 max-w-7xl mx-auto pb-12">
     <!-- Header -->
     <div class="flex items-center justify-between gap-4 flex-wrap">
       <div>
