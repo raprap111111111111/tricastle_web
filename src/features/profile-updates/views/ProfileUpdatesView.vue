@@ -86,8 +86,8 @@ async function onDecline(id: number, reason: string) {
 
     <!-- Wire the new filters component -->
     <ProfileUpdateFilters
-      @filter="store.setAdvancedFilters"
-      @reset="store.setAdvancedFilters({})"
+      @filter="(f) => store.setAdvancedFilters(f)"
+      @reset="() => store.setAdvancedFilters({})"
     />
 
     <!-- Table -->
@@ -97,8 +97,8 @@ async function onDecline(id: number, reason: string) {
       :loading="store.loading"
       :status-filter="store.filters.status"
       @review="openDialog"
-      @page-change="store.setPage"
-      @limit-change="store.setLimit"
+      @page-change="(p) => store.setPage(p)"
+      @limit-change="(l) => store.setLimit(l)"
     />
 
     <ReviewUpdateDialog

@@ -51,36 +51,36 @@ const store = reactive({
         null,
     }
 
-    const existingIndex = this.updates.findIndex((u) => u.id === item.id)
+    const existingIndex = store.updates.findIndex((u) => u.id === item.id)
 
     if (existingIndex !== -1) {
-      if (item.status === this.filters.status) {
-        this.updates[existingIndex] = item
+      if (item.status === store.filters.status) {
+        store.updates[existingIndex] = item
       } else {
-        this.updates.splice(existingIndex, 1)
-        this.pagination.total = Math.max(0, this.pagination.total - 1)
+        store.updates.splice(existingIndex, 1)
+        store.pagination.total = Math.max(0, store.pagination.total - 1)
       }
     } else {
-      if (item.status === this.filters.status) {
-        this.updates.unshift(item)
-        this.pagination.total += 1
+      if (item.status === store.filters.status) {
+        store.updates.unshift(item)
+        store.pagination.total += 1
       }
     }
   },
 
   async fetchUpdates() {
-    this.loading = true
+    store.loading = true
     try {
-      const page = this.filters.page
-      const limit = this.filters.limit
+      const page = store.filters.page
+      const limit = store.filters.limit
       const offset = (page - 1) * limit
 
       const queryParams: Record<string, any> = {
-        status: this.filters.status,
-        search: this.filters.search || undefined,
-        province: this.filters.province || undefined,
-        city: this.filters.city || undefined,
-        address: this.filters.address || undefined,
+        status: store.filters.status,
+        search: store.filters.search || undefined,
+        province: store.filters.province || undefined,
+        city: store.filters.city || undefined,
+        address: store.filters.address || undefined,
         page,
         limit,
         offset,
@@ -92,7 +92,12 @@ const store = reactive({
 
       // 1. Safely unwrap Axios response if rawResponse.data exists
       let payload = rawResponse
-      if (rawResponse && rawResponse.data && typeof rawResponse.data === 'object' && !Array.isArray(rawResponse.data)) {
+      if (
+        rawResponse &&
+        rawResponse.data &&
+        typeof rawResponse.data === 'object' &&
+        !Array.isArray(rawResponse.data)
+      ) {
         if ('records' in rawResponse.data || 'data' in rawResponse.data || 'total' in rawResponse.data) {
           payload = rawResponse.data
         }
@@ -107,7 +112,7 @@ const store = reactive({
             ? payload.data
             : []
 
-      this.updates = list.map((row) => {
+      store.updates = list.map((row) => {
         const applicant = row.applicant ?? {}
         const fullName =
           applicant.full_name ||
@@ -130,14 +135,16 @@ const store = reactive({
         } as ProfileUpdate
       })
 
-      // 3. Extract pagination fields cleanly from root payload
+      // 3. Extract pagination fields cleanly from root payload or meta
       const meta = payload?.meta ?? payload?.pagination ?? {}
       const total = Number(payload?.total ?? meta?.total ?? list.length ?? 0)
       const perPage = Number(payload?.per_page ?? payload?.limit ?? meta?.per_page ?? limit)
       const currentPage = Number(payload?.current_page ?? meta?.current_page ?? page)
-      const lastPage = Number(payload?.last_page ?? meta?.last_page ?? Math.max(1, Math.ceil(total / (perPage || 1))))
+      const lastPage = Number(
+        payload?.last_page ?? meta?.last_page ?? Math.max(1, Math.ceil(total / (perPage || 1))),
+      )
 
-      this.pagination = {
+      store.pagination = {
         total,
         current_page: currentPage,
         last_page: lastPage,
@@ -147,12 +154,12 @@ const store = reactive({
       }
     } catch (err: any) {
       console.error('Failed to fetch profile updates', err)
-      this.updates = []
-      this.pagination = {
+      store.updates = []
+      store.pagination = {
         total: 0,
         current_page: 1,
         last_page: 1,
-        per_page: this.filters.limit,
+        per_page: store.filters.limit,
         offset: 0,
         has_more: false,
       }
@@ -163,34 +170,34 @@ const store = reactive({
         life: 4000,
       })
     } finally {
-      this.loading = false
+      store.loading = false
     }
   },
 
   setStatusFilter(status: StatusFilter) {
-    this.filters.status = status
-    this.filters.page = 1
-    this.fetchUpdates()
+    store.filters.status = status
+    store.filters.page = 1
+    store.fetchUpdates()
   },
 
   setAdvancedFilters(payload: { search?: string; province?: string; city?: string; address?: string }) {
-    this.filters.search = payload.search || ''
-    this.filters.province = payload.province || ''
-    this.filters.city = payload.city || ''
-    this.filters.address = payload.address || ''
-    this.filters.page = 1
-    this.fetchUpdates()
+    store.filters.search = payload.search || ''
+    store.filters.province = payload.province || ''
+    store.filters.city = payload.city || ''
+    store.filters.address = payload.address || ''
+    store.filters.page = 1
+    store.fetchUpdates()
   },
 
   setPage(page: number) {
-    this.filters.page = Math.max(1, page)
-    this.fetchUpdates()
+    store.filters.page = Math.max(1, page)
+    store.fetchUpdates()
   },
 
   setLimit(limit: number) {
-    this.filters.limit = limit
-    this.filters.page = 1
-    this.fetchUpdates()
+    store.filters.limit = limit
+    store.filters.page = 1
+    store.fetchUpdates()
   },
 })
 
