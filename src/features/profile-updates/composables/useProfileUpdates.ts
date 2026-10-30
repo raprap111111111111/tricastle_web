@@ -1,7 +1,7 @@
 import { reactive } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { profileUpdateApi } from '../api/profile-update.api'
-import type { ProfileUpdate, ProfileUpdateFilters } from '../types'
+import type { ProfileUpdate } from '../types'
 
 type StatusFilter = 'pending' | 'approved' | 'declined'
 
@@ -88,17 +88,24 @@ const store = reactive({
         order_dir: 'desc',
       }
 
-      const response: any = await profileUpdateApi.list(queryParams)
+      const rawResponse: any = await profileUpdateApi.list(queryParams)
 
-      // Support direct object or axios nested response (.data)
-      const payload = response?.data && typeof response.data === 'object' && !Array.isArray(response.data) && (response.data.data || response.data.records)
-        ? response.data
-        : response
+      // 1. Safely unwrap Axios response if rawResponse.data exists
+      let payload = rawResponse
+      if (rawResponse && rawResponse.data && typeof rawResponse.data === 'object' && !Array.isArray(rawResponse.data)) {
+        if ('records' in rawResponse.data || 'data' in rawResponse.data || 'total' in rawResponse.data) {
+          payload = rawResponse.data
+        }
+      }
 
-      // Extract records list safely
+      // 2. Safely extract records list (matches "records": [...])
       const list: any[] = Array.isArray(payload)
         ? payload
-        : (payload.records ?? payload.data ?? [])
+        : Array.isArray(payload?.records)
+          ? payload.records
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : []
 
       this.updates = list.map((row) => {
         const applicant = row.applicant ?? {}
@@ -123,24 +130,32 @@ const store = reactive({
         } as ProfileUpdate
       })
 
-      // Extract pagination metadata defensively from meta or root payload
-      const meta = payload.meta ?? payload.pagination ?? payload
-      const total = Number(meta.total ?? payload.total ?? list.length)
-      const perPage = Number(meta.per_page ?? payload.per_page ?? meta.limit ?? payload.limit ?? limit)
-      const currentPage = Number(meta.current_page ?? payload.current_page ?? page)
-      const lastPage = Number(meta.last_page ?? payload.last_page ?? Math.max(1, Math.ceil(total / (perPage || 1))))
+      // 3. Extract pagination fields cleanly from root payload
+      const meta = payload?.meta ?? payload?.pagination ?? {}
+      const total = Number(payload?.total ?? meta?.total ?? list.length ?? 0)
+      const perPage = Number(payload?.per_page ?? payload?.limit ?? meta?.per_page ?? limit)
+      const currentPage = Number(payload?.current_page ?? meta?.current_page ?? page)
+      const lastPage = Number(payload?.last_page ?? meta?.last_page ?? Math.max(1, Math.ceil(total / (perPage || 1))))
 
       this.pagination = {
         total,
         current_page: currentPage,
         last_page: lastPage,
         per_page: perPage,
-        offset: payload.offset ?? offset,
-        has_more: payload.has_more ?? currentPage < lastPage,
+        offset: Number(payload?.offset ?? offset),
+        has_more: Boolean(payload?.has_more ?? currentPage < lastPage),
       }
     } catch (err: any) {
       console.error('Failed to fetch profile updates', err)
       this.updates = []
+      this.pagination = {
+        total: 0,
+        current_page: 1,
+        last_page: 1,
+        per_page: this.filters.limit,
+        offset: 0,
+        has_more: false,
+      }
       useToast().add({
         severity: 'error',
         summary: 'Load failed',
