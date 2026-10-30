@@ -88,8 +88,14 @@ const store = reactive({
         order_dir: 'desc',
       }
 
-      const payload: any = await profileUpdateApi.list(queryParams)
+      const response: any = await profileUpdateApi.list(queryParams)
 
+      // Support direct object or axios nested response (.data)
+      const payload = response?.data && typeof response.data === 'object' && !Array.isArray(response.data) && (response.data.data || response.data.records)
+        ? response.data
+        : response
+
+      // Extract records list safely
       const list: any[] = Array.isArray(payload)
         ? payload
         : (payload.records ?? payload.data ?? [])
@@ -117,10 +123,12 @@ const store = reactive({
         } as ProfileUpdate
       })
 
-      const total = payload.total ?? list.length
-      const perPage = payload.per_page ?? payload.limit ?? limit
-      const currentPage = payload.current_page ?? page
-      const lastPage = payload.last_page ?? Math.max(1, Math.ceil(total / perPage))
+      // Extract pagination metadata defensively from meta or root payload
+      const meta = payload.meta ?? payload.pagination ?? payload
+      const total = Number(meta.total ?? payload.total ?? list.length)
+      const perPage = Number(meta.per_page ?? payload.per_page ?? meta.limit ?? payload.limit ?? limit)
+      const currentPage = Number(meta.current_page ?? payload.current_page ?? page)
+      const lastPage = Number(meta.last_page ?? payload.last_page ?? Math.max(1, Math.ceil(total / (perPage || 1))))
 
       this.pagination = {
         total,

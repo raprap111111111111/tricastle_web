@@ -54,19 +54,23 @@ function emptySubtitle() {
 </script>
 
 <template>
-  <div class="bg-white rounded-xl shadow-sm border border-blueberry-100 overflow-hidden flex flex-col">
+  <div
+    class="bg-white rounded-xl shadow-sm border border-blueberry-100 overflow-hidden flex flex-col min-h-0"
+  >
     <DataTable
       :value="props.updates"
       :loading="props.loading"
       dataKey="id"
-      class="p-datatable-sm !border-none"
+      class="p-datatable-sm !border-none flex-1"
       responsiveLayout="scroll"
       size="small"
       :pt="{
         table: 'text-sm',
-        header: '!bg-appleCore-50/50 !text-blueberry-600 !font-semibold !text-xs !uppercase !tracking-wider',
+        header:
+          '!bg-appleCore-50/50 !text-blueberry-600 !font-semibold !text-xs !uppercase !tracking-wider',
         headerRow: '!bg-appleCore-50/50 !border-b !border-appleCore-100',
-        bodyRow: 'hover:!bg-appleCore-50/40 !border-b !border-appleCore-100/60 transition-colors',
+        bodyRow:
+          'hover:!bg-appleCore-50/40 !border-b !border-appleCore-100/60 transition-colors',
         emptyMessage: '!border-none',
       }"
     >
@@ -78,9 +82,11 @@ function emptySubtitle() {
           >
             <i
               class="text-xl"
-              :class="props.statusFilter === 'pending'
-                ? 'pi pi-check text-emerald-500'
-                : 'pi pi-user-edit text-blueberry-400'"
+              :class="
+                props.statusFilter === 'pending'
+                  ? 'pi pi-check text-emerald-500'
+                  : 'pi pi-user-edit text-blueberry-400'
+              "
             />
           </div>
           <p class="text-sm text-blueberry-700 font-medium">
@@ -163,12 +169,16 @@ function emptySubtitle() {
       </Column>
     </DataTable>
 
-    <!-- Pagination bar directly below table rows -->
-    <AppPagination
-      v-if="props.pagination && props.pagination.total > 0"
-      :pagination="props.pagination"
-      @page-change="(page) => emit('page-change', page)"
-      @limit-change="(limit) => emit('limit-change', limit)"
-    />
+    <!-- Always show bar when pagination object exists and total >= 0 -->
+    <div
+      v-if="props.pagination"
+      class="border-t border-blueberry-100 bg-white"
+    >
+      <AppPagination
+        :pagination="props.pagination"
+        @page-change="(page) => emit('page-change', page)"
+        @limit-change="(limit) => emit('limit-change', limit)"
+      />
+    </div>
   </div>
 </template>
