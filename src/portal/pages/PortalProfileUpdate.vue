@@ -15,6 +15,23 @@ import { usePortalAuth } from '../composables/usePortalAuth'
 import { usePsgc } from '@shared/composables/usePsgc'
 import type { PsgcProvince, PsgcCity } from '@features/applicants/types'
 
+// ─── Field Group Types ───────────────────────────────────────────────────────
+interface FieldDef {
+  key: string
+  label: string
+  type: string
+  required?: boolean
+  options?: string[]
+}
+
+interface FieldGroup {
+  title: string
+  shortTitle: string
+  icon: string
+  desc: string
+  fields: FieldDef[]
+}
+
 const router = useRouter()
 const toast = useToast()
 const {
@@ -67,7 +84,7 @@ function formatDate(d: Date | string | null | undefined): string | null {
 // ─── Field Definitions ────────────────────────────────────────────────────────
 const activeTabIndex = ref(0)
 
-const fieldGroups = [
+const fieldGroups = ref<FieldGroup[]>([
   {
     title: 'Personal Information',
     shortTitle: 'Personal',
@@ -169,9 +186,9 @@ const fieldGroups = [
       { key: 'emergency_contact_address', label: 'Emergency Contact Address', type: 'textarea', required: false },
     ],
   },
-]
+])
 
-const progress = computed(() => (activeTabIndex.value / (fieldGroups.length - 1)) * 100)
+const progress = computed(() => (activeTabIndex.value / (fieldGroups.value.length - 1)) * 100)
 
 // ─── Form Logic ──────────────────────────────────────────────────────────────
 const form = ref<Record<string, any>>({})
@@ -180,7 +197,7 @@ const showValidation = ref(false)
 
 function initForm() {
   if (!applicant.value) return
-  fieldGroups.forEach((group) => {
+  fieldGroups.value.forEach((group) => {
     group.fields.forEach((f) => {
       if (f.type === 'readonly') {
         form.value[f.key] = applicant.value![f.key]
@@ -267,7 +284,7 @@ function isMissing(key: string): boolean {
   if (!isEmptyValue(currentVal)) return false
 
   let fieldDef: any = null
-  for (const group of fieldGroups) {
+  for (const group of fieldGroups.value) {
     const found = group.fields.find(f => f.key === key)
     if (found) { fieldDef = found; break }
   }
@@ -276,13 +293,13 @@ function isMissing(key: string): boolean {
   return Boolean(fieldDef?.required || isBackendMissing)
 }
 
-function groupHasMissing(group: typeof fieldGroups[0]): boolean {
+function groupHasMissing(group: FieldGroup): boolean {
   return group.fields.some((f) => isMissing(f.key))
 }
 
 const incompleteRequiredFields = computed(() => {
   const list: { key: string; label: string; groupIndex: number; groupTitle: string }[] = []
-  fieldGroups.forEach((group, groupIndex) => {
+  fieldGroups.value.forEach((group, groupIndex) => {
     group.fields.forEach((f) => {
       if (f.type === 'readonly' || f.type === 'same-address-checkbox') return
       if (!f.required) return
@@ -298,7 +315,7 @@ const hasIncompleteRequired = computed(() => incompleteRequiredFields.value.leng
 
 const hasChanges = computed(() => {
   if (!applicant.value) return false
-  return fieldGroups.some((group) =>
+  return fieldGroups.value.some((group) =>
     group.fields.some((f) => {
       if (f.type === 'readonly' || f.type === 'same-address-checkbox') return false
       const orig = applicant.value![f.key] ?? (f.type === 'boolean' ? false : '')
@@ -312,7 +329,7 @@ const hasChanges = computed(() => {
 
 const submitPayload = computed(() => {
   const payload: Record<string, any> = {}
-  fieldGroups.forEach((group) => {
+  fieldGroups.value.forEach((group) => {
     group.fields.forEach((f) => {
       if (f.type === 'readonly' || f.type === 'same-address-checkbox') return
       let val = form.value[f.key]
@@ -416,7 +433,7 @@ async function handleSubmit() {
 }
 
 function nextStep() {
-  if (activeTabIndex.value < fieldGroups.length - 1) {
+  if (activeTabIndex.value < fieldGroups.value.length - 1) {
     activeTabIndex.value++
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -429,7 +446,7 @@ function prevStep() {
   }
 }
 
-function tabButtonClass(group: typeof fieldGroups[0], index: number) {
+function tabButtonClass(group: FieldGroup, index: number) {
   const active = activeTabIndex.value === index
   const bad = groupHasMissing(group)
   if (active && bad) return 'bg-red-500 text-white border-red-500 shadow-md'

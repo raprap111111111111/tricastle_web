@@ -24,11 +24,6 @@
         <RouterLink to="/auth/forgot-password" class="text-blueberry-500 hover:text-apricot-500">Forgot password?</RouterLink>
       </div>
     </form>
-
-    <!-- <p class="text-center text-sm text-blueberry-500 mt-6">
-      Don't have an account?
-      <RouterLink to="/auth/register" class="text-apricot-500 hover:text-apricot-600 font-medium">Create one</RouterLink>
-    </p> -->
   </div>
 </template>
 
@@ -36,7 +31,6 @@
 import { ref } from 'vue'
 import { useRouter, useRoute, RouterLink } from 'vue-router'
 import { useForm, useField } from 'vee-validate'
-import { toTypedSchema } from '@vee-validate/zod'
 import { useToast } from 'primevue/usetoast'
 import InputText from 'primevue/inputtext'
 import Password  from 'primevue/password'
@@ -50,8 +44,28 @@ const route     = useRoute()
 const toast     = useToast()
 const authStore = useAuthStore()
 
+// Safe schema adapter to bypass @vee-validate/zod's buggy getDefaults() cast
+const safeLoginSchema = {
+  __isTypedSchema: true as const,
+  async parse(values: any) {
+    const result = await loginSchema.safeParseAsync(values)
+    if (result.success) {
+      return { value: result.data, errors: [] }
+    }
+    return {
+      errors: result.error.issues.map((issue) => ({
+        path: issue.path.join('.'),
+        errors: [issue.message],
+      })),
+    }
+  },
+  cast(values: any) {
+    return values ?? {}
+  },
+}
+
 const { handleSubmit, errors } = useForm({
-  validationSchema: toTypedSchema(loginSchema),
+  validationSchema: safeLoginSchema,
   initialValues: { email: '', password: '', deviceName: 'web' },
 })
 
