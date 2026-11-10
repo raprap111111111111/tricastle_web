@@ -178,6 +178,8 @@ async function fetchFinalList(targetPage?: number | null): Promise<void> {
     japan_deployment_ready: adv.japan_deployment_ready ? adv.japan_deployment_ready === 'true' : '',
     previous_japan_experience: adv.previous_japan_experience ? adv.previous_japan_experience === 'true' : '',
     ssw_eligible: adv.ssw_eligible ? adv.ssw_eligible === 'true' : '',
+    company_id: adv.company_id || undefined,
+    company_category_id: adv.company_category_id || undefined,
 
     limit: limitToFetch,
     page: pageToFetch,
@@ -195,14 +197,82 @@ async function fetchFinalList(targetPage?: number | null): Promise<void> {
 }
 
 async function loadAllBatches(): Promise<void> {
-  if (batchStore.batches.length > 0) return
-  batchStore.setFilters({ limit: 1000 } as any)
-  await batchStore.fetchBatches()
+  try {
+    const token = authStore.token || localStorage.getItem('access_token') || ''
+    let allBatches: any[] = []
+    let page = 1
+    let keepGoing = true
+
+    while (keepGoing) {
+      const res = await axios.get(`${API_BASE}/batches`, {
+        params: { limit: 100, page },
+        headers: {
+          Authorization: token ? `Bearer ${token}` : '',
+          Accept: 'application/json',
+        },
+      })
+
+      const rows = res.data?.data ?? res.data?.records ?? res.data ?? []
+      if (!Array.isArray(rows) || rows.length === 0) break
+
+      allBatches = allBatches.concat(rows)
+      keepGoing = rows.length === 100
+      page++
+    }
+
+    if (allBatches.length > 0) {
+      batchStore.batches = allBatches
+    }
+  } catch {
+    batchStore.setFilters({ limit: 100 })
+    await batchStore.fetchBatches()
+  }
 }
 
-// ⚡ Load ALL companies (safely paginated via listAll)
+// ⚡ Load ALL companies (store first, axios fallback)
 async function loadAllCompanies(): Promise<void> {
-  await companyStore.fetchActiveCompanies()
+  try {
+    await companyStore.fetchActiveCompanies()
+  } catch {
+    // ignore — fallback below
+  }
+
+  // If store still empty, paginate raw API
+  if (!companyStore.activeCompanies?.length && !companyStore.companies?.length) {
+    try {
+      const token = authStore.token || localStorage.getItem('access_token') || ''
+      let all: any[] = []
+      let page = 1
+      let keepGoing = true
+
+      while (keepGoing) {
+        const res = await axios.get(`${API_BASE}/companies`, {
+          params: { limit: 100, page, is_active: true },
+          headers: {
+            Authorization: token ? `Bearer ${token}` : '',
+            Accept: 'application/json',
+          },
+        })
+        const rows = res.data?.data ?? res.data?.records ?? res.data ?? []
+        if (!Array.isArray(rows) || rows.length === 0) break
+        all = all.concat(rows)
+        keepGoing = rows.length === 100
+        page++
+      }
+
+      if (all.length > 0) {
+        // Support either store shape
+        if ('activeCompanies' in companyStore) {
+          ; (companyStore as any).activeCompanies = all
+        }
+        if ('companies' in companyStore) {
+          ; (companyStore as any).companies = all
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load companies for filters', e)
+    }
+  }
 }
 
 onMounted(async () => {
@@ -228,29 +298,35 @@ onMounted(async () => {
 // When batch changes AFTER mount → reload groups and clear group
 watch(
   () => filters.selectedBatchId.value,
-  (batchId, prev) => {
+  async (batchId, prev) => {
     if (batchId === prev) return
-    loadGroupsForBatch(batchId, { clearGroup: true })
+    await loadGroupsForBatch(batchId, { clearGroup: true })
   },
 )
+
+// Debounced watch prevents double-fetch when batch change clears group
+let filterDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
 watch(
   [filters.searchQuery, filters.selectedBatchId, filters.selectedGroupId, filters.appliedAdvanced],
   () => {
-    store.setPage(1)
+    if (filterDebounceTimer) clearTimeout(filterDebounceTimer)
+    filterDebounceTimer = setTimeout(() => {
+      store.setPage(1)
 
-    router.replace({
-      query: {
-        ...route.query,
-        search: filters.searchQuery.value.trim() || undefined,
-        batch_id: filters.selectedBatchId.value ?? undefined,
-        group_id: filters.selectedGroupId.value ?? undefined,
-        gender: filters.appliedAdvanced.value.gender || undefined,
-        province: filters.appliedAdvanced.value.province || undefined,
-      },
-    })
+      router.replace({
+        query: {
+          ...route.query,
+          search: filters.searchQuery.value.trim() || undefined,
+          batch_id: filters.selectedBatchId.value ?? undefined,
+          group_id: filters.selectedGroupId.value ?? undefined,
+          gender: filters.appliedAdvanced.value.gender || undefined,
+          province: filters.appliedAdvanced.value.province || undefined,
+        },
+      })
 
-    fetchFinalList(1)
+      fetchFinalList(1)
+    }, 350)
   },
   { deep: true },
 )
@@ -298,6 +374,37 @@ const batchOptions = computed(() => {
     { label: 'All Batches', value: null, isActive: false, applicantCount: 0 },
     ...items,
   ]
+})
+
+// ─── Company & Category options for advanced filters ──────────────────────
+const companySource = computed<any[]>(() => {
+  const active = (companyStore as any).activeCompanies
+  const all = (companyStore as any).companies
+  if (Array.isArray(active) && active.length > 0) return active
+  if (Array.isArray(all) && all.length > 0) return all
+  return []
+})
+
+const companyOptions = computed(() => [
+  { label: 'All Companies', value: '' },
+  ...companySource.value.map((c: any) => ({
+    label: c.name ?? c.company_name ?? `#${c.id}`,
+    value: String(c.id),
+  })),
+])
+
+const companyCategoryOptions = computed(() => {
+  const seen = new Map<string, { label: string; value: string }>()
+  companySource.value.forEach((c: any) => {
+    const cat = c.category ?? c.company_category ?? c.companyCategory
+    if (cat?.id != null) {
+      const id = String(cat.id)
+      if (!seen.has(id)) {
+        seen.set(id, { label: cat.name ?? cat.label ?? id, value: id })
+      }
+    }
+  })
+  return [{ label: 'All Categories', value: '' }, ...Array.from(seen.values())]
 })
 
 // Auto-detect batch ID for assign group modal when no batch filter is selected
@@ -641,10 +748,12 @@ function openPdosExport(): void {
       v-model:jlpt-level="filters.jlptLevel.value" v-model:willing-to-be-deployed="filters.willingToBeDeployed.value"
       v-model:japan-deployment-ready="filters.japanDeploymentReady.value"
       v-model:previous-japan-experience="filters.previousJapanExperience.value"
-      v-model:ssw-eligible="filters.sswEligible.value" :gender-options="filters.genderOptions"
+      v-model:ssw-eligible="filters.sswEligible.value" v-model:company="filters.company.value"
+      v-model:company-category="filters.companyCategory.value" :gender-options="filters.genderOptions"
       :civil-status-options="filters.civilStatusOptions" :nationality-options="filters.nationalityOptions"
       :quality-grade-options="filters.qualityGradeOptions" :skill-category-options="filters.skillCategoryOptions"
       :jlpt-level-options="filters.jlptLevelOptions" :boolean-options="filters.booleanOptions"
+      :company-options="companyOptions" :company-category-options="companyCategoryOptions"
       :province-options="filters.provinceOptions.value" :city-options="filters.cityOptions.value"
       :psgc-provinces="filters.psgcProvinces.value" :psgc-cities="filters.psgcCities.value"
       :loading-provinces="filters.loadingProvinces.value" :loading-cities="filters.loadingCities.value"

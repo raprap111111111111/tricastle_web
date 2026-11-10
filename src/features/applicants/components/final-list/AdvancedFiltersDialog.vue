@@ -8,54 +8,60 @@ import InputText from 'primevue/inputtext'
 defineProps<{
   visible: boolean
 
-  gender:                  string
-  civilStatus:             string
-  nationality:             string
-  qualityGrade:            string
-  city:                    string
-  province:                string
-  address:                 string
-  skillCategory:           string
-  jlptLevel:               string
-  willingToBeDeployed:     string
-  japanDeploymentReady:    string
+  gender: string
+  civilStatus: string
+  nationality: string
+  qualityGrade: string
+  city: string
+  province: string
+  address: string
+  skillCategory: string
+  jlptLevel: string
+  willingToBeDeployed: string
+  japanDeploymentReady: string
   previousJapanExperience: string
-  sswEligible:             string
+  sswEligible: string
+  company: string
+  companyCategory: string
 
-  genderOptions:        any[]
-  civilStatusOptions:   any[]
-  nationalityOptions:   any[]
-  qualityGradeOptions:  any[]
+  genderOptions: any[]
+  civilStatusOptions: any[]
+  nationalityOptions: any[]
+  qualityGradeOptions: any[]
   skillCategoryOptions: any[]
-  jlptLevelOptions:     any[]
-  booleanOptions:       any[]
-  provinceOptions:      any[]
-  cityOptions:          any[]
+  jlptLevelOptions: any[]
+  booleanOptions: any[]
+  provinceOptions: any[]
+  cityOptions: any[]
+  companyOptions: any[]
+  companyCategoryOptions: any[]
 
-  psgcProvinces:    any[]
-  psgcCities:       any[]
+  psgcProvinces: any[]
+  psgcCities: any[]
   loadingProvinces: boolean
-  loadingCities:    boolean
+  loadingCities: boolean
 
   stagedAdvancedCount: number
-  hasUnsavedChanges:   boolean
+  hasUnsavedChanges: boolean
 }>()
 
 const emit = defineEmits<{
-  'update:visible':                 [v: boolean]
-  'update:gender':                  [v: string]
-  'update:civilStatus':             [v: string]
-  'update:nationality':             [v: string]
-  'update:qualityGrade':            [v: string]
-  'update:city':                    [v: string]
-  'update:province':                [v: string]
-  'update:address':                 [v: string]
-  'update:skillCategory':           [v: string]
-  'update:jlptLevel':               [v: string]
-  'update:willingToBeDeployed':     [v: string]
-  'update:japanDeploymentReady':    [v: string]
+  'update:visible': [v: boolean]
+  'update:gender': [v: string]
+  'update:civilStatus': [v: string]
+  'update:nationality': [v: string]
+  'update:qualityGrade': [v: string]
+  'update:city': [v: string]
+  'update:province': [v: string]
+  'update:address': [v: string]
+  'update:skillCategory': [v: string]
+  'update:jlptLevel': [v: string]
+  'update:willingToBeDeployed': [v: string]
+  'update:japanDeploymentReady': [v: string]
   'update:previousJapanExperience': [v: string]
-  'update:sswEligible':             [v: string]
+  'update:sswEligible': [v: string]
+  'update:company': [v: string]
+  'update:companyCategory': [v: string]
   apply: []
   clear: []
 }>()
@@ -75,11 +81,13 @@ type StringFieldEvent =
   | 'update:japanDeploymentReady'
   | 'update:previousJapanExperience'
   | 'update:sswEligible'
+  | 'update:company'
+  | 'update:companyCategory'
 
 function emitString(event: StringFieldEvent, value: unknown): void {
   // ✅ Cast bypasses Vue's overload confusion — safe because
   // all StringFieldEvent members are declared with [v: string] signatures.
-  ;(emit as (e: string, v: string) => void)(event, String(value ?? ''))
+  ; (emit as (e: string, v: string) => void)(event, String(value ?? ''))
 }
 
 
@@ -88,13 +96,11 @@ function close() { emit('update:visible', false) }
 
 <template>
   <Dialog :visible="visible" modal :draggable="false" :dismissable-mask="false" :closable="false"
-    :style="{ width: '560px' }"
-    :pt="{
-      root:    { class: 'rounded-2xl overflow-hidden' },
-      header:  { class: '!p-0' },
+    :style="{ width: '560px' }" :pt="{
+      root: { class: 'rounded-2xl overflow-hidden' },
+      header: { class: '!p-0' },
       content: { class: '!p-0' },
-    }"
-    @update:visible="emit('update:visible', $event)">
+    }" @update:visible="emit('update:visible', $event)">
     <template #container>
       <div class="bg-white rounded-2xl overflow-hidden">
 
@@ -135,25 +141,24 @@ function close() { emit('update:visible', false) }
               <div>
                 <label class="block text-xs font-medium text-blueberry-700 mb-1.5">Gender</label>
                 <Select :model-value="gender" :options="genderOptions" option-label="label" option-value="value"
-                  class="w-full" size="small"
-                  @update:model-value="emitString('update:gender', $event)" />
+                  class="w-full" size="small" @update:model-value="emitString('update:gender', $event)" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-blueberry-700 mb-1.5">Civil Status</label>
-                <Select :model-value="civilStatus" :options="civilStatusOptions" option-label="label" option-value="value"
-                  class="w-full" size="small"
+                <Select :model-value="civilStatus" :options="civilStatusOptions" option-label="label"
+                  option-value="value" class="w-full" size="small"
                   @update:model-value="emitString('update:civilStatus', $event)" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-blueberry-700 mb-1.5">Nationality</label>
-                <Select :model-value="nationality" :options="nationalityOptions" option-label="label" option-value="value"
-                  class="w-full" size="small"
+                <Select :model-value="nationality" :options="nationalityOptions" option-label="label"
+                  option-value="value" class="w-full" size="small"
                   @update:model-value="emitString('update:nationality', $event)" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-blueberry-700 mb-1.5">Quality Grade</label>
-                <Select :model-value="qualityGrade" :options="qualityGradeOptions" option-label="label" option-value="value"
-                  class="w-full" size="small"
+                <Select :model-value="qualityGrade" :options="qualityGradeOptions" option-label="label"
+                  option-value="value" class="w-full" size="small"
                   @update:model-value="emitString('update:qualityGrade', $event)" />
               </div>
             </div>
@@ -168,39 +173,49 @@ function close() { emit('update:visible', false) }
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs font-medium text-blueberry-700 mb-1.5">Skill Category</label>
-                <Select :model-value="skillCategory" :options="skillCategoryOptions" option-label="label" option-value="value"
-                  class="w-full" size="small"
+                <Select :model-value="skillCategory" :options="skillCategoryOptions" option-label="label"
+                  option-value="value" class="w-full" size="small"
                   @update:model-value="emitString('update:skillCategory', $event)" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-blueberry-700 mb-1.5">JLPT Level</label>
                 <Select :model-value="jlptLevel" :options="jlptLevelOptions" option-label="label" option-value="value"
-                  class="w-full" size="small"
-                  @update:model-value="emitString('update:jlptLevel', $event)" />
+                  class="w-full" size="small" @update:model-value="emitString('update:jlptLevel', $event)" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-blueberry-700 mb-1.5">Willing to Deploy</label>
-                <Select :model-value="willingToBeDeployed" :options="booleanOptions" option-label="label" option-value="value"
-                  class="w-full" size="small"
+                <Select :model-value="willingToBeDeployed" :options="booleanOptions" option-label="label"
+                  option-value="value" class="w-full" size="small"
                   @update:model-value="emitString('update:willingToBeDeployed', $event)" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-blueberry-700 mb-1.5">Japan Ready</label>
-                <Select :model-value="japanDeploymentReady" :options="booleanOptions" option-label="label" option-value="value"
-                  class="w-full" size="small"
+                <Select :model-value="japanDeploymentReady" :options="booleanOptions" option-label="label"
+                  option-value="value" class="w-full" size="small"
                   @update:model-value="emitString('update:japanDeploymentReady', $event)" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-blueberry-700 mb-1.5">Japan Experience</label>
-                <Select :model-value="previousJapanExperience" :options="booleanOptions" option-label="label" option-value="value"
-                  class="w-full" size="small"
+                <Select :model-value="previousJapanExperience" :options="booleanOptions" option-label="label"
+                  option-value="value" class="w-full" size="small"
                   @update:model-value="emitString('update:previousJapanExperience', $event)" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-blueberry-700 mb-1.5">SSW Eligible</label>
                 <Select :model-value="sswEligible" :options="booleanOptions" option-label="label" option-value="value"
-                  class="w-full" size="small"
-                  @update:model-value="emitString('update:sswEligible', $event)" />
+                  class="w-full" size="small" @update:model-value="emitString('update:sswEligible', $event)" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-blueberry-700 mb-1.5">Company</label>
+                <Select :model-value="company" :options="companyOptions" option-label="label" option-value="value"
+                  class="w-full" size="small" filter show-clear placeholder="Select company..."
+                  @update:model-value="emitString('update:company', $event)" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-blueberry-700 mb-1.5">Company Category</label>
+                <Select :model-value="companyCategory" :options="companyCategoryOptions" option-label="label"
+                  option-value="value" class="w-full" size="small" filter show-clear placeholder="Select category..."
+                  @update:model-value="emitString('update:companyCategory', $event)" />
               </div>
             </div>
           </div>
@@ -221,8 +236,8 @@ function close() { emit('update:visible', false) }
                   </span>
                 </label>
                 <Select :model-value="province" :options="provinceOptions" option-label="label" option-value="value"
-                  :placeholder="loadingProvinces ? 'Loading provinces...' : 'Select province...'"
-                  class="w-full" size="small" filter show-clear :loading="loadingProvinces"
+                  :placeholder="loadingProvinces ? 'Loading provinces...' : 'Select province...'" class="w-full"
+                  size="small" filter show-clear :loading="loadingProvinces"
                   @update:model-value="emitString('update:province', $event)" />
               </div>
               <div>
@@ -237,8 +252,7 @@ function close() { emit('update:visible', false) }
                 <Select :model-value="city" :options="cityOptions" option-label="label" option-value="value"
                   :placeholder="!province ? 'Select province first...' : loadingCities ? 'Loading cities...' : 'Select city...'"
                   class="w-full" size="small" filter show-clear :loading="loadingCities"
-                  :disabled="!province || loadingCities"
-                  @update:model-value="emitString('update:city', $event)">
+                  :disabled="!province || loadingCities" @update:model-value="emitString('update:city', $event)">
                   <template #option="{ option }">
                     <div class="flex items-center gap-2 w-full">
                       <i v-if="option.value === ''" class="pi pi-list text-blueberry-400 text-xs" />
@@ -261,8 +275,7 @@ function close() { emit('update:visible', false) }
                 <div class="relative">
                   <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-blueberry-400 text-xs z-10" />
                   <InputText :model-value="address" placeholder="e.g. Bonifacio Street..." class="w-full !pl-9"
-                    size="small"
-                    @update:model-value="emitString('update:address', $event)"
+                    size="small" @update:model-value="emitString('update:address', $event)"
                     @keyup.enter="emit('apply')" />
                 </div>
                 <p class="text-[10px] text-blueberry-400 mt-1 flex items-center gap-1">

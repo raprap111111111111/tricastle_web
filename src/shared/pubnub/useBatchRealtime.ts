@@ -1,5 +1,3 @@
-// src/shared/pubnub/useBatchRealtime.ts
-
 import { useToast } from 'primevue/usetoast'
 import { usePubNub } from './usePubNub'
 import { PubNubChannels } from './channels'
@@ -9,13 +7,6 @@ interface Options {
   batchId?: number
 }
 
-/**
- * 🔔 Batch Real-time Notifications
- *
- * Usage:
- *   useBatchRealtime({ onReload: load })              // Listen to ALL batches
- *   useBatchRealtime({ onReload: load, batchId: 5 })  // For one specific batch
- */
 export function useBatchRealtime(options: Options = {}) {
   const toast = useToast()
   const { onReload, batchId } = options
@@ -24,8 +15,6 @@ export function useBatchRealtime(options: Options = {}) {
   if (batchId) channels.push(PubNubChannels.forBatch(batchId))
 
   usePubNub(channels, (msg) => {
-    console.log('🎓 Batch event:', msg)
-
     switch (msg.event) {
       case 'batch.created':
         toast.add({

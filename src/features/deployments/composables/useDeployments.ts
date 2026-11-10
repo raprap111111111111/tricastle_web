@@ -1,5 +1,3 @@
-// src/features/deployments/composables/useDeployments.ts
-
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import { useDeploymentStore } from '../stores/deployment.store'
@@ -119,10 +117,9 @@ export function useDeployments() {
         toast.add({
           severity: 'warn',
           summary: '⚠️ Partial Success',
-          detail: `${result.success_count} deployed, ${result.failed_count} failed. Check console for details.`,
+          detail: `${result.success_count} deployed, ${result.failed_count} failed.`,
           life: 6000,
         })
-        console.warn('Bulk deploy failures:', result.failed)
       }
 
       return result.success_count > 0
@@ -137,17 +134,13 @@ export function useDeployments() {
     }
   }
 
-  // 🏠 Mark returned home
   async function handleMarkReturned(
     applicantBatchId: number,
     reason: string,
     applicantName?: string,
   ): Promise<boolean> {
-    console.log('🏠 [Return] Sending:', { applicantBatchId, reason })
-
     try {
-      const result = await store.markReturned(applicantBatchId, reason)
-      console.log('✅ [Return] Success:', result)
+      await store.markReturned(applicantBatchId, reason)
 
       toast.add({
         severity: 'warn',
@@ -159,11 +152,6 @@ export function useDeployments() {
       })
       return true
     } catch (e: any) {
-      console.error('❌ [Return] Full error:', e)
-      console.error('❌ [Return] Status:', e?.response?.status)
-      console.error('❌ [Return] Response data:', e?.response?.data)
-      console.error('❌ [Return] Request URL:', e?.config?.url)
-
       const detailMsg = e?.response?.data?.message
         ?? e?.response?.data?.error
         ?? e?.message
@@ -179,17 +167,13 @@ export function useDeployments() {
     }
   }
 
-  // ✅ Mark completed
   async function handleMarkCompleted(
     applicantBatchId: number,
     notes?: string | null,
     applicantName?: string,
   ): Promise<boolean> {
-    console.log('✅ [Complete] Sending:', { applicantBatchId, notes })
-
     try {
-      const result = await store.markCompleted(applicantBatchId, notes)
-      console.log('✅ [Complete] Success:', result)
+      await store.markCompleted(applicantBatchId, notes)
 
       toast.add({
         severity: 'success',
@@ -201,11 +185,6 @@ export function useDeployments() {
       })
       return true
     } catch (e: any) {
-      console.error('❌ [Complete] Full error:', e)
-      console.error('❌ [Complete] Status:', e?.response?.status)
-      console.error('❌ [Complete] Response data:', e?.response?.data)
-      console.error('❌ [Complete] Request URL:', e?.config?.url)
-
       const detailMsg = e?.response?.data?.message
         ?? e?.response?.data?.error
         ?? e?.message

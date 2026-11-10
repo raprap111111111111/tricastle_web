@@ -17,17 +17,19 @@ export type AdvancedFilters = {
   japan_deployment_ready?: string
   previous_japan_experience?: string
   ssw_eligible?: string
+  company_id?: string
+  company_category_id?: string
 }
 
 export function useFinalListFilters() {
   // ─── Main filters ─────────────────────────────────────────────────────────
-  const searchQuery     = ref('')
+  const searchQuery = ref('')
   const selectedBatchId = ref<number | null>(null)
   const selectedGroupId = ref<number | null>(null)
 
   // ─── PSGC ─────────────────────────────────────────────────────────────────
   const {
-    provinces:            psgcProvinces,
+    provinces: psgcProvinces,
     fetchAllProvinces,
     fetchCitiesByProvince,
     loadingProvinces,
@@ -37,34 +39,36 @@ export function useFinalListFilters() {
   const psgcCities = ref<any[]>([])
 
   // ─── Staged (in-dialog) advanced values ───────────────────────────────────
-  const gender                  = ref('')
-  const civilStatus             = ref('')
-  const nationality             = ref('')
-  const qualityGrade            = ref('')
-  const city                    = ref('')
-  const province                = ref('')
-  const address                 = ref('')
-  const skillCategory           = ref('')
-  const jlptLevel               = ref('')
-  const willingToBeDeployed     = ref('')
-  const japanDeploymentReady    = ref('')
+  const gender = ref('')
+  const civilStatus = ref('')
+  const nationality = ref('')
+  const qualityGrade = ref('')
+  const city = ref('')
+  const province = ref('')
+  const address = ref('')
+  const skillCategory = ref('')
+  const jlptLevel = ref('')
+  const willingToBeDeployed = ref('')
+  const japanDeploymentReady = ref('')
   const previousJapanExperience = ref('')
-  const sswEligible             = ref('')
+  const sswEligible = ref('')
+  const company = ref('')
+  const companyCategory = ref('')
 
   const appliedAdvanced = ref<AdvancedFilters>({})
-  const showAdvanced    = ref(false)
+  const showAdvanced = ref(false)
 
   // ─── Province → cities cascade ────────────────────────────────────────────
   watch(province, async (newProvince) => {
     if (!newProvince) {
       psgcCities.value = []
-      city.value       = ''
+      city.value = ''
       return
     }
     const provinceObj = psgcProvinces.value.find((p) => p.name === newProvince)
     if (provinceObj) {
       psgcCities.value = await fetchCitiesByProvince(provinceObj.code)
-      city.value       = ''
+      city.value = ''
     }
   })
 
@@ -147,19 +151,21 @@ export function useFinalListFilters() {
   // ─── Filter apply / clear ─────────────────────────────────────────────────
   function applyAdvanced() {
     const advanced: AdvancedFilters = {
-      gender:                    gender.value || undefined,
-      civil_status:              civilStatus.value || undefined,
-      nationality:               nationality.value || undefined,
-      quality_grade:             qualityGrade.value || undefined,
-      city:                      city.value.trim() || undefined,
-      province:                  province.value || undefined,
-      address:                   address.value.trim() || undefined,
-      skill_category:            skillCategory.value || undefined,
-      jlpt_level:                jlptLevel.value || undefined,
-      willing_to_be_deployed:    willingToBeDeployed.value || undefined,
-      japan_deployment_ready:    japanDeploymentReady.value || undefined,
+      gender: gender.value || undefined,
+      civil_status: civilStatus.value || undefined,
+      nationality: nationality.value || undefined,
+      quality_grade: qualityGrade.value || undefined,
+      city: city.value.trim() || undefined,
+      province: province.value || undefined,
+      address: address.value.trim() || undefined,
+      skill_category: skillCategory.value || undefined,
+      jlpt_level: jlptLevel.value || undefined,
+      willing_to_be_deployed: willingToBeDeployed.value || undefined,
+      japan_deployment_ready: japanDeploymentReady.value || undefined,
       previous_japan_experience: previousJapanExperience.value || undefined,
-      ssw_eligible:              sswEligible.value || undefined,
+      ssw_eligible: sswEligible.value || undefined,
+      company_id: company.value || undefined,
+      company_category_id: companyCategory.value || undefined,
     }
     Object.keys(advanced).forEach((k) => {
       if (advanced[k as keyof AdvancedFilters] === undefined) {
@@ -167,43 +173,65 @@ export function useFinalListFilters() {
       }
     })
     appliedAdvanced.value = advanced
-    showAdvanced.value    = false
+    showAdvanced.value = false
   }
 
   function clearAdvanced() {
-    gender.value                  = ''
-    civilStatus.value             = ''
-    nationality.value             = ''
-    qualityGrade.value            = ''
-    city.value                    = ''
-    province.value                = ''
-    address.value                 = ''
-    skillCategory.value           = ''
-    jlptLevel.value               = ''
-    willingToBeDeployed.value     = ''
-    japanDeploymentReady.value    = ''
+    gender.value = ''
+    civilStatus.value = ''
+    nationality.value = ''
+    qualityGrade.value = ''
+    city.value = ''
+    province.value = ''
+    address.value = ''
+    skillCategory.value = ''
+    jlptLevel.value = ''
+    willingToBeDeployed.value = ''
+    japanDeploymentReady.value = ''
     previousJapanExperience.value = ''
-    sswEligible.value             = ''
-    psgcCities.value              = []
-    appliedAdvanced.value         = {}
+    sswEligible.value = ''
+    company.value = ''
+    companyCategory.value = ''
+    psgcCities.value = []
+    appliedAdvanced.value = {}
   }
 
   function onSearch(v: string) { searchQuery.value = v.trim() }
 
   function resetAll() {
-    searchQuery.value     = ''
+    searchQuery.value = ''
     selectedBatchId.value = null
     selectedGroupId.value = null
     clearAdvanced()
+  }
+
+  function setFilters(patch: Partial<Record<string, any>>) {
+    if ('search' in patch) searchQuery.value = patch.search ?? ''
+    if ('batch_id' in patch) selectedBatchId.value = patch.batch_id ?? null
+    if ('group_id' in patch) selectedGroupId.value = patch.group_id ?? null
+
+    const advancedKeys = [
+      'gender', 'civil_status', 'nationality', 'quality_grade',
+      'city', 'province', 'address', 'skill_category', 'jlpt_level',
+      'willing_to_be_deployed', 'japan_deployment_ready',
+      'previous_japan_experience', 'ssw_eligible',
+      'company_id', 'company_category_id',
+    ] as const
+
+    for (const key of advancedKeys) {
+      if (key in patch) {
+        appliedAdvanced.value = { ...appliedAdvanced.value, [key]: patch[key] || undefined }
+      }
+    }
   }
 
   // ─── Computed helpers ─────────────────────────────────────────────────────
   const appliedAdvancedCount = computed(() => Object.keys(appliedAdvanced.value).length)
 
   const hasFilters = computed(() =>
-    searchQuery.value !== '' || 
-    selectedBatchId.value !== null || 
-    selectedGroupId.value !== null || 
+    searchQuery.value !== '' ||
+    selectedBatchId.value !== null ||
+    selectedGroupId.value !== null ||
     appliedAdvancedCount.value > 0
   )
 
@@ -222,6 +250,8 @@ export function useFinalListFilters() {
     if (japanDeploymentReady.value) count++
     if (previousJapanExperience.value) count++
     if (sswEligible.value) count++
+    if (company.value) count++
+    if (companyCategory.value) count++
     return count
   })
 
@@ -240,6 +270,8 @@ export function useFinalListFilters() {
       japan_deployment_ready: japanDeploymentReady.value || undefined,
       previous_japan_experience: previousJapanExperience.value || undefined,
       ssw_eligible: sswEligible.value || undefined,
+      company_id: company.value || undefined,
+      company_category_id: companyCategory.value || undefined,
     })
     const a = JSON.stringify(appliedAdvanced.value)
     return s !== a
@@ -253,7 +285,7 @@ export function useFinalListFilters() {
     // staged
     gender, civilStatus, nationality, qualityGrade, city, province, address,
     skillCategory, jlptLevel, willingToBeDeployed, japanDeploymentReady,
-    previousJapanExperience, sswEligible,
+    previousJapanExperience, sswEligible, company, companyCategory,
     // applied
     appliedAdvanced, showAdvanced,
     // options
@@ -261,7 +293,7 @@ export function useFinalListFilters() {
     skillCategoryOptions, jlptLevelOptions, booleanOptions,
     provinceOptions, cityOptions,
     // actions
-    applyAdvanced, clearAdvanced, onSearch, resetAll,
+    applyAdvanced, clearAdvanced, onSearch, resetAll, setFilters,
     // computed
     appliedAdvancedCount, hasFilters, stagedAdvancedCount, hasUnsavedChanges,
   }

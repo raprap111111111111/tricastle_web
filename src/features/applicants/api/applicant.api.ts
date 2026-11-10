@@ -65,6 +65,13 @@ export const applicantApi = {
     return res.data
   },
 
+    // ─── Remarks ───────────────────────────────────────────────────────────────
+  async updateRemarks(id: number, remarks: string[]): Promise<Applicant> {
+    const res = await http.patch<Applicant>(`${BASE}/${id}/remarks`, { remarks })
+    // unwrap { data: Applicant } if your http client returns full envelope
+    return (res.data as any)?.data ?? res.data
+  },
+
   // ─── Duplicate Detection ───────────────────────────────────────────────────
   async checkDuplicates(payload: DuplicateCheckPayload): Promise<DuplicateCheckResult> {
     const res = await http.post<{ data: DuplicateCheckResult }>(

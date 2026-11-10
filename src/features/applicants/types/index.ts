@@ -265,6 +265,7 @@ export interface Applicant {
   // Status
   status:           ApplicantStatus
   rejection_reason: string | null
+  remarks?:          string | null
   final_listed_at:  string | null
   rejected_at:      string | null
 
@@ -466,6 +467,7 @@ export interface CreateApplicantPayload {
 export interface UpdateApplicantPayload extends Partial<CreateApplicantPayload> {
   status?:           ApplicantStatus
   rejection_reason?: string | null
+  remarks?:          string | null
   quality_score?:    number
   quality_grade?:    QualityGrade
 }

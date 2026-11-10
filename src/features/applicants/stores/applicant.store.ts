@@ -106,7 +106,6 @@ export const useApplicantStore = defineStore('applicants', () => {
 
   // ─── Fetch Passport Offices ─────────────────────────────
   async function fetchPassportOffices(force = false) {
-    // 🎯 Defensive null check on passportOffices.value before calling Object.keys
     if (
       !force &&
       passportOffices.value &&
@@ -121,7 +120,7 @@ export const useApplicantStore = defineStore('applicants', () => {
       const res = await passportOfficeApi.listGrouped()
       passportOffices.value = res && typeof res === 'object' ? res : {}
     } catch (e: any) {
-      passportOffices.value = {} // Ensure state stays an object on error
+      passportOffices.value = {}
       console.error('Failed to load Passport Issuing Offices:', e)
     } finally {
       loadingOffices.value = false
@@ -132,13 +131,11 @@ export const useApplicantStore = defineStore('applicants', () => {
   async function autoCreatePassportOffice(officeName: string, region: string = 'Others') {
     loadingOffices.value = true
     try {
-      // 1. Send create payload to backend
       const created = await passportOfficeApi.create({
         office_name: officeName.trim(),
         region: region.trim() || 'Others',
       })
 
-      // 2. Refetch grouped offices so UI updates immediately
       await fetchPassportOffices(true)
 
       return created
@@ -268,6 +265,23 @@ export const useApplicantStore = defineStore('applicants', () => {
     }
   }
 
+  // ─── Remarks ─────────────────────────────────────────────
+  async function updateRemarks(id: number, remarks: string[]): Promise<Applicant> {
+    submitting.value = true
+    clearError()
+    try {
+      const updated = await applicantApi.updateRemarks(id, remarks)
+      replaceInList(updated)
+      return updated
+    } catch (e: any) {
+      error.value =
+        e?.response?.data?.message ?? e?.message ?? 'Failed to update remarks'
+      throw e
+    } finally {
+      submitting.value = false
+    }
+  }
+
   // ─── Duplicate check ────────────────────────────────────
   async function checkDuplicates(
     payload: DuplicateCheckPayload,
@@ -349,7 +363,7 @@ export const useApplicantStore = defineStore('applicants', () => {
     fetchApplicants,
     fetchApplicant,
     fetchPassportOffices,
-    autoCreatePassportOffice, 
+    autoCreatePassportOffice,
     createApplicant,
     updateApplicant,
     deleteApplicant,
@@ -358,6 +372,9 @@ export const useApplicantStore = defineStore('applicants', () => {
     moveToFinalList,
     rejectApplicant,
     updateStatus,
+
+    // Remarks
+    updateRemarks,
 
     // Utilities
     checkDuplicates,

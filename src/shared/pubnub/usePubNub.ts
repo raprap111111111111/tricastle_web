@@ -1,5 +1,3 @@
-// src/shared/pubnub/usePubNub.ts
-
 import { onBeforeUnmount, onMounted } from 'vue'
 import { getPubNub } from './pubnub.client'
 
@@ -11,7 +9,6 @@ export interface PubNubMessage {
 
 type MessageHandler = (message: PubNubMessage) => void
 
-// ─── PubNub event types (defined inline) ─────────────
 interface MessageEvent {
   channel: string
   message: any

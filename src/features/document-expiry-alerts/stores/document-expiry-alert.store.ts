@@ -1,12 +1,9 @@
-// src/features/document-expiry-alerts/stores/document-expiry-alert.store.ts
-
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { documentExpiryAlertApi } from '../api/document-expiry-alert.api';
 import type { DocumentExpiryAlert, DocumentExpiryAlertFilters } from '../types';
 
 export const useDocumentExpiryAlertStore = defineStore('documentExpiryAlert', () => {
-  // ─── State ─────────────────────────────────────────
   const alerts        = ref<DocumentExpiryAlert[]>([]);
   const selectedAlert = ref<DocumentExpiryAlert | null>(null);
   const total         = ref<number>(0);
@@ -27,7 +24,6 @@ export const useDocumentExpiryAlertStore = defineStore('documentExpiryAlert', ()
     document_type_id: null,
   });
 
-  // ─── Getters ───────────────────────────────────────
   const expiredAlerts = computed(() =>
     (alerts.value ?? []).filter((a) => a?.alert_type === 'expired')
   );
@@ -53,13 +49,9 @@ export const useDocumentExpiryAlertStore = defineStore('documentExpiryAlert', ()
     return groups;
   });
 
-  // ─── Response Unwrapper ────────────────────────────
   function unwrapList(rawAxiosResponse: any) {
-    console.log('[unwrapList] raw:', rawAxiosResponse);
-
     let payload = rawAxiosResponse;
 
-    // Unwrap Laravel responseSuccess()
     if (
       payload &&
       typeof payload === 'object' &&
@@ -69,7 +61,6 @@ export const useDocumentExpiryAlertStore = defineStore('documentExpiryAlert', ()
       payload = payload.data;
     }
 
-    // Custom pagination shape: { records: [...], total, current_page, ... }
     if (payload && Array.isArray(payload.records)) {
       return {
         list:        payload.records as DocumentExpiryAlert[],
@@ -80,7 +71,6 @@ export const useDocumentExpiryAlertStore = defineStore('documentExpiryAlert', ()
       };
     }
 
-    // Fallback shapes
     if (payload && Array.isArray(payload.data)) {
       return {
         list:        payload.data as DocumentExpiryAlert[],
@@ -101,7 +91,6 @@ export const useDocumentExpiryAlertStore = defineStore('documentExpiryAlert', ()
       };
     }
 
-    console.warn('[unwrapList] Unexpected shape:', rawAxiosResponse);
     return { list: [], total: 0, currentPage: 1, lastPage: 1, hasMore: false };
   }
 
@@ -124,7 +113,6 @@ export const useDocumentExpiryAlertStore = defineStore('documentExpiryAlert', ()
     return payload ?? null;
   }
 
-  // ─── Actions ───────────────────────────────────────
   async function fetchAlerts(overrideFilters?: Partial<DocumentExpiryAlertFilters>) {
     loading.value = true;
     error.value = null;
@@ -142,7 +130,6 @@ export const useDocumentExpiryAlertStore = defineStore('documentExpiryAlert', ()
       lastPage.value    = result.lastPage;
       hasMore.value     = result.hasMore;
     } catch (err: any) {
-      console.error('[fetchAlerts] ERROR:', err);
       error.value  = err?.response?.data?.message ?? err?.message ?? 'Failed to fetch alerts';
       alerts.value = [];
       total.value  = 0;
@@ -159,7 +146,6 @@ export const useDocumentExpiryAlertStore = defineStore('documentExpiryAlert', ()
       selectedAlert.value = unwrapItem(response);
       return selectedAlert.value;
     } catch (err: any) {
-      console.error('[fetchAlert] ERROR:', err);
       error.value = err?.response?.data?.message ?? 'Failed to fetch document';
       selectedAlert.value = null;
     } finally {
@@ -185,7 +171,6 @@ export const useDocumentExpiryAlertStore = defineStore('documentExpiryAlert', ()
   }
 
   return {
-    // State
     alerts,
     selectedAlert,
     total,
@@ -195,11 +180,9 @@ export const useDocumentExpiryAlertStore = defineStore('documentExpiryAlert', ()
     loading,
     error,
     filters,
-    // Getters
     expiredAlerts,
     criticalAlerts,
     alertsByType,
-    // Actions
     fetchAlerts,
     fetchAlert,
     setPage,

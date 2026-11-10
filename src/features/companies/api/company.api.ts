@@ -23,32 +23,15 @@ export const companyApi = {
       }
     }
 
-    // 🔍 DEBUG: Watch the exact parameters sent to Laravel
-    console.log('[companyApi.list] Outgoing Request Params:', params)
-
     const { data } = await http.get(BASE, { params })
-
-    // 🔍 DEBUG: Watch the exact response returning from Laravel
-    console.log('[companyApi.list] Raw Backend Response:', data)
 
     const records = data.records ?? data.data ?? []
     const total = data.total ?? data.meta?.total ?? records.length
     const limit = data.limit ?? data.per_page ?? filters.limit ?? 15
     const currentPage = data.current_page ?? data.page ?? filters.page ?? 1
     
-    // 🎯 FIX: Correctly calculate total pages instead of defaulting to 1
     const calculatedLastPage = Math.max(1, Math.ceil(total / limit))
     const hasMore = data.has_more ?? data.meta?.has_more ?? (currentPage < calculatedLastPage)
-
-    // 🔍 DEBUG: Check the math for pagination looping
-    console.log('[companyApi.list] Normalized Pagination Math:', {
-      recordsFetched: records.length,
-      total,
-      limit,
-      currentPage,
-      calculatedLastPage,
-      hasMore
-    })
 
     return {
       data: records,
@@ -66,36 +49,26 @@ export const companyApi = {
     }
   },
 
-  /**
-   * Fetches ALL companies across all pages.
-   */
   async listAll(filters: CompanyFilters = {}): Promise<Company[]> {
     let allRecords: Company[] = []
     let page = 1
     let hasMore = true
 
-    console.log('[companyApi.listAll] Starting to fetch ALL companies...')
-
     while (hasMore) {
-      console.log(`[companyApi.listAll] Fetching Page ${page}...`)
-      
       const response = await this.list({
         ...filters,
         page,
-        limit: 100, // 🎯 Changed to 100 because your backend MAX_LIMIT is 100!
+        limit: 100,
       })
 
       allRecords = allRecords.concat(response.data)
 
       hasMore = response.meta?.has_more ?? (page < (response.meta?.last_page ?? 1))
 
-      console.log(`[companyApi.listAll] Page ${page} complete. Total gathered so far: ${allRecords.length}. hasMore: ${hasMore}`)
-
       if (response.data.length === 0) break
       page++
     }
 
-    console.log('[companyApi.listAll] Finished! Final Total Companies:', allRecords.length)
     return allRecords
   },
 

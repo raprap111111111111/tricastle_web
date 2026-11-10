@@ -1,4 +1,3 @@
-<!-- src/features/applicants/components/ApplicantTable.vue -->
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
@@ -11,6 +10,7 @@ import Menu from 'primevue/menu'
 import ApplicantStatusBadge from './ApplicantStatusBadge.vue'
 import ApplicantDeleteDialog from './ApplicantDeleteDialog.vue'
 import RejectApplicantDialog from './RejectApplicantDialog.vue'
+import EditRemarksDialog from './final-list/EditRemarksDialog.vue'
 import DeployButton from '@features/deployments/components/DeployButton.vue'
 import AppPagination from '@shared/ui/table/AppPagination.vue'
 import { useApplicantStore } from '../stores/applicant.store'
@@ -32,6 +32,7 @@ const emit = defineEmits<{
   (e: 'delete', id: number): void
   (e: 'update:selectedIds', ids: number[]): void
   (e: 'clear-selection'): void
+  (e: 'remarks-updated', payload: { id: number; remarks: string[] }): void
 }>()
 
 const router  = useRouter()
@@ -42,6 +43,55 @@ const store   = useApplicantStore()
 const deleteDialog      = ref(false)
 const rejectDialog      = ref(false)
 const selectedApplicant = ref<Applicant | null>(null)
+
+// ─── 📝 Remarks Dialog State ───────────────────────────
+const remarksDialog    = ref(false)
+const remarksSubmitting = ref(false)
+const remarksApplicant  = ref<Applicant | null>(null)
+
+function getRemarks(a: Applicant | null | undefined): string[] {
+  if (!a) return []
+  const r = (a as any).remarks
+  return Array.isArray(r) ? r.filter((x) => typeof x === 'string' && x.trim()) : []
+}
+
+function openEditRemarks(applicant: Applicant) {
+  remarksApplicant.value = applicant
+  remarksDialog.value = true
+}
+
+async function onRemarksSave(remarks: string[]) {
+  if (!remarksApplicant.value) return
+  const id = remarksApplicant.value.id
+  remarksSubmitting.value = true
+  setRowLoading(id, true)
+  try {
+    const updated = await store.updateRemarks(id, remarks)
+    const next = (updated as any)?.remarks ?? remarks
+
+    emit('remarks-updated', { id, remarks: next })
+    toast.add({
+      severity: 'success',
+      summary: 'Remarks Saved',
+      detail: 'Applicant remarks updated successfully.',
+      life: 2500,
+    })
+    remarksDialog.value = false
+  } catch (e: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Save Failed',
+      detail: e?.response?.data?.message ?? 'Could not update remarks.',
+      life: 4000,
+    })
+  } finally {
+    remarksSubmitting.value = false
+    setRowLoading(id, false)
+  }
+}
+
+// Hover preview bounds
+const HOVER_LIMIT = 5
 
 // ─── 🖼️ Photo Hover Preview State ──────────────────────
 const hoveredPhotoId = ref<number | null>(null)
@@ -108,8 +158,13 @@ const menuItems = computed(() => {
   if (!a) return []
 
   const items: any[] = [
-    { label: 'View Details', icon: 'pi pi-eye',    command: () => goToView(a.id) },
-    { label: 'Edit',         icon: 'pi pi-pencil', command: () => goToEdit(a.id) },
+    { label: 'View Details', icon: 'pi pi-eye',     command: () => goToView(a.id) },
+    { label: 'Edit Profile', icon: 'pi pi-pencil',  command: () => goToEdit(a.id) },
+    {
+      label: 'Edit Remarks',
+      icon: 'pi pi-comment',
+      command: () => openEditRemarks(a),
+    },
     { separator: true },
   ]
 
@@ -348,10 +403,78 @@ function formatDate(dateStr: string | null | undefined): string {
         </template>
       </Column>
 
-      <!-- ✅ Status Column (restored) -->
+      <!-- Status Column -->
       <Column field="status" header="Status" style="width: 140px">
         <template #body="{ data }">
           <ApplicantStatusBadge :status="data.status" />
+        </template>
+      </Column>
+
+      <!-- 📝 Remarks Column with Floating Hover -->
+      <Column header="Remarks" style="width: 150px">
+        <template #body="{ data }">
+          <div
+            class="relative group inline-flex items-center gap-1 max-w-[140px]"
+            @click.stop
+          >
+            <template v-if="getRemarks(data).length">
+              <span
+                class="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-medium truncate max-w-[100px] cursor-default"
+              >
+                {{ getRemarks(data)[0] }}
+              </span>
+              <span
+                v-if="getRemarks(data).length > 1"
+                class="text-[11px] font-semibold text-blueberry-500 whitespace-nowrap cursor-default"
+              >
+                +{{ getRemarks(data).length - 1 }}
+              </span>
+
+              <!-- Floating hover panel -->
+              <div
+                class="pointer-events-none group-hover:pointer-events-auto
+                       invisible opacity-0 group-hover:visible group-hover:opacity-100
+                       transition-all duration-150 ease-out
+                       absolute z-50 left-0 top-full mt-1
+                       bg-white border border-appleCore-200 shadow-xl rounded-xl p-3
+                       min-w-[220px] max-w-[300px]"
+              >
+                <div class="flex items-center justify-between border-b border-appleCore-100 pb-2 mb-2">
+                  <span class="text-[11px] font-semibold uppercase tracking-wider text-blueberry-600">
+                    Remarks ({{ getRemarks(data).length }})
+                  </span>
+                  <button
+                    type="button"
+                    class="text-xs text-apricot-600 hover:text-apricot-700 font-medium flex items-center gap-1 cursor-pointer"
+                    @click="openEditRemarks(data)"
+                  >
+                    <i class="pi pi-pencil text-[10px]" />
+                    <span>Edit</span>
+                  </button>
+                </div>
+
+                <ul class="m-0 pl-4 flex flex-col gap-1.5 max-h-[160px] overflow-y-auto">
+                  <li
+                    v-for="(r, i) in getRemarks(data).slice(0, HOVER_LIMIT)"
+                    :key="i"
+                    class="text-xs text-blueberry-800 leading-snug"
+                  >
+                    {{ r }}
+                  </li>
+                </ul>
+
+                <button
+                  v-if="getRemarks(data).length > HOVER_LIMIT"
+                  type="button"
+                  class="mt-2.5 w-full pt-2 border-t border-appleCore-100 text-xs text-apricot-600 hover:text-apricot-700 hover:underline font-medium text-center cursor-pointer"
+                  @click="openEditRemarks(data)"
+                >
+                  See more (+{{ getRemarks(data).length - HOVER_LIMIT }})
+                </button>
+              </div>
+            </template>
+            <span v-else class="text-xs text-blueberry-300">—</span>
+          </div>
         </template>
       </Column>
 
@@ -393,7 +516,6 @@ function formatDate(dateStr: string | null | undefined): string {
               @click="goToEdit(data.id)"
             />
 
-            <!-- ✅ Move to Final List (kept) -->
             <Button
               v-if="data.status !== 'final_list' && data.status !== 'rejected'"
               icon="pi pi-check-circle"
@@ -406,7 +528,6 @@ function formatDate(dateStr: string | null | undefined): string {
               @click="handleMoveToFinalList(data)"
             />
 
-            <!-- ✅ Deploy for final_list applicants (kept) -->
             <DeployButton
               v-if="data.status === 'final_list' && data.applicant_batches?.[0]?.id"
               :applicant-batch-id="data.applicant_batches[0].id"
@@ -483,6 +604,15 @@ function formatDate(dateStr: string | null | undefined): string {
       :applicant="selectedApplicant"
       :loading="selectedApplicant ? isRowLoading(selectedApplicant.id) : false"
       @confirm="onRejectConfirmed"
+    />
+
+    <!-- Edit Remarks Dialog -->
+    <EditRemarksDialog
+      v-model:visible="remarksDialog"
+      :applicant-name="remarksApplicant ? getFullName(remarksApplicant) : ''"
+      :initial-remarks="getRemarks(remarksApplicant)"
+      :submitting="remarksSubmitting"
+      @save="onRemarksSave"
     />
   </div>
 </template>

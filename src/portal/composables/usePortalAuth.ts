@@ -1,5 +1,4 @@
-// src/portal/composables/usePortalAuth.ts
-import { ref, computed, toRaw } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { portalApi, TOKEN_KEY } from '../services/portalApi'
 
@@ -29,18 +28,8 @@ export function usePortalAuth() {
       missingFields.value = data.missing_fields ?? []
       pendingRequest.value = data.pending_request ?? null
 
-      console.log('👤 [Portal User Loaded]:', {
-        account: toRaw(account.value),
-        applicant: toRaw(applicant.value),
-        missingFields: toRaw(missingFields.value),
-      })
-
       return data
     } catch (err: any) {
-      console.error(
-        '❌ [fetchMe Failed]: Clearing session locally.',
-        err.response?.data || err.message,
-      )
       clearSession()
       throw err
     }
@@ -58,7 +47,6 @@ export function usePortalAuth() {
         last_name: lastName,
         date_of_birth: dateOfBirth,
       })
-      console.log('🔍 [Verify Claim Result]:', data)
       return data
     } finally {
       loading.value = false
@@ -82,7 +70,6 @@ export function usePortalAuth() {
       }
 
       localStorage.setItem(TOKEN_KEY, data.token)
-      console.log('🔑 [Register Successful] Token saved.')
 
       await fetchMe()
       router.push('/portal/dashboard')
@@ -102,7 +89,6 @@ export function usePortalAuth() {
       }
 
       localStorage.setItem(TOKEN_KEY, data.token)
-      console.log('🔑 [Login Successful] Token saved.')
 
       await fetchMe()
       router.push('/portal/dashboard')
@@ -116,7 +102,6 @@ export function usePortalAuth() {
     loading.value = true
     try {
       const { data } = await portalApi.post('/profile-updates', payload)
-      console.log('📝 [Profile Update Submitted]:', data)
       await fetchMe()
       return data
     } finally {
