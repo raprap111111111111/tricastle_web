@@ -23,10 +23,11 @@ export default defineConfig({
         '**/.git/**',
         '**/dist/**',
         '**/.vite/**',
+        '**/*.tsbuildinfo',
       ],
     },
   },
   css: {
-    devSourcemap: false, // reduces churn in dev
+    devSourcemap: false, 
   },
 })

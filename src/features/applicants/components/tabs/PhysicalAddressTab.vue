@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
-import { computed, ref, watch } from 'vue'
-import InputText from 'primevue/inputtext'
+import { ref, watch } from 'vue'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import AddressSelector from '../AddressSelector.vue'
@@ -10,7 +9,11 @@ import type { PhysicalAddressFormValues } from '../../schemas/applicant.schema'
 import { physicalAddressSchema } from '../../schemas/applicant.schema'
 
 const props = defineProps<{
-  initialValues?: Partial<PhysicalAddressFormValues>
+  initialValues?: Partial<PhysicalAddressFormValues> & {
+    currentAddress?: any
+    permanentAddress?: any
+    sameAsCurrent?: boolean
+  }
 }>()
 
 const emit = defineEmits<{
@@ -19,6 +22,32 @@ const emit = defineEmits<{
   (e: 'validate', values: PhysicalAddressFormValues | null): void
 }>()
 
+// ─── Initialize Address States from props.initialValues ───
+const currentAddress = ref({
+  country: props.initialValues?.currentAddress?.country ?? 'Philippines',
+  region: props.initialValues?.currentAddress?.region ?? null,
+  province: props.initialValues?.currentAddress?.province ?? props.initialValues?.province ?? null,
+  city: props.initialValues?.currentAddress?.city ?? props.initialValues?.city ?? null,
+  barangay: props.initialValues?.currentAddress?.barangay ?? null,
+  street: props.initialValues?.currentAddress?.street ?? '',
+  postal_code: props.initialValues?.currentAddress?.postal_code ?? props.initialValues?.postal_code ?? '',
+  full_address: props.initialValues?.currentAddress?.full_address ?? props.initialValues?.current_address ?? '',
+})
+
+const sameAsCurrent = ref(props.initialValues?.sameAsCurrent ?? false)
+
+const permanentAddress = ref({
+  country: props.initialValues?.permanentAddress?.country ?? 'Philippines',
+  region: props.initialValues?.permanentAddress?.region ?? null,
+  province: props.initialValues?.permanentAddress?.province ?? null,
+  city: props.initialValues?.permanentAddress?.city ?? null,
+  barangay: props.initialValues?.permanentAddress?.barangay ?? null,
+  street: props.initialValues?.permanentAddress?.street ?? '',
+  postal_code: props.initialValues?.permanentAddress?.postal_code ?? '',
+  full_address: props.initialValues?.permanentAddress?.full_address ?? props.initialValues?.permanent_address ?? '',
+})
+
+// ─── VeeValidate Setup ──────────────────────────────────
 const { handleSubmit, defineField, errors, values, validate, setFieldValue } =
   useForm<PhysicalAddressFormValues>({
     validationSchema: toTypedSchema(physicalAddressSchema),
@@ -27,11 +56,11 @@ const { handleSubmit, defineField, errors, values, validate, setFieldValue } =
       weight_kg: props.initialValues?.weight_kg ?? null,
       dominant_hand: props.initialValues?.dominant_hand ?? null,
       blood_type: props.initialValues?.blood_type ?? null,
-      current_address: props.initialValues?.current_address ?? '',
-      permanent_address: props.initialValues?.permanent_address ?? '',
-      city: props.initialValues?.city ?? '',
-      province: props.initialValues?.province ?? '',
-      postal_code: props.initialValues?.postal_code ?? '',
+      current_address: currentAddress.value.full_address || (props.initialValues?.current_address ?? ''),
+      permanent_address: permanentAddress.value.full_address || (props.initialValues?.permanent_address ?? ''),
+      city: currentAddress.value.city || (props.initialValues?.city ?? ''),
+      province: currentAddress.value.province || (props.initialValues?.province ?? ''),
+      postal_code: currentAddress.value.postal_code || (props.initialValues?.postal_code ?? ''),
     },
   })
 
@@ -40,40 +69,34 @@ const [weight_kg] = defineField('weight_kg')
 const [dominant_hand] = defineField('dominant_hand')
 const [blood_type] = defineField('blood_type')
 
-// ─── Address states ─────────────────────────────────────
-const currentAddress = ref({
-  country: 'Philippines',
-  region: null as string | null,
-  province: null as string | null,
-  city: null as string | null,
-  barangay: null as string | null,
-  street: '',
-  postal_code: '',
-  full_address: '',
-})
-
-const permanentAddress = ref({ ...currentAddress.value })
-const sameAsCurrent = ref(false)
-
 // ─── Sync address to form fields ────────────────────────
-watch(currentAddress, (val) => {
-  setFieldValue('current_address', val.full_address)
-  setFieldValue('city', val.city ?? '')
-  setFieldValue('province', val.province ?? '')
-  setFieldValue('postal_code', val.postal_code ?? '')
+watch(
+  currentAddress,
+  (val) => {
+    if (val.full_address) setFieldValue('current_address', val.full_address)
+    if (val.city) setFieldValue('city', val.city)
+    if (val.province) setFieldValue('province', val.province)
+    if (val.postal_code) setFieldValue('postal_code', val.postal_code)
 
-  if (sameAsCurrent.value) {
-    permanentAddress.value = { ...val }
-  }
-}, { deep: true })
+    if (sameAsCurrent.value) {
+      permanentAddress.value = { ...val }
+    }
+  },
+  { deep: true }
+)
 
-watch(permanentAddress, (val) => {
-  setFieldValue('permanent_address', val.full_address)
-}, { deep: true })
+watch(
+  permanentAddress,
+  (val) => {
+    if (val.full_address) setFieldValue('permanent_address', val.full_address)
+  },
+  { deep: true }
+)
 
 watch(sameAsCurrent, (isSame) => {
   if (isSame) {
     permanentAddress.value = { ...currentAddress.value }
+    setFieldValue('permanent_address', currentAddress.value.full_address)
   }
 })
 
@@ -95,14 +118,39 @@ const bloodTypeOptions = [
   { label: 'O-', value: 'O-' },
 ]
 
+// Helper to construct full payload to preserve address state
+const getFullFormPayload = (formValues: PhysicalAddressFormValues) => {
+  return {
+    ...formValues,
+    current_address: currentAddress.value.full_address || formValues.current_address,
+    permanent_address: sameAsCurrent.value
+      ? (currentAddress.value.full_address || formValues.current_address)
+      : (permanentAddress.value.full_address || formValues.permanent_address),
+    city: currentAddress.value.city || formValues.city,
+    province: currentAddress.value.province || formValues.province,
+    postal_code: currentAddress.value.postal_code || formValues.postal_code,
+    // Preserve full objects for AddressSelector when coming back
+    currentAddress: currentAddress.value,
+    permanentAddress: permanentAddress.value,
+    sameAsCurrent: sameAsCurrent.value,
+  }
+}
+
 // ─── Validation emit ────────────────────────────────────
-watch(values, async () => {
-  const result = await validate()
-  emit('validate', result.valid ? { ...values } as PhysicalAddressFormValues : null)
-}, { deep: true })
+watch(
+  [values, currentAddress, permanentAddress, sameAsCurrent],
+  async () => {
+    const result = await validate()
+    emit(
+      'validate',
+      result.valid ? (getFullFormPayload(values as PhysicalAddressFormValues) as any) : null
+    )
+  },
+  { deep: true }
+)
 
 const onSubmit = handleSubmit((formValues) => {
-  emit('next', formValues)
+  emit('next', getFullFormPayload(formValues) as any)
 })
 </script>
 

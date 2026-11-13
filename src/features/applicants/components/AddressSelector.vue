@@ -82,8 +82,28 @@ const fullAddress = computed(() => {
   return parts.join(', ')
 })
 
-// ─── Initialization & Defaults ──────────────────────────
-onMounted(async () => {
+// ─── Name Normalizer & Matching Helper ─────────────────
+// Handles differences like "City of Bacolod" vs "Bacolod City", "Brgy. 11" vs "Barangay 11 (Pob.)"
+function normalize(str: string | null | undefined): string {
+  if (!str) return ''
+  return str
+    .toLowerCase()
+    .replace(/^(city of|brgy\.?|barangay)\s+/gi, '')
+    .replace(/\s+(city|pob\.?|poblacion)$/gi, '')
+    .replace(/[^a-z0-9]/g, '')
+    .trim()
+}
+
+function matchName(apiName: string, targetName: string | null | undefined): boolean {
+  if (!targetName) return false
+  const a = normalize(apiName)
+  const b = normalize(targetName)
+  if (!a || !b) return false
+  return a === b || a.includes(b) || b.includes(a)
+}
+
+// ─── Robust Address Initialization ──────────────────────
+async function initAddress() {
   if (!isPhilippines.value) return
 
   isInitializing.value = true
@@ -91,61 +111,62 @@ onMounted(async () => {
   try {
     await loadRegions()
 
-    // 🎯 CREATE MODE: Auto-select Western Visayas + Negros Occidental
-    if (!props.modelValue.region) {
-      const westernVisayas = regions.value.find(
-        (r) =>
-          r.code === '0600000000' ||
-          r.code === '060000000'  ||
-          r.name.toLowerCase().includes('western visayas'),
-      )
+    // Sync primitive fields in case they changed
+    street.value = props.modelValue.street ?? ''
+    postalCode.value = props.modelValue.postal_code ?? ''
 
+    const hasSavedData = Boolean(
+      props.modelValue.province ||
+      props.modelValue.city ||
+      props.modelValue.barangay ||
+      props.modelValue.region ||
+      props.modelValue.full_address
+    )
+
+    if (hasSavedData) {
+      // 🎯 RESTORE PREVIOUSLY SELECTED ADDRESS
+      
+      // 1. Restore Region (or default to Western Visayas if region wasn't saved)
+      let targetRegion = regions.value.find(r => matchName(r.name, props.modelValue.region))
+      if (!targetRegion) {
+        targetRegion = regions.value.find(r => matchName(r.name, 'Western Visayas'))
+      }
+
+      if (targetRegion) {
+        regionCode.value = targetRegion.code
+        await loadProvinces(targetRegion.code)
+
+        // 2. Restore Province
+        const targetProv = provinces.value.find(p => matchName(p.name, props.modelValue.province))
+        if (targetProv) {
+          provinceCode.value = targetProv.code
+          await loadCities(targetProv.code)
+
+          // 3. Restore City
+          const targetCity = cities.value.find(c => matchName(c.name, props.modelValue.city))
+          if (targetCity) {
+            cityCode.value = targetCity.code
+            await loadBarangays(targetCity.code)
+
+            // 4. Restore Barangay
+            const targetBrgy = barangays.value.find(b => matchName(b.name, props.modelValue.barangay))
+            if (targetBrgy) {
+              barangayCode.value = targetBrgy.code
+            }
+          }
+        }
+      }
+    } else {
+      // 🎯 BRAND NEW ADDRESS DEFAULT (Western Visayas + Negros Occidental)
+      const westernVisayas = regions.value.find(r => matchName(r.name, 'Western Visayas'))
       if (westernVisayas) {
         regionCode.value = westernVisayas.code
         await loadProvinces(westernVisayas.code)
 
-        // Auto-select Negros Occidental
-        const negrosOccidental = provinces.value.find(
-          (p) =>
-            p.code === '0604500000' ||
-            p.code === '064500000'  ||
-            p.name.toLowerCase().includes('negros occidental'),
-        )
-
+        const negrosOccidental = provinces.value.find(p => matchName(p.name, 'Negros Occidental'))
         if (negrosOccidental) {
           provinceCode.value = negrosOccidental.code
-          await loadCities(negrosOccidental.code) // Pre-load cities for Negros Occ
-        }
-      }
-    } 
-    // 🎯 EDIT MODE: Restore saved location from parent
-    else {
-      const existingRegion = regions.value.find((r) => r.name === props.modelValue.region)
-      if (existingRegion) {
-        regionCode.value = existingRegion.code
-        await loadProvinces(existingRegion.code)
-
-        if (props.modelValue.province) {
-          const existingProv = provinces.value.find((p) => p.name === props.modelValue.province)
-          if (existingProv) {
-            provinceCode.value = existingProv.code
-            await loadCities(existingProv.code)
-
-            if (props.modelValue.city) {
-              const existingCity = cities.value.find((c) => c.name === props.modelValue.city)
-              if (existingCity) {
-                cityCode.value = existingCity.code
-                await loadBarangays(existingCity.code)
-
-                if (props.modelValue.barangay) {
-                  const existingBrgy = barangays.value.find((b) => b.name === props.modelValue.barangay)
-                  if (existingBrgy) {
-                    barangayCode.value = existingBrgy.code
-                  }
-                }
-              }
-            }
-          }
+          await loadCities(negrosOccidental.code)
         }
       }
     }
@@ -154,7 +175,9 @@ onMounted(async () => {
   } finally {
     isInitializing.value = false
   }
-})
+}
+
+onMounted(initAddress)
 
 // ─── API Loaders ────────────────────────────────────────
 async function loadRegions() {
@@ -207,8 +230,9 @@ async function loadBarangays(city: string) {
   }
 }
 
-// ─── Cascading watchers ─────────────────────────────────
+// ─── Cascading watchers (User Manual Selection) ─────────
 watch(country, (val) => {
+  if (isInitializing.value) return
   if (val === 'Philippines' && regions.value.length === 0) {
     loadRegions()
   }
@@ -243,6 +267,7 @@ watch(cityCode, (val) => {
 watch(
   [country, regionCode, provinceCode, cityCode, barangayCode, street, postalCode, fullAddress],
   () => {
+    if (isInitializing.value) return // Prevent emitting incomplete address during init load
     emit('update:modelValue', {
       country:      country.value,
       region:       regionName.value,
