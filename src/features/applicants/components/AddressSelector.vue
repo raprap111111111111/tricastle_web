@@ -29,13 +29,14 @@ const emit = defineEmits<{
 }>()
 
 // ─── Local state ────────────────────────────────────────
-const country      = ref<string>(props.modelValue.country ?? 'Philippines')
-const regionCode   = ref<string | null>(null)
-const provinceCode = ref<string | null>(null)
-const cityCode     = ref<string | null>(null)
-const barangayCode = ref<string | null>(null)
-const street       = ref<string>(props.modelValue.street ?? '')
-const postalCode   = ref<string>(props.modelValue.postal_code ?? '')
+const country        = ref<string>(props.modelValue.country ?? 'Philippines')
+const regionCode     = ref<string | null>(null)
+const provinceCode   = ref<string | null>(null)
+const cityCode       = ref<string | null>(null)
+const barangayCode   = ref<string | null>(null)
+const street         = ref<string>(props.modelValue.street ?? '')
+const postalCode     = ref<string>(props.modelValue.postal_code ?? '')
+const isInitializing = ref(false)
 
 // ─── Data ───────────────────────────────────────────────
 const regions      = ref<PsgcRegion[]>([])
@@ -50,13 +51,13 @@ const loadingBarangays = ref(false)
 
 // ─── Countries ──────────────────────────────────────────
 const countryOptions = [
-  { label: '🇵🇭 Philippines', value: 'Philippines' },
-  { label: '🇯🇵 Japan',       value: 'Japan' },
+  { label: '🇵🇭 Philippines',   value: 'Philippines' },
+  { label: '🇯🇵 Japan',         value: 'Japan' },
   { label: '🇺🇸 United States', value: 'United States' },
-  { label: '🇸🇬 Singapore',   value: 'Singapore' },
-  { label: '🇦🇪 UAE',         value: 'UAE' },
-  { label: '🇸🇦 Saudi Arabia', value: 'Saudi Arabia' },
-  { label: 'Other',            value: 'Other' },
+  { label: '🇸🇬 Singapore',     value: 'Singapore' },
+  { label: '🇦🇪 UAE',           value: 'UAE' },
+  { label: '🇸🇦 Saudi Arabia',  value: 'Saudi Arabia' },
+  { label: 'Other',              value: 'Other' },
 ]
 
 const isPhilippines = computed(() => country.value === 'Philippines')
@@ -81,13 +82,81 @@ const fullAddress = computed(() => {
   return parts.join(', ')
 })
 
-// ─── Load regions on mount ──────────────────────────────
+// ─── Initialization & Defaults ──────────────────────────
 onMounted(async () => {
-  if (isPhilippines.value) {
+  if (!isPhilippines.value) return
+
+  isInitializing.value = true
+
+  try {
     await loadRegions()
+
+    // 🎯 CREATE MODE: Auto-select Western Visayas + Negros Occidental
+    if (!props.modelValue.region) {
+      const westernVisayas = regions.value.find(
+        (r) =>
+          r.code === '0600000000' ||
+          r.code === '060000000'  ||
+          r.name.toLowerCase().includes('western visayas'),
+      )
+
+      if (westernVisayas) {
+        regionCode.value = westernVisayas.code
+        await loadProvinces(westernVisayas.code)
+
+        // Auto-select Negros Occidental
+        const negrosOccidental = provinces.value.find(
+          (p) =>
+            p.code === '0604500000' ||
+            p.code === '064500000'  ||
+            p.name.toLowerCase().includes('negros occidental'),
+        )
+
+        if (negrosOccidental) {
+          provinceCode.value = negrosOccidental.code
+          await loadCities(negrosOccidental.code) // Pre-load cities for Negros Occ
+        }
+      }
+    } 
+    // 🎯 EDIT MODE: Restore saved location from parent
+    else {
+      const existingRegion = regions.value.find((r) => r.name === props.modelValue.region)
+      if (existingRegion) {
+        regionCode.value = existingRegion.code
+        await loadProvinces(existingRegion.code)
+
+        if (props.modelValue.province) {
+          const existingProv = provinces.value.find((p) => p.name === props.modelValue.province)
+          if (existingProv) {
+            provinceCode.value = existingProv.code
+            await loadCities(existingProv.code)
+
+            if (props.modelValue.city) {
+              const existingCity = cities.value.find((c) => c.name === props.modelValue.city)
+              if (existingCity) {
+                cityCode.value = existingCity.code
+                await loadBarangays(existingCity.code)
+
+                if (props.modelValue.barangay) {
+                  const existingBrgy = barangays.value.find((b) => b.name === props.modelValue.barangay)
+                  if (existingBrgy) {
+                    barangayCode.value = existingBrgy.code
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Failed to initialize address options:', e)
+  } finally {
+    isInitializing.value = false
   }
 })
 
+// ─── API Loaders ────────────────────────────────────────
 async function loadRegions() {
   loadingRegions.value = true
   try {
@@ -143,7 +212,6 @@ watch(country, (val) => {
   if (val === 'Philippines' && regions.value.length === 0) {
     loadRegions()
   }
-  // Reset all when country changes
   regionCode.value = null
   provinceCode.value = null
   cityCode.value = null
@@ -151,6 +219,7 @@ watch(country, (val) => {
 })
 
 watch(regionCode, (val) => {
+  if (isInitializing.value) return
   provinceCode.value = null
   cityCode.value = null
   barangayCode.value = null
@@ -158,12 +227,14 @@ watch(regionCode, (val) => {
 })
 
 watch(provinceCode, (val) => {
+  if (isInitializing.value) return
   cityCode.value = null
   barangayCode.value = null
   if (val) loadCities(val)
 })
 
 watch(cityCode, (val) => {
+  if (isInitializing.value) return
   barangayCode.value = null
   if (val) loadBarangays(val)
 })

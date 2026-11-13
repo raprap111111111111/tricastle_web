@@ -1,3 +1,4 @@
+<!-- src/features/applicants/components/tabs/PersonalTab.vue -->
 <script setup lang="ts">
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
@@ -69,6 +70,82 @@ const [civil_status]       = defineField('civil_status')
 const [number_of_children] = defineField('number_of_children')
 const [nationality]        = defineField('nationality')
 
+// ─── Email Preset & Smart Domain Selector ───────────────
+const domainOptions = [
+  { label: '@gmail.com',      value: '@gmail.com' },
+  { label: '@yahoo.com',      value: '@yahoo.com' },
+  { label: '@outlook.com',    value: '@outlook.com' },
+  { label: '@hotmail.com',    value: '@hotmail.com' },
+  { label: '@icloud.com',     value: '@icloud.com' },
+  { label: 'Other / Custom',  value: 'custom' },
+]
+
+// Parse initial email into username + domain
+const rawInitialEmail = (props.initialValues as any)?.email ?? ''
+let initialUsername = ''
+let initialDomain = '@gmail.com'
+let initialCustomDomain = ''
+
+if (rawInitialEmail) {
+  const parts = rawInitialEmail.split('@')
+  if (parts.length === 2) {
+    initialUsername = parts[0]
+    const fullDomain = '@' + parts[1]
+    const matched = domainOptions.find(d => d.value.toLowerCase() === fullDomain.toLowerCase())
+    if (matched) {
+      initialDomain = matched.value
+    } else {
+      initialDomain = 'custom'
+      initialCustomDomain = '@' + parts[1]
+    }
+  } else {
+    initialUsername = rawInitialEmail
+  }
+}
+
+const emailUsername = ref(initialUsername)
+const emailDomain = ref(initialDomain)
+const customDomain = ref(initialCustomDomain)
+
+function syncEmail() {
+  const uname = emailUsername.value.trim()
+  if (!uname) {
+    email.value = ''
+    return
+  }
+
+  // Handle case when user pastes full email into username field
+  if (uname.includes('@')) {
+    const parts = uname.split('@')
+    const userPart = parts[0]
+    const domainPart = '@' + parts[1]
+
+    const matched = domainOptions.find(d => d.value.toLowerCase() === domainPart.toLowerCase())
+    if (matched) {
+      emailDomain.value = matched.value
+      customDomain.value = ''
+    } else if (parts[1]) {
+      emailDomain.value = 'custom'
+      customDomain.value = domainPart.startsWith('@') ? domainPart : '@' + domainPart
+    }
+    emailUsername.value = userPart
+    return
+  }
+
+  let domain = emailDomain.value
+  if (domain === 'custom') {
+    let cDom = customDomain.value.trim()
+    if (cDom && !cDom.startsWith('@')) {
+      cDom = '@' + cDom
+    }
+    domain = cDom
+  }
+
+  email.value = uname ? `${uname}${domain}` : ''
+}
+
+watch([emailUsername, emailDomain, customDomain], syncEmail, { immediate: true })
+
 const dobProxy = computed<Date | null>({
   get: () => toDate(date_of_birth.value),
   set: (v) => { date_of_birth.value = toISO(v) },
@@ -85,7 +162,7 @@ const civilOptions = [
   { label: 'Widowed',         value: 'widowed'         },
   { label: 'Separated',       value: 'separated'       },
   { label: 'Divorced',        value: 'divorced'        },
-  { label: 'Live-in Partner', value: 'live_in_partner' }, // 👈 Added option
+  { label: 'Live-in Partner', value: 'live_in_partner' },
 ]
 
 // ─── Real-time Duplicate Check ──────────────────────────
@@ -217,28 +294,50 @@ const onSubmit = handleSubmit((formValues) => {
           <InputText v-model="suffix" placeholder="Jr., Sr., III" />
         </div>
 
-        <!-- Email -->
-        <div class="flex flex-col gap-1">
+        <!-- Email (Username + Preset Domain Selector) -->
+        <div class="flex flex-col gap-1 md:col-span-2">
           <label class="text-sm font-medium text-blueberry-700">
-            Email <span class="text-red-500">*</span>
+            Email Address <span class="text-red-500">*</span>
           </label>
-          <div class="relative">
-            <InputText
-              v-model="email"
-              type="email"
-              placeholder="juan@example.com"
-              class="w-full pr-9"
-              :invalid="!!errors.email || emailStatus === 'taken'"
-              :class="{
-                '!border-green-500': emailStatus === 'available' && !errors.email,
-              }"
-            />
-            <div class="absolute right-3 top-1/2 -translate-y-1/2">
-              <i v-if="emailStatus === 'checking'" class="pi pi-spin pi-spinner text-blueberry-400 text-sm" />
-              <i v-else-if="emailStatus === 'available'" class="pi pi-check-circle text-green-500 text-sm" />
-              <i v-else-if="emailStatus === 'taken'" class="pi pi-times-circle text-red-500 text-sm" />
+          <div class="flex flex-col sm:flex-row items-stretch gap-2">
+            <div class="relative flex-1">
+              <InputText
+                v-model="emailUsername"
+                placeholder="juan.delacruz"
+                class="w-full pr-9"
+                :invalid="!!errors.email || emailStatus === 'taken'"
+                :class="{
+                  '!border-green-500': emailStatus === 'available' && !errors.email,
+                }"
+              />
+              <div class="absolute right-3 top-1/2 -translate-y-1/2">
+                <i v-if="emailStatus === 'checking'" class="pi pi-spin pi-spinner text-blueberry-400 text-sm" />
+                <i v-else-if="emailStatus === 'available'" class="pi pi-check-circle text-green-500 text-sm" />
+                <i v-else-if="emailStatus === 'taken'" class="pi pi-times-circle text-red-500 text-sm" />
+              </div>
             </div>
+
+            <!-- Domain Select -->
+            <Select
+              v-model="emailDomain"
+              :options="domainOptions"
+              option-label="label"
+              option-value="value"
+              class="w-full sm:w-44"
+            />
+
+            <!-- Custom Domain input if 'custom' is selected -->
+            <InputText
+              v-if="emailDomain === 'custom'"
+              v-model="customDomain"
+              placeholder="@domain.com"
+              class="w-full sm:w-40"
+            />
           </div>
+
+          <p v-if="emailUsername" class="text-[11px] text-blueberry-500 mt-0.5">
+            Full email: <span class="font-medium text-blueberry-800">{{ email }}</span>
+          </p>
           <small v-if="errors.email" class="text-red-500">{{ errors.email }}</small>
           <small v-else-if="emailStatus === 'taken'" class="text-red-500">
             <i class="pi pi-exclamation-circle text-[10px] mr-1" />
@@ -350,6 +449,7 @@ const onSubmit = handleSubmit((formValues) => {
       </div>
     </section>
 
+    <!-- Navigation -->
     <div class="flex justify-end">
       <button
         type="submit"

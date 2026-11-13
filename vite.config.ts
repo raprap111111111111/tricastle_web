@@ -17,5 +17,16 @@ export default defineConfig({
     port: 3000,
     strictPort: true,
     host: true,
+    watch: {
+      ignored: [
+        '**/node_modules/**',
+        '**/.git/**',
+        '**/dist/**',
+        '**/.vite/**',
+      ],
+    },
+  },
+  css: {
+    devSourcemap: false, // reduces churn in dev
   },
 })

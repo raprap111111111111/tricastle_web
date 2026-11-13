@@ -13,6 +13,8 @@ import WizardStepper from '../components/WizardStepper.vue'
 import PersonalTab from '../components/tabs/PersonalTab.vue'
 import PhysicalAddressTab from '../components/tabs/PhysicalAddressTab.vue'
 import DocumentsTab from '../components/tabs/DocumentsTab.vue'
+import DeploymentTab from '../components/tabs/DeploymentTab.vue'
+import FamilyTab from '../components/tabs/FamilyTab.vue'
 import LifestyleTab from '../components/tabs/LifestyleTab.vue'
 import EducationTab from '../components/tabs/EducationTab.vue'
 import EmploymentTab from '../components/tabs/EmploymentTab.vue'
@@ -60,6 +62,8 @@ const loaded = ref(false)
 const personalData    = ref<PersonalFormValues | null>(null)
 const physicalData    = ref<PhysicalAddressFormValues | null>(null)
 const documentsData   = ref<DocumentsFormValues | null>(null)
+const deploymentData = ref<any>(null)
+const familyData     = ref<any>(null)
 const lifestyleData   = ref<LifestyleFormValues | null>(null)
 const educationsData  = ref<EducationEntryValues[]>([])
 const employmentsData = ref<EmploymentEntryValues[]>([])
@@ -87,18 +91,19 @@ onMounted(async () => {
 
     // ── Personal ────────────────────────────────────────
     personalData.value = {
-      first_name:         a.first_name         ?? '',
-      middle_name:        a.middle_name        ?? '',
-      last_name:          a.last_name          ?? '',
-      suffix:             a.suffix             ?? '',
-      email:              a.email              ?? '',
-      phone:              a.phone              ?? '',
-      mobile:             a.mobile             ?? '',
-      date_of_birth:      a.date_of_birth      ?? null,
-      gender:             a.gender             ?? null,
-      civil_status:       a.civil_status       ?? null,
-      number_of_children: a.number_of_children ?? 0,
-      nationality:        a.nationality        ?? 'Filipino',
+      first_name:              a.first_name             ?? '',
+      middle_name:             a.middle_name            ?? '',
+      last_name:               a.last_name              ?? '',
+      suffix:                  a.suffix                 ?? '',
+      email:                   a.email                  ?? '',
+      phone:                   a.phone                  ?? '',
+      mobile:                  a.mobile                 ?? '',
+      date_of_birth:           a.date_of_birth          ?? null,
+      gender:                  a.gender                 ?? null,
+      civil_status:            a.civil_status           ?? null,
+      number_of_children:      a.number_of_children     ?? 0,
+      nationality:             a.nationality            ?? 'Filipino',
+      english_proficiency_pct: a.english_proficiency_pct ?? 0,
     }
     setStepState('personal', 'valid')
 
@@ -126,6 +131,14 @@ onMounted(async () => {
       pagibig_number:    a.pagibig_number    ?? '',
     }
     setStepState('documents', 'valid')
+
+    // ── Deployment ──────────────────────────────────────
+    deploymentData.value = (a as any).deployment ?? null
+    setStepState('deployment', 'valid')
+
+    // ── Family ──────────────────────────────────────────
+    familyData.value = (a as any).family ?? (a as any).family_members ?? null
+    setStepState('family', 'valid')
 
     // ── Lifestyle ───────────────────────────────────────
     if (a.lifestyle) {
@@ -169,6 +182,7 @@ onMounted(async () => {
       date_started:       emp.date_started,
       date_ended:         emp.date_ended         ?? null,
       is_current:         emp.is_current,
+      is_overseas:        emp.is_overseas        ?? false,
       country:            emp.country            ?? 'Philippines',
       city:               emp.city               ?? '',
       salary:             emp.salary             ?? null,
@@ -226,6 +240,16 @@ function onDocumentsValidate(values: DocumentsFormValues | null) {
   }
 }
 
+function onDeploymentValidate(values: any) {
+  deploymentData.value = values
+  setStepState('deployment', values ? 'valid' : 'invalid')
+}
+
+function onFamilyValidate(values: any) {
+  familyData.value = values
+  setStepState('family', values ? 'valid' : 'invalid')
+}
+
 function onLifestyleValidate(values: LifestyleFormValues | null) {
   if (values) {
     lifestyleData.value = values
@@ -251,6 +275,18 @@ function onPhysicalNext(values: PhysicalAddressFormValues) {
 function onDocumentsNext(values: DocumentsFormValues) {
   documentsData.value = values
   setStepState('documents', 'valid')
+  goNext()
+}
+
+function onDeploymentNext(values: any) {
+  deploymentData.value = values
+  setStepState('deployment', 'valid')
+  goNext()
+}
+
+function onFamilyNext(values: any) {
+  familyData.value = values
+  setStepState('family', 'valid')
   goNext()
 }
 
@@ -497,6 +533,24 @@ async function onFinalSubmit() {
         :initial-values="documentsData ?? undefined"
         @next="onDocumentsNext"
         @validate="onDocumentsValidate"
+        @back="goBack"
+      />
+
+      <DeploymentTab
+        v-else-if="currentStep.key === 'deployment'"
+        :key="`deployment-${props.id}`"
+        :initial-values="deploymentData"
+        @next="onDeploymentNext"
+        @validate="onDeploymentValidate"
+        @back="goBack"
+      />
+
+      <FamilyTab
+        v-else-if="currentStep.key === 'family'"
+        :key="`family-${props.id}`"
+        :initial-values="familyData"
+        @next="onFamilyNext"
+        @validate="onFamilyValidate"
         @back="goBack"
       />
 

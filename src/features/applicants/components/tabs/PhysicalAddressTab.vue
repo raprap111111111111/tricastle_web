@@ -23,22 +23,22 @@ const { handleSubmit, defineField, errors, values, validate, setFieldValue } =
   useForm<PhysicalAddressFormValues>({
     validationSchema: toTypedSchema(physicalAddressSchema),
     initialValues: {
-      height_cm:         props.initialValues?.height_cm         ?? null,
-      weight_kg:         props.initialValues?.weight_kg         ?? null,
-      dominant_hand:     props.initialValues?.dominant_hand     ?? null,
-      blood_type:        props.initialValues?.blood_type        ?? null,
-      current_address:   props.initialValues?.current_address   ?? '',
+      height_cm: props.initialValues?.height_cm ?? null,
+      weight_kg: props.initialValues?.weight_kg ?? null,
+      dominant_hand: props.initialValues?.dominant_hand ?? null,
+      blood_type: props.initialValues?.blood_type ?? null,
+      current_address: props.initialValues?.current_address ?? '',
       permanent_address: props.initialValues?.permanent_address ?? '',
-      city:              props.initialValues?.city              ?? '',
-      province:          props.initialValues?.province          ?? '',
-      postal_code:       props.initialValues?.postal_code       ?? '',
+      city: props.initialValues?.city ?? '',
+      province: props.initialValues?.province ?? '',
+      postal_code: props.initialValues?.postal_code ?? '',
     },
   })
 
-const [height_cm]     = defineField('height_cm')
-const [weight_kg]     = defineField('weight_kg')
+const [height_cm] = defineField('height_cm')
+const [weight_kg] = defineField('weight_kg')
 const [dominant_hand] = defineField('dominant_hand')
-const [blood_type]    = defineField('blood_type')
+const [blood_type] = defineField('blood_type')
 
 // ─── Address states ─────────────────────────────────────
 const currentAddress = ref({
@@ -53,14 +53,14 @@ const currentAddress = ref({
 })
 
 const permanentAddress = ref({ ...currentAddress.value })
-const sameAsCurrent    = ref(false)
+const sameAsCurrent = ref(false)
 
 // ─── Sync address to form fields ────────────────────────
 watch(currentAddress, (val) => {
   setFieldValue('current_address', val.full_address)
-  setFieldValue('city',            val.city ?? '')
-  setFieldValue('province',        val.province ?? '')
-  setFieldValue('postal_code',     val.postal_code ?? '')
+  setFieldValue('city', val.city ?? '')
+  setFieldValue('province', val.province ?? '')
+  setFieldValue('postal_code', val.postal_code ?? '')
 
   if (sameAsCurrent.value) {
     permanentAddress.value = { ...val }
@@ -79,16 +79,20 @@ watch(sameAsCurrent, (isSame) => {
 
 // ─── Options ────────────────────────────────────────────
 const handOptions = [
-  { label: 'Left',  value: 'left'  },
+  { label: 'Left', value: 'left' },
   { label: 'Right', value: 'right' },
-  { label: 'Both',  value: 'both'  },
+  { label: 'Both', value: 'both' },
 ]
 
-const bloodOptions = [
-  { label: 'A',  value: 'A'  },
-  { label: 'B',  value: 'B'  },
-  { label: 'AB', value: 'AB' },
-  { label: 'O',  value: 'O'  },
+const bloodTypeOptions = [
+  { label: 'A+', value: 'A+' },
+  { label: 'A-', value: 'A-' },
+  { label: 'B+', value: 'B+' },
+  { label: 'B-', value: 'B-' },
+  { label: 'AB+', value: 'AB+' },
+  { label: 'AB-', value: 'AB-' },
+  { label: 'O+', value: 'O+' },
+  { label: 'O-', value: 'O-' },
 ]
 
 // ─── Validation emit ────────────────────────────────────
@@ -125,75 +129,45 @@ const onSubmit = handleSubmit((formValues) => {
 
         <div class="flex flex-col gap-1">
           <label class="text-sm font-medium text-blueberry-700">Dominant Hand</label>
-          <Select
-            v-model="dominant_hand"
-            :options="handOptions"
-            option-label="label"
-            option-value="value"
-            placeholder="Select"
-          />
+          <Select v-model="dominant_hand" :options="handOptions" option-label="label" option-value="value"
+            placeholder="Select" />
         </div>
 
         <div class="flex flex-col gap-1">
           <label class="text-sm font-medium text-blueberry-700">Blood Type</label>
-          <Select
-            v-model="blood_type"
-            :options="bloodOptions"
-            option-label="label"
-            option-value="value"
-            placeholder="Select"
-          />
+          <Select v-model="blood_type" :options="bloodTypeOptions" option-label="label" option-value="value"
+            placeholder="Select" />
         </div>
       </div>
     </section>
 
     <!-- ─── Current Address ──────────────────────────── -->
     <section class="bg-white rounded-xl border border-appleCore-100 p-6">
-      <AddressSelector
-        v-model="currentAddress"
-        label="Current Address"
-      />
+      <AddressSelector v-model="currentAddress" label="Current Address" />
     </section>
 
     <!-- ─── Same as Current toggle ───────────────────── -->
     <label class="flex items-center gap-2 px-6 cursor-pointer">
-      <input
-        v-model="sameAsCurrent"
-        type="checkbox"
-        class="w-4 h-4 accent-apricot-500"
-      />
+      <input v-model="sameAsCurrent" type="checkbox" class="w-4 h-4 accent-apricot-500" />
       <span class="text-sm text-blueberry-700">
         Permanent address is the same as current address
       </span>
     </label>
 
     <!-- ─── Permanent Address ────────────────────────── -->
-    <section
-      v-if="!sameAsCurrent"
-      class="bg-white rounded-xl border border-appleCore-100 p-6"
-    >
-      <AddressSelector
-        v-model="permanentAddress"
-        label="Permanent Address"
-      />
+    <section v-if="!sameAsCurrent" class="bg-white rounded-xl border border-appleCore-100 p-6">
+      <AddressSelector v-model="permanentAddress" label="Permanent Address" />
     </section>
 
     <!-- ─── Actions ──────────────────────────────────── -->
     <div class="flex justify-between">
-      <button
-        type="button"
-        class="inline-flex items-center gap-2 px-6 py-2.5 bg-gray-200 text-gray-700 rounded-lg
-               font-medium text-sm hover:bg-gray-300 transition-colors"
-        @click="emit('back')"
-      >
+      <button type="button" class="inline-flex items-center gap-2 px-6 py-2.5 bg-gray-200 text-gray-700 rounded-lg
+               font-medium text-sm hover:bg-gray-300 transition-colors" @click="emit('back')">
         <i class="pi pi-arrow-left text-xs" />
         Back
       </button>
-      <button
-        type="submit"
-        class="inline-flex items-center gap-2 px-6 py-2.5 bg-apricot-500 text-white rounded-lg
-               font-medium text-sm hover:bg-apricot-600 transition-colors"
-      >
+      <button type="submit" class="inline-flex items-center gap-2 px-6 py-2.5 bg-apricot-500 text-white rounded-lg
+               font-medium text-sm hover:bg-apricot-600 transition-colors">
         Next
         <i class="pi pi-arrow-right text-xs" />
       </button>

@@ -75,8 +75,8 @@ const onNext = handleSubmit((data) => {
   <form class="flex flex-col gap-6" @submit.prevent="onNext">
 
     <!-- ─── Info Banner ──────────────────────────────────────────────────────── -->
-    <div class="flex items-start gap-2 px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-xl text-sm text-indigo-700">
-      <i class="pi pi-info-circle text-indigo-500 mt-0.5 flex-shrink-0" />
+    <div class="flex items-start gap-2 px-4 py-3 bg-apricot-50 border border-apricot-200 rounded-xl text-sm text-apricot-800">
+      <i class="pi pi-info-circle text-apricot-500 mt-0.5 flex-shrink-0" />
       <span>
         This section collects <strong>screening information</strong> for Japan construction deployment.
         All fields are optional — fill what is available now.
@@ -369,6 +369,7 @@ const onNext = handleSubmit((data) => {
           label="Next"
           icon="pi pi-arrow-right"
           icon-pos="right"
+          class="!bg-apricot-500 hover:!bg-apricot-600 !border-apricot-500 !text-white"
         />
       </div>
     </div>

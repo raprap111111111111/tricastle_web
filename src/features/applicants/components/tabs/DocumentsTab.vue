@@ -20,15 +20,15 @@ import type { Applicant } from '../../types'
 const props = defineProps<{
   initialValues?: Partial<Applicant> & {
     id_photo_file?: File | null
-    biodata_file?:  File | null
+    biodata_file?: File | null
     biodata_notes?: string | null
     passport_issuing_office_id?: number | null
   }
 }>()
 
 const emit = defineEmits<{
-  next:     [values: DocumentsFormValues]
-  back:     []
+  next: [values: DocumentsFormValues]
+  back: []
   validate: [values: DocumentsFormValues | null]
 }>()
 
@@ -37,14 +37,33 @@ const store = useApplicantStore()
 const { passportOffices, loadingOffices } = storeToRefs(store)
 
 // ─── Flatten grouped passport offices for Select dropdown options ─────────────
+// ─── Flatten passport offices safely (handles Array or Grouped Object) ────────
 const flatPassportOffices = computed(() => {
-  return Object.entries(passportOffices.value).flatMap(([region, offices]) =>
-    (offices ?? []).map((o) => ({
+  if (!passportOffices.value) return []
+
+  // If passportOffices is already an Array
+  if (Array.isArray(passportOffices.value)) {
+    return passportOffices.value.map((o: any) => ({
       id: o.id,
       name: o.name,
-      region: region,
+      region: o.region ?? 'General',
     }))
-  )
+  }
+
+  // If passportOffices is a Grouped Object { "NCR": [...], "Visayas": [...] }
+  return Object.entries(passportOffices.value).flatMap(([region, offices]) => {
+    const list = Array.isArray(offices)
+      ? offices
+      : offices && typeof offices === 'object'
+        ? [offices]
+        : []
+
+    return list.map((o: any) => ({
+      id: o.id,
+      name: o.name,
+      region: o.region ?? region,
+    }))
+  })
 })
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -67,26 +86,26 @@ const { handleSubmit, defineField, setFieldValue, errors, values } =
   useForm<DocumentsFormValues>({
     validationSchema: toTypedSchema(documentsSchema),
     initialValues: {
-      passport_number:            props.initialValues?.passport_number            ?? '',
-      passport_expiry:            props.initialValues?.passport_expiry            ?? null,
+      passport_number: props.initialValues?.passport_number ?? '',
+      passport_expiry: props.initialValues?.passport_expiry ?? null,
       passport_issuing_office_id: props.initialValues?.passport_issuing_office_id ?? null,
-      sss_number:                 props.initialValues?.sss_number                 ?? '',
-      tin_number:                 props.initialValues?.tin_number                 ?? '',
-      philhealth_number:          props.initialValues?.philhealth_number          ?? '',
-      pagibig_number:             props.initialValues?.pagibig_number             ?? '',
-      id_photo_file:              props.initialValues?.id_photo_file              ?? null,
-      biodata_file:               props.initialValues?.biodata_file               ?? null,
-      biodata_notes:              props.initialValues?.biodata_notes              ?? null,
+      sss_number: props.initialValues?.sss_number ?? '',
+      tin_number: props.initialValues?.tin_number ?? '',
+      philhealth_number: props.initialValues?.philhealth_number ?? '',
+      pagibig_number: props.initialValues?.pagibig_number ?? '',
+      id_photo_file: props.initialValues?.id_photo_file ?? null,
+      biodata_file: props.initialValues?.biodata_file ?? null,
+      biodata_notes: props.initialValues?.biodata_notes ?? null,
     },
   })
 
-const [passport_number]            = defineField('passport_number')
-const [passport_expiry]            = defineField('passport_expiry')
+const [passport_number] = defineField('passport_number')
+const [passport_expiry] = defineField('passport_expiry')
 const [passport_issuing_office_id] = defineField('passport_issuing_office_id')
-const [sss_number]                 = defineField('sss_number')
-const [tin_number]                 = defineField('tin_number')
-const [philhealth_number]          = defineField('philhealth_number')
-const [pagibig_number]             = defineField('pagibig_number')
+const [sss_number] = defineField('sss_number')
+const [tin_number] = defineField('tin_number')
+const [philhealth_number] = defineField('philhealth_number')
+const [pagibig_number] = defineField('pagibig_number')
 
 const passportExpiryProxy = computed<Date | null>({
   get: () => toDate(passport_expiry.value),
@@ -97,14 +116,14 @@ watch(values, (v) => emit('validate', v as DocumentsFormValues), { deep: true })
 
 // ─── 🖼️ 2x2 ID Photo Upload State ─────────────────────────────────────────────
 const photoInputRef = ref<HTMLInputElement | null>(null)
-const idPhotoFile   = ref<File | null>(props.initialValues?.id_photo_file ?? null)
-const photoPreview  = ref<string | null>(null)
+const idPhotoFile = ref<File | null>(props.initialValues?.id_photo_file ?? null)
+const photoPreview = ref<string | null>(null)
 
 function triggerPhotoInput() { photoInputRef.value?.click() }
 
 function onPhotoChange(e: Event) {
   const input = e.target as HTMLInputElement
-  const file  = input.files?.[0]
+  const file = input.files?.[0]
   if (file) applyPhoto(file)
 }
 
@@ -120,7 +139,7 @@ function applyPhoto(file: File) {
 }
 
 function clearPhotoFile() {
-  idPhotoFile.value  = null
+  idPhotoFile.value = null
   photoPreview.value = null
   setFieldValue('id_photo_file', null)
   if (photoInputRef.value) photoInputRef.value.value = ''
@@ -128,15 +147,15 @@ function clearPhotoFile() {
 
 // ─── Biodata Upload State ─────────────────────────────────────────────────────
 const fileInputRef = ref<HTMLInputElement | null>(null)
-const isDragging   = ref(false)
-const biodataFile  = ref<File | null>(props.initialValues?.biodata_file ?? null)
+const isDragging = ref(false)
+const biodataFile = ref<File | null>(props.initialValues?.biodata_file ?? null)
 const biodataNotes = ref<string>(props.initialValues?.biodata_notes ?? '')
 
 function triggerFileInput() { fileInputRef.value?.click() }
 
 function onFileChange(e: Event) {
   const input = e.target as HTMLInputElement
-  const file  = input.files?.[0]
+  const file = input.files?.[0]
   if (file) applyFile(file)
 }
 
@@ -157,15 +176,15 @@ function applyFile(file: File) {
 }
 
 function clearBiodataFile() {
-  biodataFile.value  = null
+  biodataFile.value = null
   biodataNotes.value = ''
-  setFieldValue('biodata_file',  null)
+  setFieldValue('biodata_file', null)
   setFieldValue('biodata_notes', null)
   if (fileInputRef.value) fileInputRef.value.value = ''
 }
 
 function formatFileSize(bytes: number): string {
-  if (bytes < 1024)        return `${bytes} B`
+  if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
@@ -178,25 +197,25 @@ watch(biodataNotes, (v) => setFieldValue('biodata_notes', v || null))
 const helperApi = axios.create({ baseURL: 'http://localhost:5555', timeout: 120000 })
 
 const scanDialogVisible = ref(false)
-const scanTarget        = ref<'photo' | 'biodata' | null>(null)
-const checkingHelper    = ref(false)
-const helperInstalled   = ref(false)
-const scanners          = ref<Array<{ name: string }>>([])
-const selectedScanner   = ref('')
-const scanning          = ref(false)
+const scanTarget = ref<'photo' | 'biodata' | null>(null)
+const checkingHelper = ref(false)
+const helperInstalled = ref(false)
+const scanners = ref<Array<{ name: string }>>([])
+const selectedScanner = ref('')
+const scanning = ref(false)
 
 const scanResolution = ref(300)
-const scanColorMode  = ref('Color')
+const scanColorMode = ref('Color')
 
 const resolutionOptions = [
-  { label: '📄 Draft (150 DPI)',  value: 150 },
+  { label: '📄 Draft (150 DPI)', value: 150 },
   { label: '📋 Normal (300 DPI)', value: 300 },
-  { label: '⭐ High (600 DPI)',    value: 600 },
+  { label: '⭐ High (600 DPI)', value: 600 },
 ]
 const colorModeOptions = [
-  { label: '🎨 Color',            value: 'Color' },
-  { label: '⚫ Grayscale',        value: 'Gray' },
-  { label: '⬛ Black & White',    value: 'BW' },
+  { label: '🎨 Color', value: 'Color' },
+  { label: '⚫ Grayscale', value: 'Gray' },
+  { label: '⬛ Black & White', value: 'BW' },
 ]
 
 async function openScanner(target: 'photo' | 'biodata') {
@@ -239,17 +258,17 @@ async function executeScan() {
     const format = scanTarget.value === 'photo' ? 'jpg' : 'pdf'
 
     const { data: scanData } = await helperApi.post('/scan', {
-      device:     selectedScanner.value,
+      device: selectedScanner.value,
       resolution: scanResolution.value,
-      colorMode:  scanColorMode.value,
-      format:     format,
+      colorMode: scanColorMode.value,
+      format: format,
     })
 
     if (!scanData.success) throw new Error('Scan failed')
 
     const response = await fetch(scanData.data)
-    const blob     = await response.blob()
-    
+    const blob = await response.blob()
+
     const filename = scanTarget.value === 'photo' ? `scanned_photo_${Date.now()}.jpg` : `scanned_biodata_${Date.now()}.pdf`
     const file = new File([blob], filename, { type: scanData.mimeType ?? (format === 'jpg' ? 'image/jpeg' : 'application/pdf') })
 
@@ -287,7 +306,8 @@ const onSubmit = handleSubmit((values) => {
       <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-1 flex items-center gap-2">
         <i class="pi pi-camera text-apricot-500" />
         2×2 ID Photo / Profile Picture
-        <span class="text-xs font-sans font-normal text-blueberry-400 normal-case tracking-normal ml-1">(optional)</span>
+        <span
+          class="text-xs font-sans font-normal text-blueberry-400 normal-case tracking-normal ml-1">(optional)</span>
       </h3>
       <p class="text-xs text-blueberry-400 mb-4">
         Used on table hover previews and profile sheets. White background preferred.
@@ -295,7 +315,8 @@ const onSubmit = handleSubmit((values) => {
 
       <div class="flex items-center gap-5">
         <!-- Photo Preview Circle -->
-        <div class="w-24 h-24 rounded-2xl border-2 border-dashed border-appleCore-200 bg-appleCore-50 flex items-center justify-center overflow-hidden flex-shrink-0 relative group">
+        <div
+          class="w-24 h-24 rounded-2xl border-2 border-dashed border-appleCore-200 bg-appleCore-50 flex items-center justify-center overflow-hidden flex-shrink-0 relative group">
           <img v-if="photoPreview" :src="photoPreview" alt="2x2 Preview" class="w-full h-full object-cover" />
           <div v-else class="flex flex-col items-center gap-1 text-blueberry-400">
             <i class="pi pi-image text-2xl" />
@@ -305,22 +326,28 @@ const onSubmit = handleSubmit((values) => {
 
         <!-- Controls -->
         <div class="flex flex-col items-start gap-2">
-          <input ref="photoInputRef" type="file" accept="image/jpeg,image/png,image/jpg" class="hidden" @change="onPhotoChange" />
+          <input ref="photoInputRef" type="file" accept="image/jpeg,image/png,image/jpg" class="hidden"
+            @change="onPhotoChange" />
 
           <div class="flex items-center gap-2">
-            <button type="button" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-appleCore-200 bg-white text-xs font-semibold text-blueberry-700 hover:bg-appleCore-50 transition-colors shadow-2xs" @click="triggerPhotoInput">
+            <button type="button"
+              class="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-appleCore-200 bg-white text-xs font-semibold text-blueberry-700 hover:bg-appleCore-50 transition-colors shadow-2xs"
+              @click="triggerPhotoInput">
               <i class="pi pi-upload text-xs text-apricot-500" />
               {{ idPhotoFile ? 'Replace Photo' : 'Upload File' }}
             </button>
-            
+
             <!-- 🖨️ SCAN BUTTON -->
-            <button type="button" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-purple-200 bg-purple-50 text-xs font-semibold text-purple-700 hover:bg-purple-100 transition-colors shadow-2xs" @click="openScanner('photo')">
+            <button type="button"
+              class="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-purple-200 bg-purple-50 text-xs font-semibold text-purple-700 hover:bg-purple-100 transition-colors shadow-2xs"
+              @click="openScanner('photo')">
               <i class="pi pi-print text-xs text-purple-500" />
               Scan Photo
             </button>
           </div>
 
-          <button v-if="idPhotoFile" type="button" class="text-xs text-red-500 hover:underline" @click="clearPhotoFile">Remove photo</button>
+          <button v-if="idPhotoFile" type="button" class="text-xs text-red-500 hover:underline"
+            @click="clearPhotoFile">Remove photo</button>
           <p class="text-[11px] text-blueberry-400">JPG or PNG · max 5MB</p>
         </div>
       </div>
@@ -343,32 +370,29 @@ const onSubmit = handleSubmit((values) => {
         <!-- Passport Expiry -->
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold text-blueberry-700 uppercase tracking-wide">Passport Expiry Date</label>
-          <DatePicker v-model="passportExpiryProxy" date-format="yy-mm-dd" placeholder="YYYY-MM-DD" show-icon class="w-full" />
+          <DatePicker v-model="passportExpiryProxy" date-format="yy-mm-dd" placeholder="YYYY-MM-DD" show-icon
+            class="w-full" />
           <small v-if="errors.passport_expiry" class="text-red-500 text-xs">{{ errors.passport_expiry }}</small>
         </div>
 
         <!-- 🎯 Dynamic Passport Issuing Location Selector (DFA) -->
         <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold text-blueberry-700 uppercase tracking-wide">Passport Issuing Office (DFA)</label>
-          <Select
-            v-model="passport_issuing_office_id"
-            :options="flatPassportOffices"
-            option-label="name"
-            option-value="id"
-            placeholder="Select DFA Location"
-            :loading="loadingOffices"
-            filter
-            show-clear
-            class="w-full"
-          >
+          <label class="text-xs font-semibold text-blueberry-700 uppercase tracking-wide">Passport Issuing Office
+            (DFA)</label>
+          <Select v-model="passport_issuing_office_id" :options="flatPassportOffices" option-label="name"
+            option-value="id" placeholder="Select DFA Location" :loading="loadingOffices" filter show-clear
+            class="w-full">
             <template #option="slotProps">
               <div class="flex flex-col">
-                <span class="text-xs font-semibold text-apricot-600 uppercase tracking-wider mb-0.5">{{ slotProps.option.region }}</span>
+                <span class="text-xs font-semibold text-apricot-600 uppercase tracking-wider mb-0.5">{{
+                  slotProps.option.region }}</span>
                 <span class="text-sm font-medium text-blueberry-800">{{ slotProps.option.name }}</span>
               </div>
             </template>
           </Select>
-          <small v-if="errors.passport_issuing_office_id" class="text-red-500 text-xs">{{ errors.passport_issuing_office_id }}</small>
+          <small v-if="errors.passport_issuing_office_id" class="text-red-500 text-xs">{{
+            errors.passport_issuing_office_id
+            }}</small>
         </div>
       </div>
     </section>
@@ -406,16 +430,14 @@ const onSubmit = handleSubmit((values) => {
         <h3 class="text-base font-serif font-semibold text-blueberry-800 flex items-center gap-2">
           <i class="pi pi-file-pdf text-apricot-500" />
           Biodata Document
-          <span class="text-xs font-sans font-normal text-blueberry-400 normal-case tracking-normal ml-1">(optional)</span>
+          <span
+            class="text-xs font-sans font-normal text-blueberry-400 normal-case tracking-normal ml-1">(optional)</span>
         </h3>
-        
+
         <!-- 🖨️ SCAN BUTTON -->
-        <Button 
-          icon="pi pi-print" 
-          label="Scan Biodata" 
-          class="!bg-purple-500 !border-purple-500 !text-white hover:!bg-purple-600 !py-1.5 !px-3 !text-xs" 
-          @click="openScanner('biodata')"
-        />
+        <Button icon="pi pi-print" label="Scan Biodata"
+          class="!bg-purple-500 !border-purple-500 !text-white hover:!bg-purple-600 !py-1.5 !px-3 !text-xs"
+          @click="openScanner('biodata')" />
       </div>
 
       <p class="text-xs text-blueberry-400 mb-4">
@@ -423,11 +445,10 @@ const onSubmit = handleSubmit((values) => {
       </p>
 
       <!-- Drop zone -->
-      <div
-        class="relative border-2 border-dashed rounded-xl transition-all duration-200 cursor-pointer select-none"
+      <div class="relative border-2 border-dashed rounded-xl transition-all duration-200 cursor-pointer select-none"
         :class="isDragging ? 'border-apricot-400 bg-apricot-50' : biodataFile ? 'border-green-300 bg-green-50/50' : 'border-appleCore-200 hover:border-apricot-300 hover:bg-apricot-50/20'"
-        @dragover.prevent="isDragging = true" @dragleave.prevent="isDragging = false" @drop.prevent="onDrop" @click="triggerFileInput"
-      >
+        @dragover.prevent="isDragging = true" @dragleave.prevent="isDragging = false" @drop.prevent="onDrop"
+        @click="triggerFileInput">
         <input ref="fileInputRef" type="file" accept=".pdf,.jpg,.jpeg,.png" class="hidden" @change="onFileChange" />
 
         <div v-if="!biodataFile" class="flex flex-col items-center justify-center py-10 gap-2">
@@ -435,49 +456,62 @@ const onSubmit = handleSubmit((values) => {
             <i class="pi pi-upload text-blueberry-400 text-xl" />
           </div>
           <p class="text-sm font-medium text-blueberry-700">
-            Drop biodata here, <span class="text-apricot-600 underline underline-offset-2">browse file</span>, or use Scan.
+            Drop biodata here, <span class="text-apricot-600 underline underline-offset-2">browse file</span>, or use
+            Scan.
           </p>
         </div>
 
         <div v-else class="flex items-center gap-3 p-4" @click.stop>
-          <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" :class="biodataFile.type === 'application/pdf' ? 'bg-red-100' : 'bg-blue-100'">
-            <i class="text-xl" :class="biodataFile.type === 'application/pdf' ? 'pi pi-file-pdf text-red-600' : 'pi pi-image text-blue-600'" />
+          <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+            :class="biodataFile.type === 'application/pdf' ? 'bg-red-100' : 'bg-blue-100'">
+            <i class="text-xl"
+              :class="biodataFile.type === 'application/pdf' ? 'pi pi-file-pdf text-red-600' : 'pi pi-image text-blue-600'" />
           </div>
           <div class="flex-1 min-w-0">
             <p class="text-sm font-semibold text-blueberry-800 truncate">{{ biodataFile.name }}</p>
             <p class="text-xs text-blueberry-500 mt-0.5">
-              {{ formatFileSize(biodataFile.size) }} · <button type="button" class="text-apricot-600 hover:underline" @click="triggerFileInput">Replace</button>
+              {{ formatFileSize(biodataFile.size) }} · <button type="button" class="text-apricot-600 hover:underline"
+                @click="triggerFileInput">Replace</button>
             </p>
           </div>
-          <button type="button" class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 hover:bg-red-100 text-blueberry-400 hover:text-red-600 transition-colors" @click="clearBiodataFile">
+          <button type="button"
+            class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 hover:bg-red-100 text-blueberry-400 hover:text-red-600 transition-colors"
+            @click="clearBiodataFile">
             <i class="pi pi-times text-sm" />
           </button>
         </div>
       </div>
 
       <!-- Notes -->
-      <Transition enter-active-class="transition-all duration-200 ease-out" enter-from-class="opacity-0 -translate-y-1" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition-all duration-150 ease-in" leave-from-class="opacity-100" leave-to-class="opacity-0">
+      <Transition enter-active-class="transition-all duration-200 ease-out" enter-from-class="opacity-0 -translate-y-1"
+        enter-to-class="opacity-100 translate-y-0" leave-active-class="transition-all duration-150 ease-in"
+        leave-from-class="opacity-100" leave-to-class="opacity-0">
         <div v-if="biodataFile" class="mt-3">
           <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">
             Notes <span class="font-normal text-blueberry-400 normal-case tracking-normal ml-1">(optional)</span>
           </label>
-          <InputText v-model="biodataNotes" placeholder="e.g. Scanned copy — original submitted on intake day" class="w-full" />
+          <InputText v-model="biodataNotes" placeholder="e.g. Scanned copy — original submitted on intake day"
+            class="w-full" />
         </div>
       </Transition>
     </section>
 
     <!-- ─── Navigation ───────────────────────────────────────────────────────── -->
     <div class="flex items-center justify-between pt-2">
-      <button type="button" class="inline-flex items-center gap-2 px-6 py-2.5 bg-gray-100 text-blueberry-700 rounded-xl font-medium text-sm hover:bg-gray-200 transition-colors" @click="emit('back')">
+      <button type="button"
+        class="inline-flex items-center gap-2 px-6 py-2.5 bg-gray-100 text-blueberry-700 rounded-xl font-medium text-sm hover:bg-gray-200 transition-colors"
+        @click="emit('back')">
         <i class="pi pi-arrow-left text-xs" /> Back
       </button>
-      <button type="submit" class="inline-flex items-center gap-2 px-6 py-2.5 bg-apricot-500 text-white rounded-xl font-medium text-sm hover:bg-apricot-600 transition-colors">
+      <button type="submit"
+        class="inline-flex items-center gap-2 px-6 py-2.5 bg-apricot-500 text-white rounded-xl font-medium text-sm hover:bg-apricot-600 transition-colors">
         Next <i class="pi pi-arrow-right text-xs" />
       </button>
     </div>
 
     <!-- 🖨️ SCANNER DIALOG (Embedded) -->
-    <Dialog v-model:visible="scanDialogVisible" modal :closable="!scanning" :style="{ width: '520px' }" :pt="{ header: { class: '!bg-purple-50 !border-b !border-purple-100' } }">
+    <Dialog v-model:visible="scanDialogVisible" modal :closable="!scanning" :style="{ width: '520px' }"
+      :pt="{ header: { class: '!bg-purple-50 !border-b !border-purple-100' } }">
       <template #header>
         <div class="flex items-center gap-2">
           <div class="w-9 h-9 rounded-xl bg-purple-500 flex items-center justify-center">
@@ -506,14 +540,17 @@ const onSubmit = handleSubmit((values) => {
               <i class="pi pi-exclamation-triangle" /> Scanner Helper Not Running
             </h4>
             <p class="text-sm text-amber-800 mb-3">
-              Please make sure the Tricastle Scan Helper (NAPS2 bridge) is running on <code class="bg-amber-100 px-1.5 py-0.5 rounded text-xs">localhost:5555</code>.
+              Please make sure the Tricastle Scan Helper (NAPS2 bridge) is running on <code
+                class="bg-amber-100 px-1.5 py-0.5 rounded text-xs">localhost:5555</code>.
             </p>
           </div>
           <div class="flex gap-2">
             <a href="https://www.naps2.com/download" target="_blank" class="flex-1">
-              <Button label="Install NAPS2" icon="pi pi-external-link" outlined class="w-full !border-purple-300 !text-purple-600" />
+              <Button label="Install NAPS2" icon="pi pi-external-link" outlined
+                class="w-full !border-purple-300 !text-purple-600" />
             </a>
-            <Button label="Retry" icon="pi pi-refresh" class="!bg-purple-500 !border-purple-500 flex-1" @click="checkHelper" />
+            <Button label="Retry" icon="pi pi-refresh" class="!bg-purple-500 !border-purple-500 flex-1"
+              @click="checkHelper" />
           </div>
         </div>
 
@@ -530,21 +567,25 @@ const onSubmit = handleSubmit((values) => {
           <template v-else-if="scanners.length > 0">
             <div>
               <label class="block text-sm font-medium text-blueberry-700 mb-1.5">Scanner Device</label>
-              <Select v-model="selectedScanner" :options="scanners" option-label="name" option-value="name" class="w-full" />
+              <Select v-model="selectedScanner" :options="scanners" option-label="name" option-value="name"
+                class="w-full" />
             </div>
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block text-sm font-medium text-blueberry-700 mb-1.5">Resolution</label>
-                <Select v-model="scanResolution" :options="resolutionOptions" option-label="label" option-value="value" class="w-full" />
+                <Select v-model="scanResolution" :options="resolutionOptions" option-label="label" option-value="value"
+                  class="w-full" />
               </div>
               <div>
                 <label class="block text-sm font-medium text-blueberry-700 mb-1.5">Color</label>
-                <Select v-model="scanColorMode" :options="colorModeOptions" option-label="label" option-value="value" class="w-full" />
+                <Select v-model="scanColorMode" :options="colorModeOptions" option-label="label" option-value="value"
+                  class="w-full" />
               </div>
             </div>
           </template>
 
-          <div v-else-if="scanners.length === 0 && !scanning" class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <div v-else-if="scanners.length === 0 && !scanning"
+            class="bg-amber-50 border border-amber-200 rounded-xl p-3">
             <p class="text-sm text-amber-800 mb-2">⚠️ No USB scanners detected</p>
             <p class="text-xs text-amber-700 mb-2">Make sure your scanner is powered on and connected.</p>
             <Button label="Refresh" icon="pi pi-refresh" text size="small" @click="loadScanners" />
@@ -554,7 +595,8 @@ const onSubmit = handleSubmit((values) => {
 
       <template #footer>
         <Button label="Cancel" text @click="scanDialogVisible = false" :disabled="scanning" />
-        <Button v-if="helperInstalled && scanners.length > 0 && !scanning" label="Start Scan" icon="pi pi-play" class="!bg-purple-500 !border-purple-500" @click="executeScan" />
+        <Button v-if="helperInstalled && scanners.length > 0 && !scanning" label="Start Scan" icon="pi pi-play"
+          class="!bg-purple-500 !border-purple-500" @click="executeScan" />
       </template>
     </Dialog>
 

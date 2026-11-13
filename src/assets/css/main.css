@@ -1,8 +1,6 @@
-/* ✅ @import statements FIRST */
 @import './theme.css';
 @import './typography.css';
 
-/* ✅ Then Tailwind directives */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

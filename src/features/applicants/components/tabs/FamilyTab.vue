@@ -35,6 +35,72 @@ const salaryUnitOptions = [
   { label: 'per year',  value: 'per_year' },
 ]
 
+// 🎯 Living Situation presets (AIS-friendly wording)
+const livingSituationOptions = [
+  {
+    label: 'Living with parents and siblings',
+    value: 'living in his/her parents house together with his/her siblings',
+  },
+  {
+    label: 'Living with parents',
+    value: 'living with parents',
+  },
+  {
+    label: 'Living with spouse and children',
+    value: 'living with spouse and children',
+  },
+  {
+    label: 'Living with spouse',
+    value: 'living with spouse',
+  },
+  {
+    label: 'Living with children (single parent)',
+    value: 'living with children',
+  },
+  {
+    label: 'Living alone in a rented house / room',
+    value: 'living alone in a rented apartment',
+  },
+  {
+    label: 'Living with relatives',
+    value: 'living with relatives',
+  },
+  {
+    label: 'Living in a dormitory / boarding house',
+    value: 'living in a boarding house',
+  },
+  {
+    label: 'Living with in-laws',
+    value: 'living with in-laws',
+  },
+]
+
+// 🎯 Common Philippine Occupations for Parents & Spouse
+const occupationOptions = [
+  'Housewife',
+  'Farmer',
+  'Fisherman',
+  'Construction Worker',
+  'Carpenter / Mason',
+  'Welder / Electrician',
+  'Factory Worker',
+  'Tricycle / Jeepney / Bus Driver',
+  'Private / Company Driver',
+  'Vendor / Sari-Sari Store Owner',
+  'Security Guard',
+  'Domestic Helper / Household Worker',
+  'Mechanic',
+  'Teacher',
+  'Nurse / Healthcare Worker',
+  'Office Staff / Clerk',
+  'Government Employee',
+  'Self-Employed / Business Owner',
+  'Overseas Filipino Worker (OFW)',
+  'Retired',
+  'Deceased',
+  'Unemployed',
+]
+
 // ─── Emit validate on every change ────────────────────────────────────────────
 watch(
   values,
@@ -52,8 +118,8 @@ const onNext = handleSubmit((data) => {
   <form class="flex flex-col gap-6" @submit.prevent="onNext">
 
     <!-- ─── Info Banner ──────────────────────────────────────────────────────── -->
-    <div class="flex items-start gap-2 px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-xl text-sm text-indigo-700">
-      <i class="pi pi-info-circle text-indigo-500 mt-0.5 flex-shrink-0" />
+    <div class="flex items-start gap-2 px-4 py-3 bg-apricot-50 border border-apricot-200 rounded-xl text-sm text-apricot-800">
+      <i class="pi pi-info-circle text-apricot-500 mt-0.5 flex-shrink-0" />
       <span>
         This section collects <strong>family background &amp; relative details</strong> for AIS generation and emergency contact.
         All fields are optional — fill what is available now.
@@ -71,21 +137,32 @@ const onNext = handleSubmit((data) => {
       </p>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-xl bg-apricot-50 border border-apricot-200">
+        <!-- Living Situation -->
         <div class="md:col-span-3">
           <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">
             Living Situation
           </label>
-          <InputText
+          <Select
             :model-value="values.living_situation ?? ''"
-            placeholder="e.g. living in his parents house together with his siblings"
+            :options="livingSituationOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="Select or type living situation..."
+            editable
+            filter
+            show-clear
             class="w-full"
             @update:model-value="(v) => setFieldValue('living_situation', v || null)"
           />
           <p class="text-[10px] text-blueberry-400 mt-1">
-            Printed on AIS as: <em>: living in his parents house together with his siblings</em>
+            Printed on AIS as:
+            <em class="text-blueberry-600">
+              {{ values.living_situation || 'living in his/her parents house together with his/her siblings' }}
+            </em>
           </p>
         </div>
 
+        <!-- Birth Order -->
         <div>
           <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">
             Birth Order
@@ -101,6 +178,7 @@ const onNext = handleSubmit((data) => {
           <p class="text-[10px] text-blueberry-400 mt-1">2 → “2nd child”</p>
         </div>
 
+        <!-- Total Siblings -->
         <div>
           <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">
             Total Siblings
@@ -115,6 +193,7 @@ const onNext = handleSubmit((data) => {
           />
         </div>
 
+        <!-- Siblings Note -->
         <div>
           <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">
             Siblings Note
@@ -154,9 +233,13 @@ const onNext = handleSubmit((data) => {
           </div>
           <div>
             <label class="block text-xs font-medium text-blueberry-700 mb-1">Occupation</label>
-            <InputText
+            <Select
               :model-value="values.father_occupation ?? ''"
-              placeholder="Occupation"
+              :options="occupationOptions"
+              placeholder="Select or type occupation..."
+              editable
+              filter
+              show-clear
               class="w-full"
               @update:model-value="(v) => setFieldValue('father_occupation', v || null)"
             />
@@ -186,9 +269,13 @@ const onNext = handleSubmit((data) => {
           </div>
           <div>
             <label class="block text-xs font-medium text-blueberry-700 mb-1">Occupation</label>
-            <InputText
+            <Select
               :model-value="values.mother_occupation ?? ''"
-              placeholder="Occupation"
+              :options="occupationOptions"
+              placeholder="Select or type occupation..."
+              editable
+              filter
+              show-clear
               class="w-full"
               @update:model-value="(v) => setFieldValue('mother_occupation', v || null)"
             />
@@ -236,9 +323,13 @@ const onNext = handleSubmit((data) => {
         </div>
         <div>
           <label class="block text-xs font-medium text-blueberry-700 mb-1">Occupation</label>
-          <InputText
+          <Select
             :model-value="values.spouse_occupation ?? ''"
-            placeholder="Occupation"
+            :options="occupationOptions"
+            placeholder="Select or type occupation..."
+            editable
+            filter
+            show-clear
             class="w-full"
             @update:model-value="(v) => setFieldValue('spouse_occupation', v || null)"
           />
@@ -325,15 +416,13 @@ const onNext = handleSubmit((data) => {
         outlined
         @click="emit('back')"
       />
-      <div class="flex items-center gap-3">
-        <span class="text-xs text-blueberry-400 italic">All fields are optional</span>
-        <Button
-          type="submit"
-          label="Next"
-          icon="pi pi-arrow-right"
-          icon-pos="right"
-        />
-      </div>
+      <Button
+        type="submit"
+        label="Next"
+        icon="pi pi-arrow-right"
+        icon-pos="right"
+        class="!bg-apricot-500 hover:!bg-apricot-600 !border-apricot-500 !text-white"
+      />
     </div>
 
   </form>
