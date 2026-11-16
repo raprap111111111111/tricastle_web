@@ -39,3 +39,15 @@ export async function updateApplicantStatus(
   )
   return data.data
 }
+
+// ─── Bulk Actions ──────────────────────────────────────
+
+export async function bulkMoveToFinalList(
+  ids: number[],
+): Promise<{ updated_count: number }> {
+  const { data } = await http.post<ApiResponse<{ updated_count: number }>>(
+    '/applicants/bulk-final-list',
+    { ids },
+  )
+  return data.data
+}

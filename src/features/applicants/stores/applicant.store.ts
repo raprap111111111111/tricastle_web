@@ -299,6 +299,37 @@ export const useApplicantStore = defineStore('applicants', () => {
     }
   }
 
+  // ─── Bulk Status Actions ──────────────────────────────
+
+async function bulkMoveToFinalList(ids: number[]): Promise<number> {
+  submitting.value = true
+  clearError()
+  try {
+    const result = await applicantApi.bulkMoveToFinalList(ids)
+
+    // Remove moved applicants from the local list
+    // (this page excludes final_list, so they should disappear)
+    const idSet = new Set(ids)
+    applicants.value = applicants.value.filter((a) => !idSet.has(a.id))
+
+    // Adjust pagination total
+    if (pagination.value) {
+      pagination.value.total = Math.max(
+        0,
+        pagination.value.total - result.updated_count,
+      )
+    }
+
+    return result.updated_count
+  } catch (e: any) {
+    error.value =
+      e?.response?.data?.message ?? e?.message ?? 'Failed to bulk move to final list'
+    throw e
+  } finally {
+    submitting.value = false
+  }
+}
+
   function setFilters(newFilters: Partial<ApplicantFilters>) {
     const nextFilters = {
       ...filters.value,
@@ -385,5 +416,6 @@ export const useApplicantStore = defineStore('applicants', () => {
     clearApplicant,
     clearError,
     replaceInList,
+    bulkMoveToFinalList,
   }
 })

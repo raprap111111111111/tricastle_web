@@ -65,7 +65,14 @@ export const applicantApi = {
     return res.data
   },
 
-    // ─── Remarks ───────────────────────────────────────────────────────────────
+  async bulkMoveToFinalList(ids: number[]): Promise<{ updated_count: number }> {
+    const res = await http.post<{ data: { updated_count: number } }>(
+      `${BASE}/bulk-final-list`,
+      { ids },
+    )
+    return (res.data as any)?.data ?? res.data
+  },
+
   async updateRemarks(id: number, remarks: string[]): Promise<Applicant> {
     const res = await http.patch<Applicant>(`${BASE}/${id}/remarks`, { remarks })
     // unwrap { data: Applicant } if your http client returns full envelope

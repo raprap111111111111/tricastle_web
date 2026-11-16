@@ -681,7 +681,7 @@ function closeExportDialog() {
               </p>
               <div class="space-y-3">
                 <div>
-                  <label class="block text-xs font-medium text-blueberry-700 mb-1.5 flex items-center gap-1">
+                  <label class="flex text-xs font-medium text-blueberry-700 mb-1.5 items-center gap-1">
                     <span>Province</span>
                     <span v-if="!loadingProvinces && psgcProvinces.length > 0"
                       class="text-[10px] text-blueberry-400 font-normal">
@@ -693,7 +693,7 @@ function closeExportDialog() {
                     size="small" filter show-clear :loading="loadingProvinces" />
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-blueberry-700 mb-1.5 flex items-center gap-1">
+                  <label class="flex text-xs font-medium text-blueberry-700 mb-1.5 items-center gap-1">
                     <span>City / Municipality</span>
                     <span v-if="province && !loadingCities && psgcCities.length > 0"
                       class="text-[10px] text-blueberry-400 font-normal">
@@ -950,8 +950,8 @@ function closeExportDialog() {
               : exportScope === 'location' ? 'location'
                 : exportScope === 'status' ? 'status'
                   : 'list'" :applicants="exportApplicants" :batch-id="exportBatchId ?? undefined" :batch-name="availableBatches.find(b => b.id === exportBatchId)?.name
-                    ?? folder?.label" :location="exportLocation || folder?.label"
-              :status="exportStatus || undefined" label="Download .xlsx" @exported="closeExportDialog" />
+                    ?? folder?.label" :location="exportLocation || folder?.label" :status="exportStatus || undefined"
+              label="Download .xlsx" @exported="closeExportDialog" />
           </div>
         </div>
       </template>

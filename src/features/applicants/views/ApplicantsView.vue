@@ -2,6 +2,7 @@
 import { onMounted, onActivated, computed, watch, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
 import Dialog from 'primevue/dialog'
@@ -29,6 +30,7 @@ import {
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const confirm = useConfirm()
 const store = useApplicantStore()
 const { handleDelete } = useApplicants()
 
@@ -119,6 +121,55 @@ function onReset() { loadInProgress() }
 function onPageChange(page: number) { store.setPage(page); store.fetchApplicants() }
 function onLimitChange(limit: number) { store.setLimit(limit); store.fetchApplicants() }
 async function onDelete(id: number) { await handleDelete(id) }
+
+// ─── 🔲 Bulk Selection ────────────────────────────────
+const selectedIds = ref<number[]>([])
+const bulkSubmitting = ref(false)
+
+const hasSelection = computed(() => selectedIds.value.length > 0)
+
+function onSelectionChange(ids: number[]) {
+  selectedIds.value = ids
+}
+
+function clearSelection() {
+  selectedIds.value = []
+}
+
+async function handleBulkMoveToFinalList() {
+  if (!hasSelection.value) return
+
+  confirm.require({
+    header: 'Bulk Move to Final List',
+    message: `Move ${selectedIds.value.length} selected applicant(s) to the Final List?`,
+    icon: 'pi pi-check-circle',
+    acceptLabel: `Yes, Move ${selectedIds.value.length}`,
+    rejectLabel: 'Cancel',
+    acceptClass: '!bg-green-600 !border-green-600 hover:!bg-green-700',
+    accept: async () => {
+      bulkSubmitting.value = true
+      try {
+        const count = await store.bulkMoveToFinalList(selectedIds.value)
+        toast.add({
+          severity: 'success',
+          summary: 'Bulk Move Complete',
+          detail: `${count} applicant(s) moved to Final List`,
+          life: 4000,
+        })
+        selectedIds.value = []
+      } catch (e: any) {
+        toast.add({
+          severity: 'error',
+          summary: 'Bulk Move Failed',
+          detail: e?.response?.data?.message ?? 'Could not move applicants',
+          life: 4000,
+        })
+      } finally {
+        bulkSubmitting.value = false
+      }
+    },
+  })
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 📊 EXCEL EXPORT
@@ -369,10 +420,34 @@ async function handleDownload(): Promise<void> {
       <ApplicantFilters @filter="onFilter" @reset="onReset" />
     </AppCard>
 
+    <!-- ─── Bulk Action Bar ────────────────────────── -->
+    <Transition name="slide-down">
+      <div v-if="hasSelection" class="flex items-center justify-between px-4 py-3 bg-green-50
+               border border-green-200 rounded-lg">
+        <div class="flex items-center gap-3">
+          <span class="inline-flex items-center justify-center w-7 h-7 rounded-full
+                        bg-green-600 text-white text-xs font-bold">
+            {{ selectedIds.length }}
+          </span>
+          <span class="text-sm font-medium text-green-800">
+            applicant{{ selectedIds.length !== 1 ? 's' : '' }} selected
+          </span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <AppButton label="Move to Final List" icon="pi pi-check-circle" variant="accent" :loading="bulkSubmitting"
+            class="!bg-green-600 !border-green-600 hover:!bg-green-700" @click="handleBulkMoveToFinalList" />
+          <Button label="Clear" text size="small" severity="secondary" @click="clearSelection" />
+        </div>
+      </div>
+    </Transition>
+
     <!-- ─── Table ──────────────────────────────────── -->
     <AppCard :padding="'none'" :shadow="'soft'">
       <ApplicantTable :applicants="store.applicants" :pagination="store.pagination" :loading="store.loading"
-        :submitting="store.submitting" @page-change="onPageChange" @limit-change="onLimitChange" @delete="onDelete" />
+        :submitting="store.submitting" :selectable="true" :selected-ids="selectedIds"
+        @update:selected-ids="onSelectionChange" @clear-selection="clearSelection" @page-change="onPageChange"
+        @limit-change="onLimitChange" @delete="onDelete" />
     </AppCard>
 
     <!-- ═══════════════════════════════════════════════════
@@ -444,8 +519,8 @@ async function handleDownload(): Promise<void> {
                 <Select v-model="exportLocation" :options="[
                   { label: 'All Locations (grouped by province)', value: '' },
                   ...availableLocations.map(l => ({ label: l, value: l }))
-                ]" option-label="label" option-value="value" placeholder="All locations..." class="w-full"
-                  size="small" filter show-clear />
+                ]" option-label="label" option-value="value" placeholder="All locations..." class="w-full" size="small"
+                  filter show-clear />
               </div>
 
               <!-- Status picker -->
@@ -459,8 +534,8 @@ async function handleDownload(): Promise<void> {
                     label: s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' '),
                     value: s,
                   }))
-                ]" option-label="label" option-value="value" placeholder="All statuses..." class="w-full"
-                  size="small" show-clear />
+                ]" option-label="label" option-value="value" placeholder="All statuses..." class="w-full" size="small"
+                  show-clear />
               </div>
 
               <!-- Note about pagination -->
@@ -562,3 +637,16 @@ async function handleDownload(): Promise<void> {
     </Dialog>
   </div>
 </template>
+
+<style scoped>
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.2s ease;
+}
+
+.slide-down-enter-from,
+.slide-down-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+</style>

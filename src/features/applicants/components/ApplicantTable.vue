@@ -120,6 +120,26 @@ function onNameLeave() {
   }, 150)
 }
 
+// ─── 📍 Clean Address Parsing ──────────────────────────
+function getShortAddress(a: Applicant): string {
+  if (!a.current_address) return '—'
+  const parts = a.current_address.split(',').map((s) => s.trim()).filter(Boolean)
+  if (parts.length === 0) return '—'
+  return parts.slice(0, 2).join(', ')
+}
+
+function getAddressSubtext(a: Applicant): string {
+  if (a.city || a.province) {
+    return [a.city, a.province].filter(Boolean).join(', ')
+  }
+  if (!a.current_address) return ''
+  const parts = a.current_address.split(',').map((s) => s.trim()).filter(Boolean)
+  if (parts.length > 2) {
+    return parts.slice(2, 4).join(', ')
+  }
+  return ''
+}
+
 // ─── Selection support ─────────────────────────────
 const selectedRows = computed<Applicant[]>({
   get() {
@@ -343,7 +363,7 @@ function formatDate(dateStr: string | null | undefined): string {
       size="small"
       :row-hover="true"
       :pt="{
-        table: 'text-sm',
+        table: 'text-sm w-full',
         header: '!bg-appleCore-50/50 !text-blueberry-600 !font-semibold !text-xs !uppercase !tracking-wider',
         headerRow: '!bg-appleCore-50/50 !border-b !border-appleCore-100',
         bodyRow: 'hover:!bg-appleCore-50/40 !border-b !border-appleCore-100/60 transition-colors',
@@ -362,7 +382,7 @@ function formatDate(dateStr: string | null | undefined): string {
         <template #body="{ data }">
           <button 
             type="button" 
-            class="font-mono text-xs text-apricot-600 font-semibold hover:text-apricot-700 hover:underline transition-colors focus:outline-none text-left"
+            class="font-mono text-xs text-apricot-600 font-semibold hover:text-apricot-700 hover:underline transition-colors focus:outline-none text-left whitespace-nowrap"
             @click.stop="goToView(data.id)"
           >
             {{ data.applicant_code }}
@@ -371,7 +391,7 @@ function formatDate(dateStr: string | null | undefined): string {
       </Column>
 
       <!-- Applicant Column -->
-      <Column header="Applicant" sortable sort-field="last_name">
+      <Column header="Applicant" sortable sort-field="last_name" style="min-width: 200px">
         <template #body="{ data }">
           <button
             type="button"
@@ -387,39 +407,54 @@ function formatDate(dateStr: string | null | undefined): string {
               @error="($event.target as HTMLImageElement).src = getDefaultAvatar(getFullName(data))"
             />
             <div class="flex flex-col items-start min-w-0">
-              <span class="font-medium text-blueberry-800 group-hover:text-apricot-600 group-hover:underline transition-colors truncate">
+              <span class="font-medium text-blueberry-800 group-hover:text-apricot-600 group-hover:underline transition-colors truncate max-w-[180px]">
                 {{ getFullName(data) }}
               </span>
-              <span class="text-xs text-blueberry-400 mt-0.5 truncate">{{ data.email }}</span>
+              <span class="text-xs text-blueberry-400 mt-0.5 truncate max-w-[180px]">{{ data.email }}</span>
             </div>
           </button>
         </template>
       </Column>
 
-      <!-- Address (Barangay) -->
-      <Column field="current_address" header="Address (Barangay)">
+      <!-- Clean Address Column -->
+      <Column field="current_address" header="Address" style="min-width: 180px; max-width: 240px">
         <template #body="{ data }">
-          <span class="text-sm text-blueberry-700">{{ data.current_address || '—' }}</span>
+          <div 
+            v-if="data.current_address" 
+            class="flex flex-col text-xs max-w-[220px]"
+            v-tooltip.bottom="{ value: data.current_address, fitContent: true }"
+          >
+            <span class="font-medium text-blueberry-800 truncate">
+              {{ getShortAddress(data) }}
+            </span>
+            <span 
+              v-if="getAddressSubtext(data)" 
+              class="text-[11px] text-blueberry-400 truncate mt-0.5"
+            >
+              {{ getAddressSubtext(data) }}
+            </span>
+          </div>
+          <span v-else class="text-xs text-blueberry-300">—</span>
         </template>
       </Column>
 
       <!-- Status Column -->
-      <Column field="status" header="Status" style="width: 140px">
+      <Column field="status" header="Status" style="width: 130px">
         <template #body="{ data }">
           <ApplicantStatusBadge :status="data.status" />
         </template>
       </Column>
 
       <!-- 📝 Remarks Column with Floating Hover -->
-      <Column header="Remarks" style="width: 150px">
+      <Column header="Remarks" style="width: 140px">
         <template #body="{ data }">
           <div
-            class="relative group inline-flex items-center gap-1 max-w-[140px]"
+            class="relative group inline-flex items-center gap-1 max-w-[130px]"
             @click.stop
           >
             <template v-if="getRemarks(data).length">
               <span
-                class="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-medium truncate max-w-[100px] cursor-default"
+                class="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-medium truncate max-w-[90px] cursor-default"
               >
                 {{ getRemarks(data)[0] }}
               </span>
@@ -479,10 +514,10 @@ function formatDate(dateStr: string | null | undefined): string {
       </Column>
 
       <!-- Passport Expiry -->
-      <Column field="passport_expiry" header="Passport Expiry" style="width: 150px">
+      <Column field="passport_expiry" header="Passport Expiry" style="width: 140px">
         <template #body="{ data }">
           <span
-            class="text-sm"
+            class="text-xs font-mono whitespace-nowrap"
             :class="!data.passport_expiry ? 'text-blueberry-300' : 'text-blueberry-700'"
           >
             {{ formatDate(data.passport_expiry) }}
@@ -491,9 +526,9 @@ function formatDate(dateStr: string | null | undefined): string {
       </Column>
 
       <!-- Actions Column -->
-      <Column header="Actions" style="width: 180px">
+      <Column header="Actions" style="width: 170px">
         <template #body="{ data }">
-          <div class="flex items-center gap-0.5" @click.stop>
+          <div class="flex items-center gap-0.5 whitespace-nowrap" @click.stop>
             <Button
               icon="pi pi-eye"
               text
