@@ -19,7 +19,7 @@ export type CivilStatus =
   | 'live_in_partner' // 👈 Added 'live_in_partner'
 
 export type DominantHand = 'left' | 'right' | 'both'
-export type BloodType    = 'A' | 'B' | 'AB' | 'O'
+export type BloodType = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-'
 export type QualityGrade = 'A' | 'B' | 'C' | 'D' | 'F'
 
 export type SkillCategory = 'skilled' | 'semi_skilled' | 'unskilled'

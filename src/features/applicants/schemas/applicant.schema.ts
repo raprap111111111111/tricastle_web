@@ -42,7 +42,7 @@ export const physicalAddressSchema = z.object({
   height_cm:         z.coerce.number().positive().max(300).nullable().optional(),
   weight_kg:         z.coerce.number().positive().max(500).nullable().optional(),
   dominant_hand:     z.enum(['left', 'right', 'both']).nullable().optional(),
-  blood_type:        z.enum(['A', 'B', 'AB', 'O']).nullable().optional(),
+  blood_type:        z.enum(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']).nullable().optional(),
   current_address:   z.string().max(500).nullable().optional(),
   permanent_address: z.string().max(500).nullable().optional(),
   city:              z.string().max(100).nullable().optional(),
