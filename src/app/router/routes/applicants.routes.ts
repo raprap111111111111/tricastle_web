@@ -58,9 +58,10 @@ export const applicantsRoutes: RouteRecordRaw[] = [
           permissions: [Perm.applicantCreate],
         },
       },
-      
+
+      // ─── Rejected ────────────────────────────────────
       {
-        path: 'rejected',                    
+        path: 'rejected',
         name: 'applicants.rejected',
         component: () =>
           import('@features/applicants/views/RejectedApplicantsView.vue'),
@@ -71,6 +72,18 @@ export const applicantsRoutes: RouteRecordRaw[] = [
         },
       },
 
+      // ─── 🟣 Self-Registered (QR / Walk-In) ───────────
+      {
+        path: 'self-registered',
+        name: 'applicants.self-registered',
+        component: () =>
+          import('@features/applicants/views/SelfRegisteredApplicantsView.vue'),
+        meta: {
+          title: 'Self-Registered Applicants',
+          requiresAuth: true,
+          permissions: [Perm.applicantViewAny],
+        },
+      },
 
       // ─── View / Edit ─────────────────────────────────
       {

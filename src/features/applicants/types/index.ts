@@ -1,6 +1,7 @@
 // ─── Enums / Literals ─────────────────────────────────────────────────────────
 
 export type ApplicantStatus =
+  | 'self_registered'
   | 'pending'
   | 'under_review'
   | 'verified'

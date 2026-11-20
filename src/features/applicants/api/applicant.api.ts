@@ -65,6 +65,13 @@ export const applicantApi = {
     return res.data
   },
 
+  async acceptSelfRegistered(id: number): Promise<Applicant> {
+    const res = await http.patch<{ data: Applicant }>(
+      `${BASE}/${id}/accept-self-registered`,
+    )
+    return (res.data as any)?.data ?? res.data
+  },
+
   async bulkMoveToFinalList(ids: number[]): Promise<{ updated_count: number }> {
     const res = await http.post<{ data: { updated_count: number } }>(
       `${BASE}/bulk-final-list`,
@@ -75,7 +82,6 @@ export const applicantApi = {
 
   async updateRemarks(id: number, remarks: string[]): Promise<Applicant> {
     const res = await http.patch<Applicant>(`${BASE}/${id}/remarks`, { remarks })
-    // unwrap { data: Applicant } if your http client returns full envelope
     return (res.data as any)?.data ?? res.data
   },
 

@@ -31,6 +31,9 @@ import { profileUpdatesRoutes } from './routes/profile-updates.routes'
 import portalRoutes from '@/portal/router/portal.routes'
 import { portalGuard } from '@/portal/router/portal.guard'
 
+// ── 1. Import Public Self-Registration Routes ──────────────────────────────
+import publicApplyRoutes from '@/public-apply/router/publicApply.routes'
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -66,11 +69,19 @@ const router = createRouter({
     // Applicant Portal Routes
     ...portalRoutes,
 
+    // ── 2. Add Public Self-Registration Routes (/apply) ───────────────────
+    ...publicApplyRoutes,
+
     { path: '/:pathMatch(.*)*', name: 'NotFound', redirect: '/dashboard' },
   ],
 })
 
 router.beforeEach((to, from) => {
+  // ── 3. Allow Public Application (/apply) without staff/portal auth checks ──
+  if (to.path.startsWith('/apply')) {
+    return true
+  }
+
   // 1) Let portalGuard handle /portal/* routes
   const portalResult = portalGuard(to)
   if (portalResult !== null) {

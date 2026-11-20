@@ -12,18 +12,22 @@ const authStore = useAuthStore()
 const notificationStore = useNotificationStore()
 
 /**
- * Portal detection:
- * Pauses staff notification polling while viewing applicant portal pages
+ * Portal & Public Apply detection:
+ * Pauses staff notification polling while viewing portal or public application pages
  */
 const isPortalRoute = computed(() => {
-  return route.path.startsWith('/portal') || route.meta.layout === 'portal'
+  return (
+    route.path.startsWith('/portal') ||
+    route.path.startsWith('/apply') || // 👈 Added /apply check
+    route.meta.layout === 'portal'
+  )
 })
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 function startNotificationPolling() {
   stopNotificationPolling()
-  // Run staff polling ONLY when logged in as staff and NOT on a portal route
+  // Run staff polling ONLY when logged in as staff and NOT on a portal/apply route
   if (!authStore.isAuthenticated || isPortalRoute.value) return
 
   notificationStore.fetchUnreadCount()

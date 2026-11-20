@@ -39,12 +39,20 @@ export function buildNavSections(_ctx: PermissionContext): NavSection[] {
           permissions: [Perm.applicantViewAny],
         },
 
-        // ✅ NEW: Staff review queue for applicant self-service updates
+        // 🟣 NEW: Dedicated Sidebar Tab for Self-Registered Applicants (QR / Walk-In)
+        {
+          icon: 'pi pi-qrcode',
+          title: 'Self-Registered',
+          to: '/applicants/self-registered',
+          permissions: [Perm.applicantViewAny],
+        },
+
+        // Staff review queue for applicant self-service updates
         {
           icon: 'pi pi-user-edit',
           title: 'Profile Updates',
           to: '/profile-update-requests',
-          permissions: [Perm.applicantViewAny], // or Perm.profileUpdateRequestViewAny when you seed it
+          permissions: [Perm.applicantViewAny],
         },
 
         {

@@ -62,6 +62,16 @@ export const useApplicantStore = defineStore('applicants', () => {
     if (applicant.value?.id === updated.id) applicant.value = updated
   }
 
+  function removeFromList(id: number) {
+    applicants.value = applicants.value.filter((a) => a.id !== id)
+    if (pagination.value && pagination.value.total > 0) {
+      pagination.value.total -= 1
+    }
+    if (applicant.value?.id === id) {
+      applicant.value = null
+    }
+  }
+
   // ─── Fetch ──────────────────────────────────────────────
   async function fetchApplicants() {
     loading.value = true
@@ -265,6 +275,63 @@ export const useApplicantStore = defineStore('applicants', () => {
     }
   }
 
+  // ─── Self-Registered Actions ─────────────────────────────
+
+  async function acceptSelfRegistered(id: number): Promise<Applicant> {
+    submitting.value = true
+    clearError()
+    try {
+      const updated = await applicantApi.acceptSelfRegistered(id)
+      // If we are currently filtered by 'self_registered', remove it from this view
+      if (filters.value.status === 'self_registered') {
+        removeFromList(id)
+      } else {
+        replaceInList(updated)
+      }
+      return updated
+    } catch (e: any) {
+      error.value =
+        e?.response?.data?.message ??
+        e?.message ??
+        'Failed to accept self-registered applicant'
+      throw e
+    } finally {
+      submitting.value = false
+    }
+  }
+
+  async function bulkAcceptSelfRegistered(ids: number[]): Promise<number> {
+    submitting.value = true
+    clearError()
+    try {
+      let successCount = 0
+      await Promise.all(
+        ids.map(async (id) => {
+          await applicantApi.acceptSelfRegistered(id)
+          successCount++
+        }),
+      )
+
+      // Remove accepted applicants from the current self-registered list
+      const idSet = new Set(ids)
+      applicants.value = applicants.value.filter((a) => !idSet.has(a.id))
+
+      if (pagination.value) {
+        pagination.value.total = Math.max(0, pagination.value.total - successCount)
+      }
+
+      return successCount
+    } catch (e: any) {
+      error.value =
+        e?.response?.data?.message ??
+        e?.message ??
+        'Failed to bulk accept self-registered applicants'
+      throw e
+    } finally {
+      submitting.value = false
+    }
+  }
+
   // ─── Remarks ─────────────────────────────────────────────
   async function updateRemarks(id: number, remarks: string[]): Promise<Applicant> {
     submitting.value = true
@@ -301,34 +368,31 @@ export const useApplicantStore = defineStore('applicants', () => {
 
   // ─── Bulk Status Actions ──────────────────────────────
 
-async function bulkMoveToFinalList(ids: number[]): Promise<number> {
-  submitting.value = true
-  clearError()
-  try {
-    const result = await applicantApi.bulkMoveToFinalList(ids)
+  async function bulkMoveToFinalList(ids: number[]): Promise<number> {
+    submitting.value = true
+    clearError()
+    try {
+      const result = await applicantApi.bulkMoveToFinalList(ids)
 
-    // Remove moved applicants from the local list
-    // (this page excludes final_list, so they should disappear)
-    const idSet = new Set(ids)
-    applicants.value = applicants.value.filter((a) => !idSet.has(a.id))
+      const idSet = new Set(ids)
+      applicants.value = applicants.value.filter((a) => !idSet.has(a.id))
 
-    // Adjust pagination total
-    if (pagination.value) {
-      pagination.value.total = Math.max(
-        0,
-        pagination.value.total - result.updated_count,
-      )
+      if (pagination.value) {
+        pagination.value.total = Math.max(
+          0,
+          pagination.value.total - result.updated_count,
+        )
+      }
+
+      return result.updated_count
+    } catch (e: any) {
+      error.value =
+        e?.response?.data?.message ?? e?.message ?? 'Failed to bulk move to final list'
+      throw e
+    } finally {
+      submitting.value = false
     }
-
-    return result.updated_count
-  } catch (e: any) {
-    error.value =
-      e?.response?.data?.message ?? e?.message ?? 'Failed to bulk move to final list'
-    throw e
-  } finally {
-    submitting.value = false
   }
-}
 
   function setFilters(newFilters: Partial<ApplicantFilters>) {
     const nextFilters = {
@@ -403,6 +467,10 @@ async function bulkMoveToFinalList(ids: number[]): Promise<number> {
     moveToFinalList,
     rejectApplicant,
     updateStatus,
+
+    // Self-registered workflow actions
+    acceptSelfRegistered,
+    bulkAcceptSelfRegistered,
 
     // Remarks
     updateRemarks,
