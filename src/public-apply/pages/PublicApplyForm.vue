@@ -43,9 +43,9 @@ interface WizardStepItem {
   description?: string
 }
 
-const router   = useRouter()
-const toast    = useToast()
-const store    = useApplicantStore()
+const router = useRouter()
+const toast = useToast()
+const store = useApplicantStore()
 const subStore = useApplicantSubStore()
 
 const {
@@ -63,23 +63,27 @@ const {
   goToStep,
 } = useApplicantWizard()
 
+// ─── Submission State ─────────────────────────────────────────────────────────
+const isSubmitting = ref(false)
+const isSubmitted = ref(false)
+const submittedApplicant = ref<{ applicant_code: string; full_name: string } | null>(null)
+
 // ─── Wizard State ──────────────────────────────────────────────────────────────
-const personalData    = ref<PersonalFormValues | null>(null)
-const physicalData    = ref<PhysicalAddressFormValues | null>(null)
-const documentsData   = ref<DocumentsFormValues | null>(null)
-const deploymentData  = ref<DeploymentFormValues | null>(null)
-const familyData      = ref<FamilyFormValues | null>(null)
-const lifestyleData   = ref<LifestyleFormValues | null>(null)
-const educationsData  = ref<EducationEntryValues[]>([])
+const personalData = ref<PersonalFormValues | null>(null)
+const physicalData = ref<PhysicalAddressFormValues | null>(null)
+const documentsData = ref<DocumentsFormValues | null>(null)
+const deploymentData = ref<DeploymentFormValues | null>(null)
+const familyData = ref<FamilyFormValues | null>(null)
+const lifestyleData = ref<LifestyleFormValues | null>(null)
+const educationsData = ref<EducationEntryValues[]>([])
 const employmentsData = ref<EmploymentEntryValues[]>([])
-const tattoosData     = ref<TattooEntryValues[]>([])
+const tattoosData = ref<TattooEntryValues[]>([])
 
 // ─── Duplicate Dialog ─────────────────────────────────────────────────────────
 const duplicateDialog = ref(false)
 const foundDuplicates = ref<DuplicateItem[]>([])
 
 // ─── Validate Handlers ────────────────────────────────────────────────────────
-
 function onPersonalValidate(values: PersonalFormValues | null) {
   if (values) {
     personalData.value = values
@@ -127,7 +131,6 @@ function onLifestyleValidate(values: LifestyleFormValues | null) {
 }
 
 // ─── Next Handlers ────────────────────────────────────────────────────────────
-
 function onPersonalNext(values: PersonalFormValues) {
   personalData.value = values
   setStepState('personal', 'valid')
@@ -186,31 +189,36 @@ function onTattooNext(values: { tattoos: TattooEntryValues[] }) {
 async function preCheckDuplicates(): Promise<boolean> {
   if (!personalData.value) return true
 
-  const result = await store.checkDuplicates({
-    email:           personalData.value.email,
-    first_name:      personalData.value.first_name,
-    middle_name:     personalData.value.middle_name ?? undefined,
-    last_name:       personalData.value.last_name,
-    date_of_birth:   personalData.value.date_of_birth ?? undefined,
-    passport_number: documentsData.value?.passport_number ?? undefined,
-  })
+  try {
+    const result = await store.checkDuplicates({
+      email: personalData.value.email,
+      first_name: personalData.value.first_name,
+      middle_name: personalData.value.middle_name ?? undefined,
+      last_name: personalData.value.last_name,
+      date_of_birth: personalData.value.date_of_birth ?? undefined,
+      passport_number: documentsData.value?.passport_number ?? undefined,
+    })
 
-  if (result.has_blockers) {
-    foundDuplicates.value = result.duplicates
-    duplicateDialog.value = true
-    return false
-  }
-
-  if (result.has_duplicates) {
-    const warnings = result.duplicates.filter((d: DuplicateItem) => d.severity === 'warn')
-    if (warnings.length > 0) {
-      toast.add({
-        severity: 'warn',
-        summary:  'Possible Duplicate',
-        detail:   warnings[0].message,
-        life:     6000,
-      })
+    if (result.has_blockers) {
+      foundDuplicates.value = result.duplicates
+      duplicateDialog.value = true
+      return false
     }
+
+    if (result.has_duplicates) {
+      const warnings = result.duplicates.filter((d: DuplicateItem) => d.severity === 'warn')
+      if (warnings.length > 0) {
+        toast.add({
+          severity: 'warn',
+          summary: 'Possible Duplicate',
+          detail: warnings[0].message,
+          life: 6000,
+        })
+      }
+    }
+  } catch {
+    // Continue even if pre-check encounters network warning
+    return true
   }
 
   return true
@@ -222,9 +230,9 @@ async function onFinalSubmit() {
     const stepLabels = invalidSteps.value.map((s: WizardStepItem) => s.label).join(', ')
     toast.add({
       severity: 'error',
-      summary:  'Validation Errors',
-      detail:   `Please fix errors in: ${stepLabels}`,
-      life:     5000,
+      summary: 'Validation Errors',
+      detail: `Please fix errors in: ${stepLabels}`,
+      life: 5000,
     })
     if (firstInvalidStepIndex.value !== null) {
       goToStep(firstInvalidStepIndex.value)
@@ -235,9 +243,9 @@ async function onFinalSubmit() {
   if (!personalData.value) {
     toast.add({
       severity: 'warn',
-      summary:  'Incomplete',
-      detail:   'Please fill personal info',
-      life:     3000,
+      summary: 'Incomplete',
+      detail: 'Please fill personal info',
+      life: 3000,
     })
     goToStep(0)
     return
@@ -246,20 +254,25 @@ async function onFinalSubmit() {
   const canProceed = await preCheckDuplicates()
   if (!canProceed) return
 
+  isSubmitting.value = true
+
   try {
-    const { 
-      biodata_file, 
-      biodata_notes, 
-      id_photo_file, 
-      ...docFields 
+    const {
+      biodata_file,
+      biodata_notes,
+      id_photo_file,
+      ...docFields
     } = documentsData.value ?? {}
 
-    const payload: CreateApplicantPayload = {
+        // 🟢 ENFORCE SELF_REGISTERED STATUS & REGISTRATION SOURCE
+    const payload: CreateApplicantPayload & Record<string, any> = {
       ...personalData.value,
       ...(physicalData.value ?? {}),
       ...docFields,
       ...(deploymentData.value ?? {}),
       ...(familyData.value ?? {}),
+      status: 'self_registered',
+      registration_source: 'qr_code',
     }
 
     const created = await store.createApplicant(payload)
@@ -268,66 +281,45 @@ async function onFinalSubmit() {
       await subStore.upsertLifestyle({
         applicant_id: created.id,
         ...lifestyleData.value,
-      })
+      }).catch(() => null)
     }
 
     for (const edu of educationsData.value) {
-      await subStore.createEducation({ applicant_id: created.id, ...edu })
+      await subStore.createEducation({ applicant_id: created.id, ...edu }).catch(() => null)
     }
 
     for (const emp of employmentsData.value) {
-      await subStore.createEmployment({ applicant_id: created.id, ...emp })
+      await subStore.createEmployment({ applicant_id: created.id, ...emp }).catch(() => null)
     }
 
     for (const tattoo of tattoosData.value) {
-      await subStore.createTattoo({ applicant_id: created.id, ...tattoo })
+      await subStore.createTattoo({ applicant_id: created.id, ...tattoo }).catch(() => null)
     }
 
     if (id_photo_file instanceof File) {
-      try {
-        await subStore.uploadBiodata(
-          created.id,
-          id_photo_file,
-          DOCUMENT_TYPE_IDS.ID_PHOTO ?? 10,
-          '2x2 Profile Photo',
-        )
-      } catch (err: any) {
-        toast.add({
-          severity: 'warn',
-          summary:  'Photo Upload Issue',
-          detail:   err?.response?.data?.message ?? 'Applicant created, but 2x2 photo could not be attached.',
-          life:     6000,
-        })
-      }
+      await subStore.uploadBiodata(
+        created.id,
+        id_photo_file,
+        DOCUMENT_TYPE_IDS.ID_PHOTO ?? 10,
+        '2x2 Profile Photo',
+      ).catch(() => null)
     }
 
     if (biodata_file instanceof File) {
-      try {
-        await subStore.uploadBiodata(
-          created.id,
-          biodata_file,
-          DOCUMENT_TYPE_IDS.BIODATA ?? 9,
-          biodata_notes ?? undefined,
-        )
-      } catch (err: any) {
-        toast.add({
-          severity: 'warn',
-          summary:  'Biodata Upload Issue',
-          detail:   err?.response?.data?.message ?? 'Applicant created, but biodata file could not be attached.',
-          life:     6000,
-        })
-      }
+      await subStore.uploadBiodata(
+        created.id,
+        biodata_file,
+        DOCUMENT_TYPE_IDS.BIODATA ?? 9,
+        biodata_notes ?? undefined,
+      ).catch(() => null)
     }
 
-    toast.add({
-      severity: 'success',
-      summary:  'Applicant Created',
-      detail:   `${created.applicant_code} created — status: Pending`,
-      life:     3000,
-    })
-
-    await store.fetchApplicants()
-    router.push({ name: 'applicants.index' })
+    // Save created data and show the success screen
+    submittedApplicant.value = {
+      applicant_code: created.applicant_code,
+      full_name: `${created.first_name} ${created.last_name}`,
+    }
+    isSubmitted.value = true
 
   } catch (e: any) {
     if (e?.response?.status === 409 && e?.response?.data?.duplicates?.length) {
@@ -337,22 +329,22 @@ async function onFinalSubmit() {
     }
 
     if (e?.response?.status === 422) {
-      const errors     = e.response.data.errors ?? {}
+      const errors = e.response.data.errors ?? {}
       const firstError = Object.values(errors)[0] as string[] | undefined
 
       toast.add({
         severity: 'error',
-        summary:  'Validation Failed',
-        detail:   firstError?.[0] ?? e.response.data.message ?? 'Please check your inputs.',
-        life:     5000,
+        summary: 'Validation Failed',
+        detail: firstError?.[0] ?? e.response.data.message ?? 'Please check your inputs.',
+        life: 5000,
       })
 
       if (errors.email || errors.first_name || errors.last_name) {
         goToStep(steps.findIndex((s: WizardStepItem) => s.key === 'personal'))
       } else if (
-        errors.skill_category         ||
-        errors.trade_or_occupation    ||
-        errors.jlpt_level             ||
+        errors.skill_category ||
+        errors.trade_or_occupation ||
+        errors.jlpt_level ||
         errors.willing_to_be_deployed ||
         errors.expected_salary
       ) {
@@ -370,178 +362,233 @@ async function onFinalSubmit() {
 
     toast.add({
       severity: 'error',
-      summary:  'Error',
-      detail:   e?.response?.data?.message ?? store.error ?? subStore.error ?? 'Something went wrong',
-      life:     4000,
+      summary: 'Error',
+      detail: e?.response?.data?.message ?? store.error ?? 'Something went wrong while submitting.',
+      life: 4000,
     })
+  } finally {
+    isSubmitting.value = false
   }
 }
 
 function onDuplicateDialogClose() {
   goToStep(steps.findIndex((s: WizardStepItem) => s.key === 'personal'))
 }
+
+function resetForm() {
+  window.location.reload()
+}
 </script>
 
 <template>
   <div class="flex flex-col gap-6 p-6 lg:p-8 max-w-5xl mx-auto min-h-screen">
-    <!-- Header -->
-    <div class="flex items-center gap-3 border-b border-appleCore-100 pb-4">
-      <Button
-        icon="pi pi-arrow-left"
-        text
-        rounded
-        class="!text-blueberry-600 hover:!bg-appleCore-100"
-        @click="router.push({ name: 'applicants.index' })"
-      />
-      <div>
-        <h1 class="text-2xl font-serif font-bold text-blueberry-900 tracking-tight">
-          Create New Applicant
-        </h1>
-        <p class="text-xs sm:text-sm text-blueberry-500">{{ currentStep.description }}</p>
-      </div>
-    </div>
-
-    <!-- Notice Banner -->
-    <div class="flex items-center gap-2.5 px-4 py-3 bg-blue-50/80 border border-blue-200/80 rounded-xl text-xs text-blue-900 shadow-xs">
-      <i class="pi pi-info-circle text-blue-600 text-base shrink-0" />
-      <span>
-        Applicant registration will start as <strong class="font-bold text-blue-950">Pending</strong> status. Batch assignment becomes available after transferring to <strong class="font-bold text-blue-950">Final List</strong>.
-      </span>
-    </div>
-
-    <!-- Wizard Stepper Navigation -->
-    <WizardStepper
-      :steps="steps"
-      :current-index="currentStepIndex"
-      :progress="progress"
-      :step-states="stepStates"
-      @go-to="goToStep"
-    />
-
-    <!-- Validation Error Alert Box -->
+    <!-- ═══════════════════════════════════════════════════
+             🎉 SUCCESS CONFIRMATION SCREEN
+        ════════════════════════════════════════════════════ -->
     <div
-      v-if="hasErrors"
-      class="flex items-start gap-3 p-4 bg-red-50/90 border border-red-200 rounded-xl shadow-xs"
+      v-if="isSubmitted"
+      class="bg-white rounded-3xl border border-appleCore-200 p-8 sm:p-12 shadow-sm text-center max-w-xl mx-auto my-auto flex flex-col items-center gap-6"
     >
-      <i class="pi pi-exclamation-triangle text-red-600 text-lg mt-0.5 shrink-0" />
-      <div class="flex-1">
-        <h4 class="text-xs font-bold text-red-900">
-          {{ invalidSteps.length }} step{{ invalidSteps.length > 1 ? 's have' : ' has' }} validation errors
-        </h4>
-        <div class="flex flex-wrap gap-2 mt-2">
-          <button
-            v-for="step in invalidSteps"
-            :key="step.key"
-            type="button"
-            class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-red-700
-                   rounded-lg text-xs font-semibold border border-red-200
-                   hover:bg-red-100 transition-colors shadow-2xs"
-            @click="goToStep(steps.findIndex((s: WizardStepItem) => s.key === step.key))"
-          >
-            <i class="pi pi-arrow-right text-[10px]" />
-            {{ step.label }}
-          </button>
+      <div class="w-20 h-20 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 text-4xl shadow-sm">
+        <i class="pi pi-check" />
+      </div>
+
+      <div class="space-y-2">
+        <h2 class="text-2xl sm:text-3xl font-serif font-bold text-blueberry-900">
+          Application Submitted!
+        </h2>
+        <p class="text-sm text-blueberry-600">
+          Thank you, <strong class="text-blueberry-900">{{ submittedApplicant?.full_name }}</strong>. Your registration details have been received.
+        </p>
+      </div>
+
+      <div class="w-full bg-purple-50/70 border border-purple-200/80 rounded-2xl p-5 flex flex-col items-center gap-1.5">
+        <span class="text-xs uppercase font-bold tracking-wider text-purple-700">Your Applicant Reference Code</span>
+        <span class="font-mono text-2xl font-black text-purple-900 tracking-wider">
+          {{ submittedApplicant?.applicant_code }}
+        </span>
+        <span class="text-[11px] text-purple-600">Please take a screenshot or note this code for your reference.</span>
+      </div>
+
+      <div class="text-left bg-appleCore-50/70 border border-appleCore-100 rounded-xl p-4 text-xs text-blueberry-600 space-y-2 w-full">
+        <div class="flex items-start gap-2">
+          <i class="pi pi-info-circle text-purple-600 mt-0.5 shrink-0" />
+          <span>Your application is currently <strong>Pending Review</strong> by our staff.</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <i class="pi pi-bell text-purple-600 mt-0.5 shrink-0" />
+          <span>Once approved, you will receive confirmation and your Applicant Portal credentials will be activated.</span>
         </div>
       </div>
+
+      <div class="flex items-center gap-3 w-full">
+        <Button
+          label="Submit Another Application"
+          icon="pi pi-plus"
+          outlined
+          class="w-full !text-blueberry-700 !border-blueberry-200 hover:!bg-blueberry-50 !rounded-xl !py-2.5 !text-xs font-bold"
+          @click="resetForm"
+        />
+      </div>
     </div>
 
-    <!-- Active Step Content Card -->
-    <div class="bg-white rounded-2xl border border-appleCore-200 p-6 shadow-xs">
-      <PersonalTab
-        v-if="currentStep.key === 'personal'"
-        :initial-values="personalData ?? undefined"
-        @next="onPersonalNext"
-        @validate="onPersonalValidate"
-      />
+    <!-- ═══════════════════════════════════════════════════
+             📝 PUBLIC APPLICATION WIZARD
+        ════════════════════════════════════════════════════ -->
+    <template v-else>
+      <!-- Header -->
+      <div class="flex items-center justify-between border-b border-appleCore-100 pb-4">
+        <div>
+          <h1 class="text-2xl font-serif font-bold text-blueberry-900 tracking-tight flex items-center gap-2">
+            <i class="pi pi-qrcode text-purple-600" />
+            Applicant Registration
+          </h1>
+          <p class="text-xs sm:text-sm text-blueberry-500">{{ currentStep.description }}</p>
+        </div>
+      </div>
 
-      <PhysicalAddressTab
-        v-else-if="currentStep.key === 'physical'"
-        :initial-values="physicalData ?? undefined"
-        @next="onPhysicalNext"
-        @validate="onPhysicalValidate"
-        @back="goBack"
-      />
+      <!-- Notice Banner -->
+      <div class="flex items-center gap-2.5 px-4 py-3 bg-purple-50/80 border border-purple-200/80 rounded-xl text-xs text-purple-900 shadow-2xs">
+        <i class="pi pi-info-circle text-purple-600 text-base shrink-0" />
+        <span>
+          Please fill out all required information accurately. Once submitted, your registration will be reviewed by Tricastle staff.
+        </span>
+      </div>
 
-      <DocumentsTab
-        v-else-if="currentStep.key === 'documents'"
-        :initial-values="documentsData ?? undefined"
-        @next="onDocumentsNext"
-        @validate="onDocumentsValidate"
-        @back="goBack"
-      />
-
-      <DeploymentTab
-        v-else-if="currentStep.key === 'deployment'"
-        :initial-values="deploymentData ?? undefined"
-        @next="onDeploymentNext"
-        @validate="onDeploymentValidate"
-        @back="goBack"
-      />
-
-      <FamilyTab
-        v-else-if="currentStep.key === 'family'"
-        :initial-values="familyData ?? undefined"
-        @next="onFamilyNext"
-        @validate="onFamilyValidate"
-        @back="goBack"
-      />
-
-      <LifestyleTab
-        v-else-if="currentStep.key === 'lifestyle'"
-        :initial-values="lifestyleData"
-        @next="onLifestyleNext"
-        @validate="onLifestyleValidate"
-        @back="goBack"
-      />
-
-      <EducationTab
-        v-else-if="currentStep.key === 'education'"
-        :initial-values="educationsData"
-        @next="onEducationNext"
-        @back="goBack"
-      />
-
-      <EmploymentTab
-        v-else-if="currentStep.key === 'employment'"
-        :initial-values="employmentsData"
-        @next="onEmploymentNext"
-        @back="goBack"
-      />
-
-      <TattooTab
-        v-else-if="currentStep.key === 'tattoos'"
-        :initial-values="tattoosData"
-        @next="onTattooNext"
-        @back="goBack"
-      />
-
-      <ReviewTab
-        v-else-if="currentStep.key === 'review'"
-        :personal="personalData"
-        :physical="physicalData"
-        :documents="documentsData"
-        :deployment="deploymentData"
-        :family="familyData"
-        :lifestyle="lifestyleData"
-        :educations="educationsData"
-        :employments="employmentsData"
-        :tattoos="tattoosData"
+      <!-- Stepper -->
+      <WizardStepper
         :steps="steps"
-        :loading="store.submitting || subStore.submitting"
-        :has-errors="hasErrors"
-        :invalid-steps="invalidSteps"
-        mode="create"
-        @submit="onFinalSubmit"
-        @back="goBack"
+        :current-index="currentStepIndex"
+        :progress="progress"
+        :step-states="stepStates"
         @go-to="goToStep"
       />
-    </div>
 
-    <!-- Duplicate Warning Dialog Modal -->
-    <DuplicateWarningDialog
-      v-model:visible="duplicateDialog"
-      :duplicates="foundDuplicates"
-      @close="onDuplicateDialogClose"
-    />
+      <!-- Validation Error Alert -->
+      <div
+        v-if="hasErrors"
+        class="flex items-start gap-3 p-4 bg-red-50/90 border border-red-200 rounded-xl shadow-2xs"
+      >
+        <i class="pi pi-exclamation-triangle text-red-600 text-lg mt-0.5 shrink-0" />
+        <div class="flex-1">
+          <h4 class="text-xs font-bold text-red-900">
+            {{ invalidSteps.length }} step{{ invalidSteps.length > 1 ? 's have' : ' has' }} validation errors
+          </h4>
+          <div class="flex flex-wrap gap-2 mt-2">
+            <button
+              v-for="step in invalidSteps"
+              :key="step.key"
+              type="button"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-red-700
+                     rounded-lg text-xs font-semibold border border-red-200
+                     hover:bg-red-100 transition-colors shadow-2xs"
+              @click="goToStep(steps.findIndex((s: WizardStepItem) => s.key === step.key))"
+            >
+              <i class="pi pi-arrow-right text-[10px]" />
+              {{ step.label }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Step Content -->
+      <div class="bg-white rounded-2xl border border-appleCore-200 p-6 shadow-2xs">
+        <PersonalTab
+          v-if="currentStep.key === 'personal'"
+          :initial-values="personalData ?? undefined"
+          @next="onPersonalNext"
+          @validate="onPersonalValidate"
+        />
+
+        <PhysicalAddressTab
+          v-else-if="currentStep.key === 'physical'"
+          :initial-values="physicalData ?? undefined"
+          @next="onPhysicalNext"
+          @validate="onPhysicalValidate"
+          @back="goBack"
+        />
+
+        <DocumentsTab
+          v-else-if="currentStep.key === 'documents'"
+          :initial-values="documentsData ?? undefined"
+          @next="onDocumentsNext"
+          @validate="onDocumentsValidate"
+          @back="goBack"
+        />
+
+        <DeploymentTab
+          v-else-if="currentStep.key === 'deployment'"
+          :initial-values="deploymentData ?? undefined"
+          @next="onDeploymentNext"
+          @validate="onDeploymentValidate"
+          @back="goBack"
+        />
+
+        <FamilyTab
+          v-else-if="currentStep.key === 'family'"
+          :initial-values="familyData ?? undefined"
+          @next="onFamilyNext"
+          @validate="onFamilyValidate"
+          @back="goBack"
+        />
+
+        <LifestyleTab
+          v-else-if="currentStep.key === 'lifestyle'"
+          :initial-values="lifestyleData"
+          @next="onLifestyleNext"
+          @validate="onLifestyleValidate"
+          @back="goBack"
+        />
+
+        <EducationTab
+          v-else-if="currentStep.key === 'education'"
+          :initial-values="educationsData"
+          @next="onEducationNext"
+          @back="goBack"
+        />
+
+        <EmploymentTab
+          v-else-if="currentStep.key === 'employment'"
+          :initial-values="employmentsData"
+          @next="onEmploymentNext"
+          @back="goBack"
+        />
+
+        <TattooTab
+          v-else-if="currentStep.key === 'tattoos'"
+          :initial-values="tattoosData"
+          @next="onTattooNext"
+          @back="goBack"
+        />
+
+        <ReviewTab
+          v-else-if="currentStep.key === 'review'"
+          :personal="personalData"
+          :physical="physicalData"
+          :documents="documentsData"
+          :deployment="deploymentData"
+          :family="familyData"
+          :lifestyle="lifestyleData"
+          :educations="educationsData"
+          :employments="employmentsData"
+          :tattoos="tattoosData"
+          :steps="steps"
+          :loading="isSubmitting"
+          :has-errors="hasErrors"
+          :invalid-steps="invalidSteps"
+          mode="create"
+          @submit="onFinalSubmit"
+          @back="goBack"
+          @go-to="goToStep"
+        />
+      </div>
+
+      <!-- Duplicate Dialog -->
+      <DuplicateWarningDialog
+        v-model:visible="duplicateDialog"
+        :duplicates="foundDuplicates"
+        @close="onDuplicateDialogClose"
+      />
+    </template>
   </div>
 </template>

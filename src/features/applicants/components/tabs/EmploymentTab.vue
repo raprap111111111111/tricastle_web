@@ -52,7 +52,8 @@ const entries = ref<EmploymentEntryValues[]>(
     job_description:    emp.job_description ?? '',
     date_started:       emp.date_started,
     date_ended:         emp.date_ended ?? null,
-    is_current:         emp.is_current,
+    is_current:         emp.is_current ?? false,
+    is_overseas:        emp.is_overseas ?? false,
     country:            emp.country ?? 'Philippines',
     city:               emp.city ?? '',
     salary:             emp.salary ?? null,
@@ -86,6 +87,7 @@ function addEntry() {
     date_started:       '',
     date_ended:         null,
     is_current:         false,
+    is_overseas:        false,
     country:            'Philippines',
     city:               '',
     salary:             null,
@@ -177,11 +179,19 @@ function onNext() {
             />
           </div>
 
-          <div class="flex items-end gap-2 pb-1">
-            <Checkbox v-model="entry.is_current" :binary="true" :input-id="`current_${idx}`" />
-            <label :for="`current_${idx}`" class="text-sm text-blueberry-700">
-              Currently working here
-            </label>
+          <div class="flex items-end gap-4 pb-1">
+            <div class="flex items-center gap-2">
+              <Checkbox v-model="entry.is_current" :binary="true" :input-id="`current_${idx}`" />
+              <label :for="`current_${idx}`" class="text-sm text-blueberry-700">
+                Currently working here
+              </label>
+            </div>
+            <div class="flex items-center gap-2">
+              <Checkbox v-model="entry.is_overseas" :binary="true" :input-id="`overseas_${idx}`" />
+              <label :for="`overseas_${idx}`" class="text-sm text-blueberry-700">
+                Overseas
+              </label>
+            </div>
           </div>
 
           <div class="flex flex-col gap-1">
