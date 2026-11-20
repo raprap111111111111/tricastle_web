@@ -1,28 +1,25 @@
 <!-- src/public-apply/pages/PublicApplyForm.vue -->
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 
 import { useApplicantWizard } from '@/features/applicants/composables/useApplicantWizard'
-import { useApplicantStore } from '@/features/applicants/stores/applicant.store'
-import { useApplicantSubStore } from '@/features/applicants/stores/applicant-sub.store'
+import publicApplyApi from '@/public-apply/services/publicApplyApi'
 
+// 🟢 Import ONLY from public-apply tabs
 import WizardStepper from '@/features/applicants/components/WizardStepper.vue'
-import PersonalTab from '@/features/applicants/components/tabs/PersonalTab.vue'
-import PhysicalAddressTab from '@/features/applicants/components/tabs/PhysicalAddressTab.vue'
-import DocumentsTab from '@/features/applicants/components/tabs/DocumentsTab.vue'
-import DeploymentTab from '@/features/applicants/components/tabs/DeploymentTab.vue'
-import FamilyTab from '@/features/applicants/components/tabs/FamilyTab.vue'
-import LifestyleTab from '@/features/applicants/components/tabs/LifestyleTab.vue'
-import EducationTab from '@/features/applicants/components/tabs/EducationTab.vue'
-import EmploymentTab from '@/features/applicants/components/tabs/EmploymentTab.vue'
-import TattooTab from '@/features/applicants/components/tabs/TattooTab.vue'
-import ReviewTab from '@/features/applicants/components/tabs/ReviewTab.vue'
+import PersonalTab from '@/public-apply/components/tabs/PersonalTab.vue'
+import PhysicalAddressTab from '@/public-apply/components/tabs/PhysicalAddressTab.vue'
+import DocumentsTab from '@/public-apply/components/tabs/DocumentsTab.vue'
+import DeploymentTab from '@/public-apply/components/tabs/DeploymentTab.vue'
+import FamilyTab from '@/public-apply/components/tabs/FamilyTab.vue'
+import LifestyleTab from '@/public-apply/components/tabs/LifestyleTab.vue'
+import EducationTab from '@/public-apply/components/tabs/EducationTab.vue'
+import EmploymentTab from '@/public-apply/components/tabs/EmploymentTab.vue'
+import TattooTab from '@/public-apply/components/tabs/TattooTab.vue'
+import ReviewTab from '@/public-apply/components/tabs/ReviewTab.vue'
 import DuplicateWarningDialog from '@/features/applicants/components/DuplicateWarningDialog.vue'
-
-import { DOCUMENT_TYPE_IDS } from '@/features/applicants/constants/document-types'
 
 import type {
   PersonalFormValues,
@@ -35,7 +32,7 @@ import type {
   EmploymentEntryValues,
   TattooEntryValues,
 } from '@/features/applicants/schemas/applicant.schema'
-import type { CreateApplicantPayload, DuplicateItem } from '@/features/applicants/types'
+import type { DuplicateItem } from '@/features/applicants/types'
 
 interface WizardStepItem {
   key: string
@@ -43,10 +40,7 @@ interface WizardStepItem {
   description?: string
 }
 
-const router = useRouter()
 const toast = useToast()
-const store = useApplicantStore()
-const subStore = useApplicantSubStore()
 
 const {
   steps,
@@ -185,12 +179,12 @@ function onTattooNext(values: { tattoos: TattooEntryValues[] }) {
   goNext()
 }
 
-// ─── Duplicate Pre-check ──────────────────────────────────────────────────────
+// ─── Duplicate Pre-check via Public API ──────────────────────────────────────
 async function preCheckDuplicates(): Promise<boolean> {
   if (!personalData.value) return true
 
   try {
-    const result = await store.checkDuplicates({
+    const res = await publicApplyApi.post('/check-duplicates', {
       email: personalData.value.email,
       first_name: personalData.value.first_name,
       middle_name: personalData.value.middle_name ?? undefined,
@@ -199,14 +193,15 @@ async function preCheckDuplicates(): Promise<boolean> {
       passport_number: documentsData.value?.passport_number ?? undefined,
     })
 
-    if (result.has_blockers) {
-      foundDuplicates.value = result.duplicates
+    const data = res.data?.data ?? res.data ?? {}
+    if (data.has_blockers) {
+      foundDuplicates.value = data.duplicates ?? []
       duplicateDialog.value = true
       return false
     }
 
-    if (result.has_duplicates) {
-      const warnings = result.duplicates.filter((d: DuplicateItem) => d.severity === 'warn')
+    if (data.has_duplicates) {
+      const warnings = (data.duplicates ?? []).filter((d: DuplicateItem) => d.severity === 'warn')
       if (warnings.length > 0) {
         toast.add({
           severity: 'warn',
@@ -217,14 +212,14 @@ async function preCheckDuplicates(): Promise<boolean> {
       }
     }
   } catch {
-    // Continue even if pre-check encounters network warning
+    // Fail quietly on network issues so public user can continue
     return true
   }
 
   return true
 }
 
-// ─── Final Submit ─────────────────────────────────────────────────────────────
+// ─── Final Submit via Public Endpoint ─────────────────────────────────────────
 async function onFinalSubmit() {
   if (hasErrors.value) {
     const stepLabels = invalidSteps.value.map((s: WizardStepItem) => s.label).join(', ')
@@ -264,63 +259,30 @@ async function onFinalSubmit() {
       ...docFields
     } = documentsData.value ?? {}
 
-        // 🟢 ENFORCE SELF_REGISTERED STATUS & REGISTRATION SOURCE
-    const payload: CreateApplicantPayload & Record<string, any> = {
+    const payload = {
       ...personalData.value,
       ...(physicalData.value ?? {}),
       ...docFields,
       ...(deploymentData.value ?? {}),
       ...(familyData.value ?? {}),
+      lifestyle: lifestyleData.value ?? undefined,
+      educations: educationsData.value,
+      employments: employmentsData.value,
+      tattoos: tattoosData.value,
       status: 'self_registered',
       registration_source: 'qr_code',
     }
 
-    const created = await store.createApplicant(payload)
+    // 🟢 Send to public endpoint without requiring staff auth token
+    const res = await publicApplyApi.post('/apply', payload)
+    const result = res.data?.data ?? res.data?.applicant ?? res.data
 
-    if (lifestyleData.value) {
-      await subStore.upsertLifestyle({
-        applicant_id: created.id,
-        ...lifestyleData.value,
-      }).catch(() => null)
-    }
-
-    for (const edu of educationsData.value) {
-      await subStore.createEducation({ applicant_id: created.id, ...edu }).catch(() => null)
-    }
-
-    for (const emp of employmentsData.value) {
-      await subStore.createEmployment({ applicant_id: created.id, ...emp }).catch(() => null)
-    }
-
-    for (const tattoo of tattoosData.value) {
-      await subStore.createTattoo({ applicant_id: created.id, ...tattoo }).catch(() => null)
-    }
-
-    if (id_photo_file instanceof File) {
-      await subStore.uploadBiodata(
-        created.id,
-        id_photo_file,
-        DOCUMENT_TYPE_IDS.ID_PHOTO ?? 10,
-        '2x2 Profile Photo',
-      ).catch(() => null)
-    }
-
-    if (biodata_file instanceof File) {
-      await subStore.uploadBiodata(
-        created.id,
-        biodata_file,
-        DOCUMENT_TYPE_IDS.BIODATA ?? 9,
-        biodata_notes ?? undefined,
-      ).catch(() => null)
-    }
-
-    // Save created data and show the success screen
     submittedApplicant.value = {
-      applicant_code: created.applicant_code,
-      full_name: `${created.first_name} ${created.last_name}`,
+      applicant_code: result?.applicant_code ?? 'Pending Registration',
+      full_name: `${personalData.value.first_name} ${personalData.value.last_name}`,
     }
-    isSubmitted.value = true
 
+    isSubmitted.value = true
   } catch (e: any) {
     if (e?.response?.status === 409 && e?.response?.data?.duplicates?.length) {
       foundDuplicates.value = e.response.data.duplicates
@@ -345,8 +307,7 @@ async function onFinalSubmit() {
         errors.skill_category ||
         errors.trade_or_occupation ||
         errors.jlpt_level ||
-        errors.willing_to_be_deployed ||
-        errors.expected_salary
+        errors.willing_to_be_deployed
       ) {
         goToStep(steps.findIndex((s: WizardStepItem) => s.key === 'deployment'))
       } else if (
@@ -362,8 +323,8 @@ async function onFinalSubmit() {
 
     toast.add({
       severity: 'error',
-      summary: 'Error',
-      detail: e?.response?.data?.message ?? store.error ?? 'Something went wrong while submitting.',
+      summary: 'Submission Error',
+      detail: e?.response?.data?.message ?? 'Could not submit registration. Please try again.',
       life: 4000,
     })
   } finally {
@@ -382,9 +343,7 @@ function resetForm() {
 
 <template>
   <div class="flex flex-col gap-6 p-6 lg:p-8 max-w-5xl mx-auto min-h-screen">
-    <!-- ═══════════════════════════════════════════════════
-             🎉 SUCCESS CONFIRMATION SCREEN
-        ════════════════════════════════════════════════════ -->
+    <!-- Success Confirmation -->
     <div
       v-if="isSubmitted"
       class="bg-white rounded-3xl border border-appleCore-200 p-8 sm:p-12 shadow-sm text-center max-w-xl mx-auto my-auto flex flex-col items-center gap-6"
@@ -432,11 +391,8 @@ function resetForm() {
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════
-             📝 PUBLIC APPLICATION WIZARD
-        ════════════════════════════════════════════════════ -->
+    <!-- Application Form -->
     <template v-else>
-      <!-- Header -->
       <div class="flex items-center justify-between border-b border-appleCore-100 pb-4">
         <div>
           <h1 class="text-2xl font-serif font-bold text-blueberry-900 tracking-tight flex items-center gap-2">
@@ -447,7 +403,6 @@ function resetForm() {
         </div>
       </div>
 
-      <!-- Notice Banner -->
       <div class="flex items-center gap-2.5 px-4 py-3 bg-purple-50/80 border border-purple-200/80 rounded-xl text-xs text-purple-900 shadow-2xs">
         <i class="pi pi-info-circle text-purple-600 text-base shrink-0" />
         <span>
@@ -455,7 +410,6 @@ function resetForm() {
         </span>
       </div>
 
-      <!-- Stepper -->
       <WizardStepper
         :steps="steps"
         :current-index="currentStepIndex"
@@ -464,7 +418,6 @@ function resetForm() {
         @go-to="goToStep"
       />
 
-      <!-- Validation Error Alert -->
       <div
         v-if="hasErrors"
         class="flex items-start gap-3 p-4 bg-red-50/90 border border-red-200 rounded-xl shadow-2xs"
@@ -491,7 +444,6 @@ function resetForm() {
         </div>
       </div>
 
-      <!-- Tab Step Content -->
       <div class="bg-white rounded-2xl border border-appleCore-200 p-6 shadow-2xs">
         <PersonalTab
           v-if="currentStep.key === 'personal'"
@@ -583,7 +535,6 @@ function resetForm() {
         />
       </div>
 
-      <!-- Duplicate Dialog -->
       <DuplicateWarningDialog
         v-model:visible="duplicateDialog"
         :duplicates="foundDuplicates"

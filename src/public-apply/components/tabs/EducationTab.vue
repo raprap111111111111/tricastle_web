@@ -1,11 +1,11 @@
-<!-- src/features/applicants/components/tabs/EducationTab.vue -->
+<!-- src/public-apply/components/tabs/EducationTab.vue -->
 <script setup lang="ts">
 import { ref } from 'vue'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import Button from 'primevue/button'
-import type { EducationEntryValues } from '../../schemas/applicant.schema'
+import type { EducationEntryValues } from '@/features/applicants/schemas/applicant.schema'
 
 const props = defineProps<{
   initialValues?: EducationEntryValues[]
@@ -16,48 +16,50 @@ const emit = defineEmits<{
   (e: 'back'): void
 }>()
 
-const entries = ref<EducationEntryValues[]>(
-  props.initialValues?.map((ed) => ({
-    id:               ed.id,
-    education_level:  ed.education_level,
-    education_status: ed.education_status,
-    school_name:      ed.school_name,
-    course:           ed.course ?? '',
-    year_started:     ed.year_started ?? null,
-    year_ended:       ed.year_ended ?? null,
-    honors:           ed.honors ?? '',
-  })) ?? [],
-)
-
 const levelOptions = [
-  { label: 'Elementary',    value: 'elementary'    },
-  { label: 'High School',   value: 'high_school'   },
-  { label: 'Senior High',   value: 'senior_high'   },
-  { label: 'Vocational',    value: 'vocational'    },
-  { label: 'College',       value: 'college'       },
-  { label: 'Post Graduate', value: 'post_graduate' },
+  { label: 'Elementary', value: 'elementary' },
+  { label: 'High School / Junior High', value: 'high_school' },
+  { label: 'Senior High School', value: 'senior_high' },
+  { label: 'Vocational / Tech-Voc / TESDA', value: 'vocational' },
+  { label: 'College / University', value: 'college' },
+  { label: 'Postgraduate / Masteral', value: 'post_graduate' },
 ]
 
 const statusOptions = [
-  { label: 'Graduate',      value: 'graduate'      },
+  { label: 'Graduated', value: 'graduate' },
   { label: 'Undergraduate', value: 'undergraduate' },
-  { label: 'Ongoing',       value: 'ongoing'       },
+  { label: 'Ongoing', value: 'ongoing' },
 ]
+
+const entries = ref<EducationEntryValues[]>(
+  props.initialValues?.map((edu) => ({
+    id: edu.id,
+    education_level: edu.education_level ?? 'high_school',
+    education_status: edu.education_status ?? 'graduate',
+    school_name: edu.school_name ?? '',
+    course: edu.course ?? '',
+    year_started: typeof edu.year_started === 'number' ? edu.year_started : null,
+    year_ended: typeof edu.year_ended === 'number' ? edu.year_ended : null,
+    honors: edu.honors ?? '',
+    remarks: edu.remarks ?? '',
+  })) ?? [],
+)
 
 function addEntry() {
   entries.value.push({
-    education_level:  'college',
+    education_level: 'high_school',
     education_status: 'graduate',
-    school_name:      '',
-    course:           '',
-    year_started:     null,
-    year_ended:       null,
-    honors:           '',
+    school_name: '',
+    course: '',
+    year_started: null,
+    year_ended: null,
+    honors: '',
+    remarks: '',
   })
 }
 
-function removeEntry(index: number) {
-  entries.value.splice(index, 1)
+function removeEntry(idx: number) {
+  entries.value.splice(idx, 1)
 }
 
 function onNext() {
@@ -70,7 +72,7 @@ function onNext() {
     <section class="bg-white rounded-xl border border-appleCore-100 p-6">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-base font-serif font-semibold text-blueberry-800">
-          <i class="pi pi-book mr-2" />Education History
+          <i class="pi pi-graduation-cap mr-2" />Educational Background
         </h3>
         <Button
           label="Add Education"
@@ -83,8 +85,8 @@ function onNext() {
       </div>
 
       <div v-if="entries.length === 0" class="text-center py-8 text-blueberry-400">
-        <i class="pi pi-book text-3xl mb-2" />
-        <p class="text-sm">No education records yet. Click "Add Education" to begin.</p>
+        <i class="pi pi-graduation-cap text-3xl mb-2" />
+        <p class="text-sm">No education records added yet. Click "Add Education" to begin.</p>
       </div>
 
       <div
@@ -100,52 +102,67 @@ function onNext() {
           <i class="pi pi-times" />
         </button>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="flex flex-col gap-1">
-            <label class="text-sm font-medium text-blueberry-700">Level *</label>
+            <label class="text-sm font-medium text-blueberry-700">Education Level *</label>
             <Select
               v-model="entry.education_level"
               :options="levelOptions"
               option-label="label"
               option-value="value"
               placeholder="Select level"
+              class="w-full"
             />
           </div>
 
           <div class="flex flex-col gap-1">
-            <label class="text-sm font-medium text-blueberry-700">Status</label>
+            <label class="text-sm font-medium text-blueberry-700">Status *</label>
             <Select
               v-model="entry.education_status"
               :options="statusOptions"
               option-label="label"
               option-value="value"
+              placeholder="Select status"
+              class="w-full"
             />
           </div>
 
           <div class="flex flex-col gap-1">
             <label class="text-sm font-medium text-blueberry-700">School Name *</label>
-            <InputText v-model="entry.school_name" placeholder="University of..." />
+            <InputText v-model="entry.school_name" placeholder="University / High School Name" />
           </div>
 
           <div class="flex flex-col gap-1">
-            <label class="text-sm font-medium text-blueberry-700">Course</label>
-            <InputText v-model="entry.course" placeholder="BS Computer Science" />
+            <label class="text-sm font-medium text-blueberry-700">Course / Degree / Strand</label>
+            <InputText v-model="entry.course" placeholder="BS Computer Science, General, etc." />
           </div>
 
-          <div class="flex flex-col gap-1">
-            <label class="text-sm font-medium text-blueberry-700">Year Started</label>
-            <InputNumber v-model="entry.year_started" placeholder="e.g. 2018" :min="1950" :max="2100" :use-grouping="false" />
+          <div class="grid grid-cols-2 gap-2">
+            <div class="flex flex-col gap-1">
+              <label class="text-sm font-medium text-blueberry-700">Year Started</label>
+              <InputNumber
+                v-model="entry.year_started"
+                :use-grouping="false"
+                :min="1950"
+                :max="2099"
+                placeholder="2018"
+              />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-sm font-medium text-blueberry-700">Year Ended / Graduated</label>
+              <InputNumber
+                v-model="entry.year_ended"
+                :use-grouping="false"
+                :min="1950"
+                :max="2099"
+                placeholder="2022"
+              />
+            </div>
           </div>
 
-          <!-- 🎯 RELABELED TO "Year Graduated" -->
-          <div class="flex flex-col gap-1">
-            <label class="text-sm font-medium text-blueberry-700">Year Graduated</label>
-            <InputNumber v-model="entry.year_ended" placeholder="e.g. 2022" :min="1950" :max="2100" :use-grouping="false" />
-          </div>
-
-          <div class="flex flex-col gap-1 md:col-span-3">
-            <label class="text-sm font-medium text-blueberry-700">Honors</label>
-            <InputText v-model="entry.honors" placeholder="Cum Laude, Dean's List" />
+          <div class="flex flex-col gap-1 md:col-span-2">
+            <label class="text-sm font-medium text-blueberry-700">Honors / Awards</label>
+            <InputText v-model="entry.honors" placeholder="Cum Laude, With Honors, NC II..." />
           </div>
         </div>
       </div>

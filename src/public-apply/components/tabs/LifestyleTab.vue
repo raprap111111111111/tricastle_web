@@ -1,12 +1,12 @@
-<!-- src/features/applicants/components/tabs/LifestyleTab.vue -->
+<!-- src/public-apply/components/tabs/LifestyleTab.vue -->
 <script setup lang="ts">
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
-import { lifestyleSchema, type LifestyleFormValues } from '../../schemas/applicant.schema'
-import type { ApplicantLifestyle } from '../../types'
+import { lifestyleSchema, type LifestyleFormValues } from '@/features/applicants/schemas/applicant.schema'
+import type { ApplicantLifestyle } from '@/features/applicants/types'
 
 const props = defineProps<{
   initialValues?: Partial<ApplicantLifestyle> | null
@@ -15,9 +15,10 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'next', values: LifestyleFormValues): void
   (e: 'back'): void
+  (e: 'validate', values: LifestyleFormValues | null): void
 }>()
 
-const { handleSubmit, defineField } = useForm<LifestyleFormValues>({
+const { handleSubmit, defineField, values, validate } = useForm<LifestyleFormValues>({
   validationSchema: toTypedSchema(lifestyleSchema),
   initialValues: {
     is_smoking: props.initialValues?.is_smoking ?? false,
@@ -50,13 +51,13 @@ const [medical_notes] = defineField('medical_notes')
 const [has_allergies] = defineField('has_allergies')
 const [allergies_notes] = defineField('allergies_notes')
 
-const onSubmit = handleSubmit((values) => {
-  emit('next', values)
+const onSubmit = handleSubmit((formValues) => {
+  emit('next', formValues)
 })
 </script>
 
 <template>
-  <form @submit.prevent="onSubmit" class="flex flex-col gap-6">
+  <form class="flex flex-col gap-6" @submit.prevent="onSubmit">
     <!-- Current Habits -->
     <section class="bg-white rounded-xl border border-appleCore-100 p-6">
       <h3 class="text-base font-semibold text-blueberry-800 mb-4">
@@ -71,7 +72,12 @@ const onSubmit = handleSubmit((values) => {
               Currently Smoking
             </label>
           </div>
-          <InputText v-if="is_smoking" v-model="smoking_frequency" placeholder="e.g., 5 sticks/day" class="ml-6" />
+          <InputText
+            v-if="is_smoking"
+            v-model="smoking_frequency"
+            placeholder="e.g., 5 sticks/day"
+            class="ml-6"
+          />
         </div>
 
         <div class="flex flex-col gap-3">
@@ -81,8 +87,12 @@ const onSubmit = handleSubmit((values) => {
               Currently Drinking Alcohol
             </label>
           </div>
-          <InputText v-if="is_drinking_alcohol" v-model="drinking_frequency" placeholder="e.g., Socially, weekends"
-            class="ml-6" />
+          <InputText
+            v-if="is_drinking_alcohol"
+            v-model="drinking_frequency"
+            placeholder="e.g., Socially, weekends"
+            class="ml-6"
+          />
         </div>
 
         <div class="flex flex-col gap-3">
@@ -92,8 +102,14 @@ const onSubmit = handleSubmit((values) => {
               Currently Using Drugs
             </label>
           </div>
-          <Textarea v-if="is_using_drugs" v-model="drugs_notes" rows="2" placeholder="Details..." auto-resize
-            class="ml-6" />
+          <Textarea
+            v-if="is_using_drugs"
+            v-model="drugs_notes"
+            rows="2"
+            placeholder="Details..."
+            auto-resize
+            class="ml-6"
+          />
         </div>
       </div>
     </section>
@@ -136,8 +152,14 @@ const onSubmit = handleSubmit((values) => {
               Has Medical Condition
             </label>
           </div>
-          <Textarea v-if="has_medical_condition" v-model="medical_notes" rows="3" placeholder="Describe conditions..."
-            auto-resize class="ml-6" />
+          <Textarea
+            v-if="has_medical_condition"
+            v-model="medical_notes"
+            rows="3"
+            placeholder="Describe conditions..."
+            auto-resize
+            class="ml-6"
+          />
         </div>
 
         <div class="flex flex-col gap-3">
@@ -147,21 +169,34 @@ const onSubmit = handleSubmit((values) => {
               Has Allergies
             </label>
           </div>
-          <Textarea v-if="has_allergies" v-model="allergies_notes" rows="3" placeholder="Describe allergies..."
-            auto-resize class="ml-6" />
+          <Textarea
+            v-if="has_allergies"
+            v-model="allergies_notes"
+            rows="3"
+            placeholder="Describe allergies..."
+            auto-resize
+            class="ml-6"
+          />
         </div>
       </div>
     </section>
 
     <!-- Navigation -->
     <div class="flex justify-between">
-      <button type="button" class="inline-flex items-center gap-2 px-6 py-2.5 bg-gray-200 text-blueberry-700 rounded-lg
-               font-medium text-sm hover:bg-gray-300 transition-colors" @click="emit('back')">
+      <button
+        type="button"
+        class="inline-flex items-center gap-2 px-6 py-2.5 bg-gray-200 text-blueberry-700 rounded-lg
+               font-medium text-sm hover:bg-gray-300 transition-colors"
+        @click="emit('back')"
+      >
         <i class="pi pi-arrow-left text-xs" />
         Back
       </button>
-      <button type="submit" class="inline-flex items-center gap-2 px-6 py-2.5 bg-apricot-500 text-white rounded-lg
-               font-medium text-sm hover:bg-apricot-600 transition-colors shadow-sm">
+      <button
+        type="submit"
+        class="inline-flex items-center gap-2 px-6 py-2.5 bg-apricot-500 text-white rounded-lg
+               font-medium text-sm hover:bg-apricot-600 transition-colors shadow-sm"
+      >
         Next
         <i class="pi pi-arrow-right text-xs" />
       </button>

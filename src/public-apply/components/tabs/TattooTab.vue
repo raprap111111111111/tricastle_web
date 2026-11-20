@@ -1,11 +1,11 @@
+<!-- src/public-apply/components/tabs/TattooTab.vue -->
 <script setup lang="ts">
 import { ref } from 'vue'
 import InputText from 'primevue/inputtext'
-import Textarea from 'primevue/textarea'
 import Select from 'primevue/select'
 import Checkbox from 'primevue/checkbox'
 import Button from 'primevue/button'
-import type { TattooEntryValues } from '../../schemas/applicant.schema'
+import type { TattooEntryValues } from '@/features/applicants/schemas/applicant.schema'
 
 const props = defineProps<{
   initialValues?: TattooEntryValues[]
@@ -16,30 +16,41 @@ const emit = defineEmits<{
   (e: 'back'): void
 }>()
 
+const locationOptions = [
+  { label: 'Left Arm', value: 'left_arm' },
+  { label: 'Right Arm', value: 'right_arm' },
+  { label: 'Left Leg', value: 'left_leg' },
+  { label: 'Right Leg', value: 'right_leg' },
+  { label: 'Chest', value: 'chest' },
+  { label: 'Back', value: 'back' },
+  { label: 'Neck / Face', value: 'neck_face' },
+  { label: 'Other', value: 'other' },
+]
+
+const sizeOptions = [
+  { label: 'Small (< 5cm)', value: 'small' },
+  { label: 'Medium (5-15cm)', value: 'medium' },
+  { label: 'Large (> 15cm)', value: 'large' },
+]
+
 const entries = ref<TattooEntryValues[]>(
   props.initialValues?.map((t) => ({
-    id:          t.id,
-    location:    t.location,
-    size:        t.size ?? null,
+    id: t.id,
+    location: t.location ?? 'left_arm',
+    size: t.size ?? 'small',
+    is_visible: t.is_visible ?? false,
     description: t.description ?? '',
-    photo_path:  t.photo_path ?? '',
-    is_visible:  t.is_visible,
+    photo_path: t.photo_path ?? null,
   })) ?? [],
 )
 
-const sizeOptions = [
-  { label: 'Small',  value: 'small'  },
-  { label: 'Medium', value: 'medium' },
-  { label: 'Large',  value: 'large'  },
-]
-
 function addEntry() {
   entries.value.push({
-    location:    '',
-    size:        null,
+    location: 'left_arm',
+    size: 'small',
+    is_visible: false,
     description: '',
-    photo_path:  '',
-    is_visible:  true,
+    photo_path: null,
   })
 }
 
@@ -56,11 +67,14 @@ function onNext() {
   <div class="flex flex-col gap-6">
     <section class="bg-white rounded-xl border border-appleCore-100 p-6">
       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-base font-serif font-semibold text-blueberry-800">
-          <i class="pi pi-palette mr-2" />Tattoo Records
-        </h3>
+        <div>
+          <h3 class="text-base font-serif font-semibold text-blueberry-800">
+            <i class="pi pi-pencil mr-2" />Tattoos & Body Marks
+          </h3>
+          <p class="text-xs text-blueberry-500">If you do not have tattoos, you may skip this step by clicking Next.</p>
+        </div>
         <Button
-          label="Add Tattoo"
+          label="Add Tattoo Entry"
           icon="pi pi-plus"
           size="small"
           severity="success"
@@ -70,8 +84,8 @@ function onNext() {
       </div>
 
       <div v-if="entries.length === 0" class="text-center py-8 text-blueberry-400">
-        <i class="pi pi-palette text-3xl mb-2" />
-        <p class="text-sm">No tattoo records. Click "Add Tattoo" if applicable.</p>
+        <i class="pi pi-check-circle text-3xl mb-2 text-emerald-500" />
+        <p class="text-sm">No tattoos recorded. If none, proceed to Next.</p>
       </div>
 
       <div
@@ -90,7 +104,14 @@ function onNext() {
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="flex flex-col gap-1">
             <label class="text-sm font-medium text-blueberry-700">Location *</label>
-            <InputText v-model="entry.location" placeholder="Left arm, back, chest..." />
+            <Select
+              v-model="entry.location"
+              :options="locationOptions"
+              option-label="label"
+              option-value="value"
+              placeholder="Select location"
+              class="w-full"
+            />
           </div>
 
           <div class="flex flex-col gap-1">
@@ -101,24 +122,20 @@ function onNext() {
               option-label="label"
               option-value="value"
               placeholder="Select size"
+              class="w-full"
             />
           </div>
 
           <div class="flex items-end gap-2 pb-1">
-            <Checkbox v-model="entry.is_visible" :binary="true" :input-id="`vis_${idx}`" />
-            <label :for="`vis_${idx}`" class="text-sm text-blueberry-700">
-              Visible with normal clothes
+            <Checkbox v-model="entry.is_visible" :binary="true" :input-id="`visible_${idx}`" />
+            <label :for="`visible_${idx}`" class="text-sm text-blueberry-700">
+              Visible with clothes
             </label>
           </div>
 
           <div class="flex flex-col gap-1 md:col-span-3">
             <label class="text-sm font-medium text-blueberry-700">Description</label>
-            <Textarea
-              v-model="entry.description"
-              rows="2"
-              placeholder="Describe the tattoo..."
-              auto-resize
-            />
+            <InputText v-model="entry.description" placeholder="Tribal, symbol, text, etc." />
           </div>
         </div>
       </div>
