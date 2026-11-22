@@ -6,7 +6,6 @@ import { z } from 'zod'
 import { computed, ref, watch, onUnmounted } from 'vue'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
-import DatePicker from 'primevue/datepicker'
 import InputNumber from 'primevue/inputnumber'
 import Password from 'primevue/password'
 
@@ -40,21 +39,6 @@ const publicPersonalSchema = z
     message: 'Passwords do not match',
     path: ['password_confirmation'],
   })
-
-// ─── Helpers ────────────────────────────────────────────
-function toDate(val: string | null | undefined): Date | null {
-  if (!val) return null
-  const d = new Date(val)
-  return isNaN(d.getTime()) ? null : d
-}
-
-function toISO(val: Date | null | undefined): string | null {
-  if (!val || !(val instanceof Date) || isNaN(val.getTime())) return null
-  const y = val.getFullYear()
-  const m = String(val.getMonth() + 1).padStart(2, '0')
-  const d = String(val.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
 
 // ─── Form Setup ─────────────────────────────────────────
 const { handleSubmit, defineField, errors, values, validate } = useForm<PublicPersonalFormValues>({
@@ -91,6 +75,73 @@ const [gender]                = defineField('gender')
 const [civil_status]          = defineField('civil_status')
 const [number_of_children]    = defineField('number_of_children')
 const [nationality]           = defineField('nationality')
+
+// ─── Fast Birthday Selector (Year -> Month -> Day) ─────
+const currentYear = new Date().getFullYear()
+const maxAllowedYear = currentYear - 18 // At least 18 years old
+const minAllowedYear = 1950
+
+// Year Options: 2008 down to 1950
+const yearOptions = computed(() => {
+  const yrs: { label: string; value: string }[] = []
+  for (let y = maxAllowedYear; y >= minAllowedYear; y--) {
+    yrs.push({ label: String(y), value: String(y) })
+  }
+  return yrs
+})
+
+// Month Options
+const monthOptions = [
+  { label: '01 - January',   value: '01' },
+  { label: '02 - February',  value: '02' },
+  { label: '03 - March',     value: '03' },
+  { label: '04 - April',     value: '04' },
+  { label: '05 - May',       value: '05' },
+  { label: '06 - June',      value: '06' },
+  { label: '07 - July',      value: '07' },
+  { label: '08 - August',    value: '08' },
+  { label: '09 - September', value: '09' },
+  { label: '10 - October',   value: '10' },
+  { label: '11 - November',  value: '11' },
+  { label: '12 - December',  value: '12' },
+]
+
+// Parse initial DOB if exists (YYYY-MM-DD)
+const initialDobParts = (props.initialValues?.date_of_birth ?? '').split('-')
+const birthYear = ref<string | null>(initialDobParts[0] || null)
+const birthMonth = ref<string | null>(initialDobParts[1] || null)
+const birthDay = ref<string | null>(initialDobParts[2] || null)
+
+// Day Options dynamically adjusted for month / leap years
+const dayOptions = computed(() => {
+  let totalDays = 31
+  if (birthMonth.value) {
+    const m = parseInt(birthMonth.value, 10)
+    if ([4, 6, 9, 11].includes(m)) {
+      totalDays = 30
+    } else if (m === 2) {
+      const y = birthYear.value ? parseInt(birthYear.value, 10) : 2000
+      const isLeap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0
+      totalDays = isLeap ? 29 : 28
+    }
+  }
+
+  const days: { label: string; value: string }[] = []
+  for (let d = 1; d <= totalDays; d++) {
+    const val = String(d).padStart(2, '0')
+    days.push({ label: val, value: val })
+  }
+  return days
+})
+
+// Sync Year, Month, Day -> date_of_birth string ("YYYY-MM-DD")
+watch([birthYear, birthMonth, birthDay], () => {
+  if (birthYear.value && birthMonth.value && birthDay.value) {
+    date_of_birth.value = `${birthYear.value}-${birthMonth.value}-${birthDay.value}`
+  } else {
+    date_of_birth.value = null
+  }
+})
 
 // ─── Email Domain Selector ──────────────────────────────
 const domainOptions = [
@@ -162,11 +213,6 @@ function syncEmail() {
 }
 
 watch([emailUsername, emailDomain, customDomain], syncEmail, { immediate: true })
-
-const dobProxy = computed<Date | null>({
-  get: () => toDate(date_of_birth.value),
-  set: (v) => { date_of_birth.value = toISO(v) },
-})
 
 const genderOptions = [
   { label: 'Male',   value: 'male' },
@@ -281,7 +327,7 @@ const onSubmit = handleSubmit((formValues) => {
   <form class="flex flex-col gap-6" @submit.prevent="onSubmit">
     <section class="bg-white rounded-2xl border border-appleCore-100 p-6 shadow-sm flex flex-col gap-6">
 
-      <!-- ─── 1. Personal Identity ───────────────────────────── -->
+      <!-- ─── 1. Personal Information ────────────────────────── -->
       <div>
         <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center">
           <i class="pi pi-user mr-2 text-apricot-500" />Personal Information
@@ -340,16 +386,48 @@ const onSubmit = handleSubmit((formValues) => {
             />
           </div>
 
-          <!-- Date of Birth -->
-          <div class="flex flex-col gap-1">
-            <label class="text-sm font-medium text-blueberry-700">Date of Birth</label>
-            <DatePicker
-              v-model="dobProxy"
-              date-format="yy-mm-dd"
-              placeholder="YYYY-MM-DD"
-              show-icon
-              class="w-full"
-            />
+          <!-- 🟢 Date of Birth: 1. Year -> 2. Month -> 3. Day Dropdowns -->
+          <div class="flex flex-col gap-1 md:col-span-2">
+            <label class="text-sm font-medium text-blueberry-700">
+              Date of Birth <span class="text-red-500">*</span>
+              <span class="text-[11px] text-blueberry-500 font-normal ml-1">(Year &rarr; Month &rarr; Day)</span>
+            </label>
+
+            <div class="grid grid-cols-3 gap-2">
+              <!-- 1. Year First -->
+              <Select
+                v-model="birthYear"
+                :options="yearOptions"
+                option-label="label"
+                option-value="value"
+                placeholder="Year"
+                class="w-full"
+                :invalid="!!errors.date_of_birth"
+              />
+
+              <!-- 2. Month Second -->
+              <Select
+                v-model="birthMonth"
+                :options="monthOptions"
+                option-label="label"
+                option-value="value"
+                placeholder="Month"
+                class="w-full"
+                :invalid="!!errors.date_of_birth"
+              />
+
+              <!-- 3. Day Third -->
+              <Select
+                v-model="birthDay"
+                :options="dayOptions"
+                option-label="label"
+                option-value="value"
+                placeholder="Day"
+                class="w-full"
+                :invalid="!!errors.date_of_birth"
+              />
+            </div>
+
             <small v-if="errors.date_of_birth" class="text-red-500">{{ errors.date_of_birth }}</small>
             <small v-else-if="nameStatus === 'taken'" class="text-amber-600 font-medium">
               <i class="pi pi-exclamation-triangle text-[10px] mr-1" />{{ nameDuplicateMsg }}
@@ -373,7 +451,7 @@ const onSubmit = handleSubmit((formValues) => {
         </div>
       </div>
 
-      <!-- ─── 2. Highlighted Account & Login Credentials Card ───────────── -->
+      <!-- ─── 2. Highlighted Portal Credentials Card ─────────── -->
       <div class="rounded-xl p-5 bg-gradient-to-br from-amber-50/70 via-orange-50/40 to-amber-50/60 border-2 border-apricot-200/90 shadow-sm">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-3 border-b border-apricot-200/60 mb-4">
           <div class="flex items-center gap-2">
@@ -395,7 +473,7 @@ const onSubmit = handleSubmit((formValues) => {
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Email Address (Full Width of Account Box) -->
+          <!-- Email Address -->
           <div class="flex flex-col gap-1 md:col-span-2">
             <label class="text-sm font-semibold text-blueberry-800">
               Email Address <span class="text-red-500">*</span>
@@ -506,7 +584,7 @@ const onSubmit = handleSubmit((formValues) => {
         </div>
       </div>
 
-      <!-- ─── Warnings & Error Callouts ──────────────────────── -->
+      <!-- ─── Warnings ───────────────────────────────────────── -->
       <div
         v-if="emailStatus === 'taken'"
         class="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg text-xs"
