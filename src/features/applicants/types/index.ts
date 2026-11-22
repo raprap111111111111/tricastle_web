@@ -1,7 +1,7 @@
 // ─── Enums / Literals ─────────────────────────────────────────────────────────
 
 export type ApplicantStatus =
-  | 'self_registered'
+
   | 'pending'
   | 'under_review'
   | 'verified'
@@ -267,6 +267,7 @@ export interface Applicant {
   status:           ApplicantStatus
   rejection_reason: string | null
   remarks?:          string | null
+  registered_at?:   string | null 
   final_listed_at:  string | null
   rejected_at:      string | null
 

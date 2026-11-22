@@ -1,3 +1,4 @@
+<!-- src/features/applicants/views/SelfRegisteredView.vue -->
 <script setup lang="ts">
 import { onMounted, onActivated, computed, watch, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -22,7 +23,6 @@ import type { Applicant } from '../types'
 
 // 📊 Excel Export
 import {
-  ALL_COLUMNS,
   DEFAULT_COLUMN_KEYS,
   exportApplicantList,
 } from '@shared/utils/excel-export'
@@ -116,9 +116,8 @@ const japanExpCount = computed(
 )
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 🔍 PROFILE REVIEW MODAL (Same logic as Profile Updates)
+// 🔍 PROFILE REVIEW MODAL
 // ═══════════════════════════════════════════════════════════════════════════
-
 const showReviewDialog = ref(false)
 const selectedApplicant = ref<Applicant | null>(null)
 const activeTab = ref<'personal' | 'passport' | 'deployment' | 'family'>('personal')
@@ -142,7 +141,7 @@ function closeReviewModal() {
   rejectionReason.value = ''
 }
 
-// ─── Approve Action (Approve submission -> Status = Pending & Portal Active)
+// ─── Approve Action ───────────────────────────────────
 async function handleApproveApplicant(applicant?: Applicant) {
   const target = applicant ?? selectedApplicant.value
   if (!target) return
@@ -172,7 +171,7 @@ async function handleApproveApplicant(applicant?: Applicant) {
   }
 }
 
-// ─── Reject Action (Reject submission with reason)
+// ─── Reject Action ────────────────────────────────────
 async function handleRejectApplicant() {
   if (!selectedApplicant.value || !rejectionReason.value.trim()) {
     toast.add({
@@ -314,33 +313,31 @@ async function handleDownload(): Promise<void> {
 </script>
 
 <template>
-  <div class="flex flex-col gap-8 p-8 max-w-[1400px] mx-auto">
+  <div class="flex flex-col gap-6 p-6 lg:p-8 max-w-[1400px] mx-auto w-full">
     <!-- ─── Header ─────────────────────────────────── -->
-    <header class="flex items-start justify-between gap-6 flex-wrap">
+    <header class="flex items-start justify-between gap-4 flex-wrap pt-2">
       <div class="flex flex-col gap-1">
-        <div class="flex items-center gap-2">
-          <h1 class="text-3xl font-serif font-semibold text-blueberry-800 tracking-tight flex items-center gap-2.5">
-            <i class="pi pi-qrcode text-purple-600 text-2xl" />
+        <div class="flex items-center gap-2.5 flex-wrap">
+          <h1 class="text-2xl sm:text-3xl font-serif font-semibold text-blueberry-800 tracking-tight flex items-center gap-2.5">
+            <i class="pi pi-qrcode text-apricot-500 text-2xl" />
             Self-Registered Applicants
           </h1>
-          <span
-            class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-purple-50 text-purple-700 rounded-full text-xs font-medium ring-1 ring-purple-200"
-          >
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-apricot-50 text-apricot-700 rounded-full text-xs font-semibold border border-apricot-200">
             <span class="relative flex h-2 w-2">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75" />
-              <span class="relative inline-flex rounded-full h-2 w-2 bg-purple-500" />
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-apricot-400 opacity-75" />
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-apricot-500" />
             </span>
-            Pending Staff Approval
+            Pending Review
           </span>
         </div>
-        <p class="text-sm text-blueberry-500">
-          Review new applicants registered via QR code or direct link, inspect their information, and approve them into the pipeline
+        <p class="text-xs sm:text-sm text-blueberry-500">
+          Review applicants registered via public link/QR code, verify their information, and approve them into the pipeline.
         </p>
       </div>
 
       <!-- Action Buttons -->
       <div class="flex items-center gap-2.5 flex-wrap">
-        <div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-appleCore-200/80 shadow-sm">
+        <div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-appleCore-200 shadow-xs">
           <span class="text-xs font-bold text-blueberry-700">Year:</span>
           <Select
             v-model="selectedYear"
@@ -382,10 +379,10 @@ async function handleDownload(): Promise<void> {
     </header>
 
     <!-- ─── Banner ─────────────────────────────────── -->
-    <div class="flex items-center gap-3 px-4 py-3 bg-purple-50/80 border border-purple-200 rounded-xl text-xs text-purple-900 shadow-sm">
-      <i class="pi pi-info-circle text-purple-600 text-base shrink-0" />
+    <div class="flex items-center gap-3 px-4 py-3 bg-amber-50/80 border border-amber-200/80 rounded-xl text-xs text-amber-900 shadow-xs">
+      <i class="pi pi-info-circle text-amber-600 text-base shrink-0" />
       <span>
-        When an applicant submits their details via QR registration, search their name below and click <strong>Review & Approve</strong> to inspect their profile. Once approved, their status becomes <strong>Pending</strong> and their <strong>Applicant Portal Account</strong> is activated.
+        When an applicant submits their details via self-registration, search their record below and click <strong>Review & Approve</strong> to inspect their profile. Once approved, their status becomes <strong>Pending</strong> and their <strong>Applicant Portal Account</strong> is activated.
       </span>
     </div>
 
@@ -398,13 +395,13 @@ async function handleDownload(): Promise<void> {
     </div>
 
     <!-- ─── Search Bar ────────────────────────────── -->
-    <div class="bg-white p-3.5 rounded-2xl border border-appleCore-200 shadow-sm flex items-center gap-3">
+    <div class="bg-white p-3 rounded-2xl border border-appleCore-100 shadow-xs flex items-center gap-2.5">
       <div class="relative flex-1">
         <i class="pi pi-search absolute left-3.5 top-1/2 -translate-y-1/2 text-blueberry-400 text-sm" />
         <InputText
           v-model="searchQuery"
-          placeholder="Search applicant name (e.g. Ralph Barioga), email, or applicant code (TC-2026-00011)..."
-          class="w-full !pl-10 !pr-10 !py-2.5 !text-sm !rounded-xl !border-appleCore-200 focus:!border-purple-500 focus:!ring-purple-200"
+          placeholder="Search applicant name, email, or applicant code (e.g. TC-2026-00015)..."
+          class="w-full !pl-10 !pr-10 !py-2 !text-sm !rounded-xl !border-appleCore-200 focus:!border-apricot-500 focus:!ring-apricot-200"
           @input="onSearchInput"
         />
         <button
@@ -421,7 +418,7 @@ async function handleDownload(): Promise<void> {
         label="Search"
         icon="pi pi-search"
         variant="accent"
-        class="!bg-purple-600 hover:!bg-purple-700 !border-purple-600 !rounded-xl !px-5"
+        class="!rounded-xl !px-5"
         @click="loadSelfRegistered"
       />
     </div>
@@ -430,7 +427,7 @@ async function handleDownload(): Promise<void> {
     <Transition name="slide-down">
       <div
         v-if="hasSelection"
-        class="flex items-center justify-between px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl"
+        class="flex items-center justify-between px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl shadow-xs"
       >
         <div class="flex items-center gap-3">
           <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-600 text-white text-xs font-bold">
@@ -471,31 +468,31 @@ async function handleDownload(): Promise<void> {
             <i class="pi pi-users text-4xl text-appleCore-300" />
             <p class="text-base font-semibold text-blueberry-700">No self-registered applicants pending approval</p>
             <p class="text-xs text-blueberry-400">
-              {{ searchQuery ? `No matches found for "${searchQuery}".` : 'New QR code registrations will appear here automatically.' }}
+              {{ searchQuery ? `No matches found for "${searchQuery}".` : 'New online registrations will appear here automatically.' }}
             </p>
           </div>
         </template>
 
         <Column selection-mode="multiple" header-style="width: 3rem" />
 
-        <!-- Code Column -->
-        <Column header="Code" field="applicant_code">
+        <!-- 🟢 Code Column with fixed width & nowrap -->
+        <Column header="Code" field="applicant_code" header-style="min-width: 140px;">
           <template #body="{ data }">
-            <span class="font-mono text-xs font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-200">
+            <span class="font-mono text-xs font-bold text-apricot-800 bg-apricot-50 px-2 py-1 rounded-md border border-apricot-200 whitespace-nowrap inline-block">
               {{ data.applicant_code }}
             </span>
           </template>
         </Column>
 
         <!-- Applicant Info -->
-        <Column header="Applicant">
+        <Column header="Applicant" header-style="min-width: 220px;">
           <template #body="{ data }">
             <div class="flex items-center gap-3 py-1">
-              <div class="w-9 h-9 rounded-full bg-purple-100 text-purple-700 font-bold text-xs flex items-center justify-center shrink-0 border border-purple-200">
+              <div class="w-9 h-9 rounded-full bg-apricot-100 text-apricot-800 font-bold text-xs flex items-center justify-center shrink-0 border border-apricot-200">
                 {{ getInitials(data.first_name, data.last_name) }}
               </div>
               <div class="flex flex-col min-w-0">
-                <span class="text-sm font-semibold text-blueberry-900 hover:text-purple-600 cursor-pointer" @click="openReviewModal(data)">
+                <span class="text-sm font-semibold text-blueberry-900 hover:text-apricot-600 cursor-pointer truncate" @click="openReviewModal(data)">
                   {{ data.full_name || `${data.first_name} ${data.last_name}` }}
                 </span>
                 <span class="text-xs text-blueberry-400 truncate">{{ data.email }}</span>
@@ -508,7 +505,7 @@ async function handleDownload(): Promise<void> {
         </Column>
 
         <!-- Applied Position -->
-        <Column header="Position / Trade">
+        <Column header="Position / Trade" header-style="min-width: 150px;">
           <template #body="{ data }">
             <div class="flex flex-col">
               <span class="text-xs font-medium text-blueberry-800">
@@ -522,43 +519,43 @@ async function handleDownload(): Promise<void> {
         </Column>
 
         <!-- Address -->
-        <Column header="Location">
+        <Column header="Location" header-style="min-width: 180px;">
           <template #body="{ data }">
-            <div class="flex flex-col max-w-[200px] text-xs text-blueberry-600">
+            <div class="flex flex-col max-w-[220px] text-xs text-blueberry-600">
               <span class="truncate">{{ data.current_address || data.permanent_address || '—' }}</span>
-              <span class="text-[11px] text-blueberry-400">{{ [data.city, data.province].filter(Boolean).join(', ') }}</span>
+              <span class="text-[11px] text-blueberry-400 truncate">{{ [data.city, data.province].filter(Boolean).join(', ') }}</span>
             </div>
           </template>
         </Column>
 
         <!-- Registered Date -->
-        <Column header="Registered">
+        <Column header="Registered" header-style="min-width: 110px;">
           <template #body="{ data }">
             <span class="text-xs text-blueberry-500 font-mono">
-              {{ formatDate(data.created_at) }}
+              {{ formatDate(data.created_at || data.registered_at) }}
             </span>
           </template>
         </Column>
 
         <!-- Status Pill -->
-        <Column header="Status">
+        <Column header="Status" header-style="min-width: 130px;">
           <template #body="{ data }">
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
-              <span class="w-1.5 h-1.5 rounded-full bg-purple-500" />
-              {{ data.status }}
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              {{ data.status === 'self_registered' ? 'Self-Registered' : data.status }}
             </span>
           </template>
         </Column>
 
         <!-- Actions -->
-        <Column header="Actions" align-frozen="right" :frozen="true">
+        <Column header="Actions" align-frozen="right" :frozen="true" header-style="min-width: 180px;">
           <template #body="{ data }">
             <div class="flex items-center gap-2">
               <Button
                 label="Review & Approve"
                 icon="pi pi-id-card"
                 size="small"
-                class="!bg-purple-600 hover:!bg-purple-700 !border-purple-600 !text-white !font-bold !text-xs !py-1.5 !px-3 !rounded-lg shadow-sm whitespace-nowrap"
+                class="!bg-apricot-500 hover:!bg-apricot-600 !border-apricot-500 !text-white !font-bold !text-xs !py-1.5 !px-3 !rounded-lg shadow-xs whitespace-nowrap"
                 @click="openReviewModal(data)"
               />
               <Button
@@ -577,7 +574,7 @@ async function handleDownload(): Promise<void> {
       <!-- Pagination Footer -->
       <div
         v-if="store.pagination"
-        class="flex items-center justify-between px-6 py-4 border-t border-appleCore-200 text-xs text-blueberry-600"
+        class="flex items-center justify-between px-6 py-4 border-t border-appleCore-100 text-xs text-blueberry-600"
       >
         <span>
           Showing <strong>{{ store.applicants.length }}</strong> of <strong>{{ store.pagination.total }}</strong> self-registered entries
@@ -608,8 +605,8 @@ async function handleDownload(): Promise<void> {
     </AppCard>
 
     <!-- ═══════════════════════════════════════════════════
-         🔍 PROFILE REVIEW DIALOG (Profile Update Logic)
-    ════════════════════════════════════════════════════ -->
+         🔍 PROFILE REVIEW DIALOG
+        ════════════════════════════════════════════════════ -->
     <Dialog
       v-model:visible="showReviewDialog"
       modal
@@ -625,9 +622,9 @@ async function handleDownload(): Promise<void> {
       <template #container>
         <div v-if="selectedApplicant" class="bg-white rounded-2xl overflow-hidden flex flex-col max-h-[90vh]">
           <!-- Dialog Header -->
-          <div class="flex items-center justify-between p-6 border-b border-appleCore-100 bg-purple-50/50">
+          <div class="flex items-center justify-between p-6 border-b border-appleCore-100 bg-apricot-50/40">
             <div class="flex items-center gap-3.5">
-              <div class="w-12 h-12 rounded-xl bg-purple-100 text-purple-700 font-bold text-sm flex items-center justify-center border border-purple-200">
+              <div class="w-12 h-12 rounded-xl bg-apricot-100 text-apricot-800 font-bold text-sm flex items-center justify-center border border-apricot-200">
                 {{ getInitials(selectedApplicant.first_name, selectedApplicant.last_name) }}
               </div>
               <div>
@@ -635,16 +632,18 @@ async function handleDownload(): Promise<void> {
                   <h3 class="text-base font-bold text-blueberry-900">
                     {{ selectedApplicant.full_name || `${selectedApplicant.first_name} ${selectedApplicant.last_name}` }}
                   </h3>
-                  <span class="font-mono text-xs font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-200">
+                  <span class="font-mono text-xs font-bold text-apricot-800 bg-apricot-50 px-2 py-0.5 rounded border border-apricot-200">
                     {{ selectedApplicant.applicant_code }}
                   </span>
                 </div>
-                <p class="text-xs text-blueberry-500">Submitted on {{ formatDate(selectedApplicant.created_at) }} • Status: <strong class="text-purple-700">Self-Registered</strong></p>
+                <p class="text-xs text-blueberry-500">
+                  Submitted on {{ formatDate(selectedApplicant.created_at || selectedApplicant.registered_at) }} • Status: <strong class="text-amber-700">Self-Registered</strong>
+                </p>
               </div>
             </div>
             <button
               type="button"
-              class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-appleCore-100 text-blueberry-500"
+              class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-appleCore-100 text-blueberry-500 transition-colors"
               @click="closeReviewModal"
             >
               <i class="pi pi-times text-xs" />
@@ -663,7 +662,7 @@ async function handleDownload(): Promise<void> {
               :key="tab.key"
               type="button"
               class="flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-bold transition-all"
-              :class="activeTab === tab.key ? 'border-purple-600 text-purple-700 bg-purple-50/50' : 'border-transparent text-blueberry-500 hover:text-blueberry-800'"
+              :class="activeTab === tab.key ? 'border-apricot-500 text-apricot-700 bg-apricot-50/40' : 'border-transparent text-blueberry-500 hover:text-blueberry-800'"
               @click="activeTab = tab.key as any"
             >
               <i :class="`pi ${tab.icon} text-xs`" />
@@ -762,7 +761,7 @@ async function handleDownload(): Promise<void> {
                 </span>
               </div>
               <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">JLPT Level / English %</span>
+                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">JLPT Level / English</span>
                 <span class="font-semibold text-blueberry-900">
                   JLPT: {{ selectedApplicant.language?.jlpt_level || 'None' }} | English: {{ selectedApplicant.english_proficiency_pct ?? '—' }}%
                 </span>
@@ -850,7 +849,7 @@ async function handleDownload(): Promise<void> {
 
     <!-- ═══════════════════════════════════════════════════
          📊 EXCEL EXPORT DIALOG
-    ════════════════════════════════════════════════════ -->
+        ════════════════════════════════════════════════════ -->
     <Dialog
       v-model:visible="showExportDialog"
       modal
@@ -859,7 +858,7 @@ async function handleDownload(): Promise<void> {
     >
       <template #header>
         <div class="flex items-center gap-2">
-          <i class="pi pi-file-excel text-purple-600 text-xl" />
+          <i class="pi pi-file-excel text-apricot-500 text-xl" />
           <span class="font-bold text-sm text-blueberry-800">Export Self-Registered Queue</span>
         </div>
       </template>
@@ -874,7 +873,7 @@ async function handleDownload(): Promise<void> {
           label="Download Excel"
           icon="pi pi-file-excel"
           :loading="exporting"
-          class="!bg-purple-600 hover:!bg-purple-700 !border-purple-600 !text-white !text-xs"
+          class="!bg-apricot-500 hover:!bg-apricot-600 !border-apricot-500 !text-white !text-xs"
           @click="handleDownload"
         />
       </template>

@@ -837,7 +837,7 @@ async function handleDownload(): Promise<void> {
               </p>
               <div class="space-y-3">
                 <div>
-                  <label class="block text-xs font-medium text-blueberry-700 mb-1.5 flex items-center gap-1">
+                  <label class="text-xs font-medium text-blueberry-700 mb-1.5 flex items-center gap-1">
                     <span>Province</span>
                     <span v-if="!loadingProvinces && psgcProvinces.length > 0" class="text-[10px] text-blueberry-400 font-normal">
                       ({{ psgcProvinces.length }} available)
@@ -848,7 +848,7 @@ async function handleDownload(): Promise<void> {
                     class="w-full" size="small" filter show-clear :loading="loadingProvinces" />
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-blueberry-700 mb-1.5 flex items-center gap-1">
+                  <label class="text-xs font-medium text-blueberry-700 mb-1.5 flex items-center gap-1">
                     <span>City / Municipality</span>
                     <span v-if="province && !loadingCities && psgcCities.length > 0" class="text-[10px] text-blueberry-400 font-normal">
                       ({{ psgcCities.length }} available)
