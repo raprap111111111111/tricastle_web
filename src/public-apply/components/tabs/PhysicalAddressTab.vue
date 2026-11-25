@@ -142,51 +142,110 @@ const onSubmit = handleSubmit((formValues) => {
 
 <template>
   <form class="flex flex-col gap-6" @submit.prevent="onSubmit">
-    <section class="bg-white rounded-xl border border-appleCore-100 p-6">
-      <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4">
+    <!-- ─── 1. Physical Information ──────────────────────── -->
+    <section class="bg-white rounded-2xl border border-appleCore-100 p-4 sm:p-6 shadow-sm">
+      <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center">
         <i class="pi pi-heart mr-2 text-apricot-500" />Physical Information
       </h3>
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <!-- Height -->
         <div class="flex flex-col gap-1">
-          <label class="text-sm font-medium text-blueberry-700">Height (cm)</label>
-          <InputNumber v-model="height_cm" :min="50" :max="250" placeholder="170" />
-          <small class="text-red-500">{{ errors.height_cm }}</small>
+          <label class="text-xs sm:text-sm font-medium text-blueberry-700">Height (cm)</label>
+          <InputNumber
+            v-model="height_cm"
+            :min="50"
+            :max="250"
+            placeholder="170"
+            fluid
+            class="w-full"
+            input-class="w-full text-xs sm:text-sm !py-2"
+            :invalid="!!errors.height_cm"
+          />
+          <small v-if="errors.height_cm" class="text-red-500 text-[11px]">{{ errors.height_cm }}</small>
         </div>
+
+        <!-- Weight -->
         <div class="flex flex-col gap-1">
-          <label class="text-sm font-medium text-blueberry-700">Weight (kg)</label>
-          <InputNumber v-model="weight_kg" :min="20" :max="300" placeholder="65" />
-          <small class="text-red-500">{{ errors.weight_kg }}</small>
+          <label class="text-xs sm:text-sm font-medium text-blueberry-700">Weight (kg)</label>
+          <InputNumber
+            v-model="weight_kg"
+            :min="20"
+            :max="300"
+            placeholder="65"
+            fluid
+            class="w-full"
+            input-class="w-full text-xs sm:text-sm !py-2"
+            :invalid="!!errors.weight_kg"
+          />
+          <small v-if="errors.weight_kg" class="text-red-500 text-[11px]">{{ errors.weight_kg }}</small>
         </div>
+
+        <!-- Dominant Hand -->
         <div class="flex flex-col gap-1">
-          <label class="text-sm font-medium text-blueberry-700">Dominant Hand</label>
-          <Select v-model="dominant_hand" :options="handOptions" option-label="label" option-value="value" placeholder="Select" />
+          <label class="text-xs sm:text-sm font-medium text-blueberry-700">Dominant Hand</label>
+          <Select
+            v-model="dominant_hand"
+            :options="handOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="Select"
+            class="w-full text-xs sm:text-sm"
+          />
         </div>
+
+        <!-- Blood Type -->
         <div class="flex flex-col gap-1">
-          <label class="text-sm font-medium text-blueberry-700">Blood Type</label>
-          <Select v-model="blood_type" :options="bloodTypeOptions" option-label="label" option-value="value" placeholder="Select" />
+          <label class="text-xs sm:text-sm font-medium text-blueberry-700">Blood Type</label>
+          <Select
+            v-model="blood_type"
+            :options="bloodTypeOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="Select"
+            class="w-full text-xs sm:text-sm"
+          />
         </div>
       </div>
     </section>
 
-    <section class="bg-white rounded-xl border border-appleCore-100 p-6">
+    <!-- ─── 2. Current Address ───────────────────────────── -->
+    <section class="bg-white rounded-2xl border border-appleCore-100 p-4 sm:p-6 shadow-sm">
       <AddressSelector v-model="currentAddress" label="Current Address" />
     </section>
 
-    <label class="flex items-center gap-2 px-6 cursor-pointer">
-      <input v-model="sameAsCurrent" type="checkbox" class="w-4 h-4 accent-apricot-500" />
-      <span class="text-sm text-blueberry-700">Permanent address is the same as current address</span>
+    <!-- ─── 3. Same as Current Checkbox ──────────────────── -->
+    <label class="flex items-center gap-2.5 px-2 sm:px-4 cursor-pointer select-none">
+      <input
+        v-model="sameAsCurrent"
+        type="checkbox"
+        class="w-4 h-4 rounded text-apricot-500 focus:ring-apricot-300 accent-apricot-500 cursor-pointer"
+      />
+      <span class="text-xs sm:text-sm font-medium text-blueberry-800">
+        Permanent address is the same as current address
+      </span>
     </label>
 
-    <section v-if="!sameAsCurrent" class="bg-white rounded-xl border border-appleCore-100 p-6">
+    <!-- ─── 4. Permanent Address ─────────────────────────── -->
+    <section v-if="!sameAsCurrent" class="bg-white rounded-2xl border border-appleCore-100 p-4 sm:p-6 shadow-sm">
       <AddressSelector v-model="permanentAddress" label="Permanent Address" />
     </section>
 
-    <div class="flex justify-between">
-      <button type="button" class="px-6 py-2.5 bg-gray-200 text-gray-700 rounded-lg font-medium text-sm hover:bg-gray-300" @click="emit('back')">
-        <i class="pi pi-arrow-left text-xs mr-1" /> Back
+    <!-- ─── 5. Navigation ────────────────────────────────── -->
+    <div class="flex items-center justify-between gap-3">
+      <button
+        type="button"
+        class="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 bg-appleCore-100 text-blueberry-700 rounded-lg font-medium text-sm hover:bg-appleCore-200 transition-colors"
+        @click="emit('back')"
+      >
+        <i class="pi pi-arrow-left text-xs" /> Back
       </button>
-      <button type="submit" class="px-6 py-2.5 bg-apricot-500 text-white rounded-lg font-medium text-sm hover:bg-apricot-600">
-        Next <i class="pi pi-arrow-right text-xs ml-1" />
+
+      <button
+        type="submit"
+        class="inline-flex items-center justify-center gap-1.5 px-6 py-2.5 bg-apricot-500 text-white rounded-lg font-medium text-sm hover:bg-apricot-600 transition-colors shadow-sm"
+      >
+        Next <i class="pi pi-arrow-right text-xs" />
       </button>
     </div>
   </form>

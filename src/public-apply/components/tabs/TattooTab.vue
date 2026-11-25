@@ -74,7 +74,7 @@ function onNext() {
           <p class="text-xs text-blueberry-500">If you do not have tattoos, you may skip this step by clicking Next.</p>
         </div>
         <Button
-          label="Add Tattoo Entry"
+          label="Add Tattoo"
           icon="pi pi-plus"
           size="small"
           severity="success"

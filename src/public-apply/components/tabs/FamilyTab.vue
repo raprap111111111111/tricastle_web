@@ -30,9 +30,9 @@ const { handleSubmit, values, setFieldValue } = useForm<FamilyFormValues>({
 
 // ─── Options ──────────────────────────────────────────────────────────────────
 const salaryUnitOptions = [
-  { label: 'per month', value: 'per_month' },
-  { label: 'per day',   value: 'per_day' },
-  { label: 'per year',  value: 'per_year' },
+  { label: '/ month', value: 'per_month' },
+  { label: '/ day',   value: 'per_day' },
+  { label: '/ year',  value: 'per_year' },
 ]
 
 // 🎯 Living Situation presets (AIS-friendly wording)
@@ -118,8 +118,8 @@ const onNext = handleSubmit((data) => {
   <form class="flex flex-col gap-6" @submit.prevent="onNext">
 
     <!-- ─── Info Banner ──────────────────────────────────────────────────────── -->
-    <div class="flex items-start gap-2 px-4 py-3 bg-apricot-50 border border-apricot-200 rounded-xl text-sm text-apricot-800">
-      <i class="pi pi-info-circle text-apricot-500 mt-0.5 flex-shrink-0" />
+    <div class="flex items-start gap-2.5 px-3.5 py-3 bg-apricot-50 border border-apricot-200 rounded-xl text-xs sm:text-sm text-apricot-800">
+      <i class="pi pi-info-circle text-apricot-500 mt-0.5 shrink-0 text-sm" />
       <span>
         This section collects <strong>family background &amp; relative details</strong> for AIS generation and emergency contact.
         All fields are optional — fill what is available now.
@@ -127,19 +127,19 @@ const onNext = handleSubmit((data) => {
     </div>
 
     <!-- ─── Family Background (AIS Sentences) ────────────────────────────────── -->
-    <div class="bg-white rounded-2xl border border-appleCore-100 p-6">
-      <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-1 flex items-center gap-2">
+    <div class="bg-white rounded-2xl border border-appleCore-100 p-4 sm:p-6 shadow-sm">
+      <h3 class="text-sm sm:text-base font-serif font-semibold text-blueberry-800 mb-1 flex items-center gap-2">
         <i class="pi pi-home text-apricot-500" />
         Household &amp; Living Situation
       </h3>
-      <p class="text-xs text-blueberry-400 mb-4">
+      <p class="text-[11px] sm:text-xs text-blueberry-400 mb-4">
         Used on the AIS Family Background section (living situation + birth order sentences).
       </p>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-xl bg-apricot-50 border border-apricot-200">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 p-3.5 sm:p-4 rounded-xl bg-apricot-50/70 border border-apricot-200">
         <!-- Living Situation -->
         <div class="md:col-span-3">
-          <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">
+          <label class="block text-[11px] sm:text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">
             Living Situation
           </label>
           <Select
@@ -151,10 +151,10 @@ const onNext = handleSubmit((data) => {
             editable
             filter
             show-clear
-            class="w-full"
+            class="w-full text-xs sm:text-sm"
             @update:model-value="(v) => setFieldValue('living_situation', v || null)"
           />
-          <p class="text-[10px] text-blueberry-400 mt-1">
+          <p class="text-[10px] text-blueberry-400 mt-1 truncate">
             Printed on AIS as:
             <em class="text-blueberry-600">
               {{ values.living_situation || 'living in his/her parents house together with his/her siblings' }}
@@ -163,8 +163,8 @@ const onNext = handleSubmit((data) => {
         </div>
 
         <!-- Birth Order -->
-        <div>
-          <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">
+        <div class="flex flex-col gap-1">
+          <label class="block text-[11px] sm:text-xs font-semibold text-blueberry-700 uppercase tracking-wide">
             Birth Order
           </label>
           <InputNumber
@@ -172,15 +172,17 @@ const onNext = handleSubmit((data) => {
             placeholder="e.g. 2"
             :min="1"
             :max="20"
+            fluid
             class="w-full"
+            input-class="w-full !text-xs sm:!text-sm !py-2"
             @update:model-value="(v) => setFieldValue('birth_order', v ?? null)"
           />
-          <p class="text-[10px] text-blueberry-400 mt-1">2 → “2nd child”</p>
+          <p class="text-[10px] text-blueberry-400 mt-0.5">2 &rarr; “2nd child”</p>
         </div>
 
         <!-- Total Siblings -->
-        <div>
-          <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">
+        <div class="flex flex-col gap-1">
+          <label class="block text-[11px] sm:text-xs font-semibold text-blueberry-700 uppercase tracking-wide">
             Total Siblings
           </label>
           <InputNumber
@@ -188,23 +190,25 @@ const onNext = handleSubmit((data) => {
             placeholder="e.g. 4"
             :min="0"
             :max="30"
+            fluid
             class="w-full"
+            input-class="w-full !text-xs sm:!text-sm !py-2"
             @update:model-value="(v) => setFieldValue('siblings_count', v ?? null)"
           />
         </div>
 
         <!-- Siblings Note -->
-        <div>
-          <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">
+        <div class="flex flex-col gap-1">
+          <label class="block text-[11px] sm:text-xs font-semibold text-blueberry-700 uppercase tracking-wide">
             Siblings Note
           </label>
           <InputText
             :model-value="values.siblings_description ?? ''"
             placeholder="e.g. all boys"
-            class="w-full"
+            class="w-full text-xs sm:text-sm"
             @update:model-value="(v) => setFieldValue('siblings_description', v || null)"
           />
-          <p class="text-[10px] text-blueberry-400 mt-1">
+          <p class="text-[10px] text-blueberry-400 mt-0.5 truncate">
             Prints as: <em>2nd child among 4 siblings (all boys)</em>
           </p>
         </div>
@@ -212,27 +216,27 @@ const onNext = handleSubmit((data) => {
     </div>
 
     <!-- ─── Parents Information ──────────────────────────────────────────────── -->
-    <div class="bg-white rounded-2xl border border-appleCore-100 p-6">
-      <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
+    <div class="bg-white rounded-2xl border border-appleCore-100 p-4 sm:p-6 shadow-sm">
+      <h3 class="text-sm sm:text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
         <i class="pi pi-users text-apricot-500" />
         Parents Information
       </h3>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         <!-- Father -->
-        <div class="space-y-3 p-4 rounded-xl bg-appleCore-50 border border-appleCore-100">
+        <div class="space-y-3 p-3.5 sm:p-4 rounded-xl bg-appleCore-50/70 border border-appleCore-100">
           <p class="text-xs font-bold text-blueberry-600 uppercase tracking-wider">Father</p>
           <div>
-            <label class="block text-xs font-medium text-blueberry-700 mb-1">Full Name</label>
+            <label class="block text-[11px] sm:text-xs font-medium text-blueberry-700 mb-1">Full Name</label>
             <InputText
               :model-value="values.father_name ?? ''"
               placeholder="Father's full name"
-              class="w-full"
+              class="w-full text-xs sm:text-sm"
               @update:model-value="(v) => setFieldValue('father_name', v || null)"
             />
           </div>
           <div>
-            <label class="block text-xs font-medium text-blueberry-700 mb-1">Occupation</label>
+            <label class="block text-[11px] sm:text-xs font-medium text-blueberry-700 mb-1">Occupation</label>
             <Select
               :model-value="values.father_occupation ?? ''"
               :options="occupationOptions"
@@ -240,35 +244,35 @@ const onNext = handleSubmit((data) => {
               editable
               filter
               show-clear
-              class="w-full"
+              class="w-full text-xs sm:text-sm"
               @update:model-value="(v) => setFieldValue('father_occupation', v || null)"
             />
           </div>
           <div>
-            <label class="block text-xs font-medium text-blueberry-700 mb-1">Contact Number</label>
+            <label class="block text-[11px] sm:text-xs font-medium text-blueberry-700 mb-1">Contact Number</label>
             <InputText
               :model-value="values.father_contact ?? ''"
               placeholder="e.g. 09xxxxxxxxx"
-              class="w-full"
+              class="w-full text-xs sm:text-sm"
               @update:model-value="(v) => setFieldValue('father_contact', v || null)"
             />
           </div>
         </div>
 
         <!-- Mother -->
-        <div class="space-y-3 p-4 rounded-xl bg-appleCore-50 border border-appleCore-100">
+        <div class="space-y-3 p-3.5 sm:p-4 rounded-xl bg-appleCore-50/70 border border-appleCore-100">
           <p class="text-xs font-bold text-blueberry-600 uppercase tracking-wider">Mother</p>
           <div>
-            <label class="block text-xs font-medium text-blueberry-700 mb-1">Full Name</label>
+            <label class="block text-[11px] sm:text-xs font-medium text-blueberry-700 mb-1">Full Name</label>
             <InputText
               :model-value="values.mother_name ?? ''"
               placeholder="Mother's full name"
-              class="w-full"
+              class="w-full text-xs sm:text-sm"
               @update:model-value="(v) => setFieldValue('mother_name', v || null)"
             />
           </div>
           <div>
-            <label class="block text-xs font-medium text-blueberry-700 mb-1">Occupation</label>
+            <label class="block text-[11px] sm:text-xs font-medium text-blueberry-700 mb-1">Occupation</label>
             <Select
               :model-value="values.mother_occupation ?? ''"
               :options="occupationOptions"
@@ -276,16 +280,16 @@ const onNext = handleSubmit((data) => {
               editable
               filter
               show-clear
-              class="w-full"
+              class="w-full text-xs sm:text-sm"
               @update:model-value="(v) => setFieldValue('mother_occupation', v || null)"
             />
           </div>
           <div>
-            <label class="block text-xs font-medium text-blueberry-700 mb-1">Contact Number</label>
+            <label class="block text-[11px] sm:text-xs font-medium text-blueberry-700 mb-1">Contact Number</label>
             <InputText
               :model-value="values.mother_contact ?? ''"
               placeholder="e.g. 09xxxxxxxxx"
-              class="w-full"
+              class="w-full text-xs sm:text-sm"
               @update:model-value="(v) => setFieldValue('mother_contact', v || null)"
             />
           </div>
@@ -294,35 +298,35 @@ const onNext = handleSubmit((data) => {
     </div>
 
     <!-- ─── Spouse Information ───────────────────────────────────────────────── -->
-    <div class="bg-white rounded-2xl border border-appleCore-100 p-6">
-      <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-1 flex items-center gap-2">
+    <div class="bg-white rounded-2xl border border-appleCore-100 p-4 sm:p-6 shadow-sm">
+      <h3 class="text-sm sm:text-base font-serif font-semibold text-blueberry-800 mb-1 flex items-center gap-2">
         <i class="pi pi-heart text-apricot-500" />
         Spouse Information
         <span class="text-xs font-normal text-blueberry-400">(if married)</span>
       </h3>
-      <p class="text-xs text-blueberry-400 mb-4">Provide spouse details if applicant is married.</p>
+      <p class="text-[11px] sm:text-xs text-blueberry-400 mb-4">Provide spouse details if applicant is married.</p>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-appleCore-50 border border-appleCore-100">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 p-3.5 sm:p-4 rounded-xl bg-appleCore-50/70 border border-appleCore-100">
         <div>
-          <label class="block text-xs font-medium text-blueberry-700 mb-1">Full Name</label>
+          <label class="block text-[11px] sm:text-xs font-medium text-blueberry-700 mb-1">Full Name</label>
           <InputText
             :model-value="values.spouse_name ?? ''"
             placeholder="Spouse's full name"
-            class="w-full"
+            class="w-full text-xs sm:text-sm"
             @update:model-value="(v) => setFieldValue('spouse_name', v || null)"
           />
         </div>
         <div>
-          <label class="block text-xs font-medium text-blueberry-700 mb-1">Contact Number</label>
+          <label class="block text-[11px] sm:text-xs font-medium text-blueberry-700 mb-1">Contact Number</label>
           <InputText
             :model-value="values.spouse_contact ?? ''"
             placeholder="e.g. 09xxxxxxxxx"
-            class="w-full"
+            class="w-full text-xs sm:text-sm"
             @update:model-value="(v) => setFieldValue('spouse_contact', v || null)"
           />
         </div>
         <div>
-          <label class="block text-xs font-medium text-blueberry-700 mb-1">Occupation</label>
+          <label class="block text-[11px] sm:text-xs font-medium text-blueberry-700 mb-1">Occupation</label>
           <Select
             :model-value="values.spouse_occupation ?? ''"
             :options="occupationOptions"
@@ -330,18 +334,20 @@ const onNext = handleSubmit((data) => {
             editable
             filter
             show-clear
-            class="w-full"
+            class="w-full text-xs sm:text-sm"
             @update:model-value="(v) => setFieldValue('spouse_occupation', v || null)"
           />
         </div>
         <div>
-          <label class="block text-xs font-medium text-blueberry-700 mb-1">Spouse Salary</label>
+          <label class="block text-[11px] sm:text-xs font-medium text-blueberry-700 mb-1">Spouse Salary</label>
           <div class="flex items-center gap-2">
             <InputNumber
               :model-value="values.spouse_salary ?? undefined"
               placeholder="0"
               :min="0"
+              fluid
               class="flex-1 min-w-0"
+              input-class="w-full !text-xs sm:!text-sm !py-2"
               @update:model-value="(v) => setFieldValue('spouse_salary', v ?? null)"
             />
             <Select
@@ -349,7 +355,11 @@ const onNext = handleSubmit((data) => {
               :options="salaryUnitOptions"
               option-label="label"
               option-value="value"
-              class="w-36 flex-shrink-0 min-w-0"
+              class="w-28 sm:w-36 shrink-0 text-xs sm:text-sm"
+              :pt="{
+                label: { class: '!py-2 !px-2 !text-xs truncate font-medium' },
+                dropdown: { class: '!w-6' }
+              }"
               @update:model-value="(v) => setFieldValue('spouse_salary_unit', v)"
             />
           </div>
@@ -358,48 +368,48 @@ const onNext = handleSubmit((data) => {
     </div>
 
     <!-- ─── Emergency Contact ─────────────────────────────────────────────────── -->
-    <div class="bg-white rounded-2xl border border-appleCore-100 p-6">
-      <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-1 flex items-center gap-2">
+    <div class="bg-white rounded-2xl border border-appleCore-100 p-4 sm:p-6 shadow-sm">
+      <h3 class="text-sm sm:text-base font-serif font-semibold text-blueberry-800 mb-1 flex items-center gap-2">
         <i class="pi pi-phone text-apricot-500" />
         Emergency Contact
       </h3>
-      <p class="text-xs text-blueberry-400 mb-4">
+      <p class="text-[11px] sm:text-xs text-blueberry-400 mb-4">
         Person to contact in case of emergency during deployment.
       </p>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
         <div>
-          <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">Full Name</label>
+          <label class="block text-[11px] sm:text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">Full Name</label>
           <InputText
             :model-value="values.emergency_contact_name ?? ''"
             placeholder="Emergency contact full name"
-            class="w-full"
+            class="w-full text-xs sm:text-sm"
             @update:model-value="(v) => setFieldValue('emergency_contact_name', v || null)"
           />
         </div>
         <div>
-          <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">Relationship</label>
+          <label class="block text-[11px] sm:text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">Relationship</label>
           <InputText
             :model-value="values.emergency_contact_relationship ?? ''"
             placeholder="e.g. Brother, Aunt, Close Friend..."
-            class="w-full"
+            class="w-full text-xs sm:text-sm"
             @update:model-value="(v) => setFieldValue('emergency_contact_relationship', v || null)"
           />
         </div>
         <div>
-          <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">Phone Number</label>
+          <label class="block text-[11px] sm:text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">Phone Number</label>
           <InputText
             :model-value="values.emergency_contact_phone ?? ''"
             placeholder="e.g. 09xxxxxxxxx"
-            class="w-full"
+            class="w-full text-xs sm:text-sm"
             @update:model-value="(v) => setFieldValue('emergency_contact_phone', v || null)"
           />
         </div>
         <div>
-          <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">Address</label>
+          <label class="block text-[11px] sm:text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">Address</label>
           <InputText
             :model-value="values.emergency_contact_address ?? ''"
             placeholder="Full home address"
-            class="w-full"
+            class="w-full text-xs sm:text-sm"
             @update:model-value="(v) => setFieldValue('emergency_contact_address', v || null)"
           />
         </div>
@@ -414,6 +424,8 @@ const onNext = handleSubmit((data) => {
         icon="pi pi-arrow-left"
         severity="secondary"
         outlined
+        size="small"
+        class="!text-xs sm:!text-sm"
         @click="emit('back')"
       />
       <Button
@@ -421,7 +433,8 @@ const onNext = handleSubmit((data) => {
         label="Next"
         icon="pi pi-arrow-right"
         icon-pos="right"
-        class="!bg-apricot-500 hover:!bg-apricot-600 !border-apricot-500 !text-white"
+        size="small"
+        class="!bg-apricot-500 hover:!bg-apricot-600 !border-apricot-500 !text-white !text-xs sm:!text-sm"
       />
     </div>
 
