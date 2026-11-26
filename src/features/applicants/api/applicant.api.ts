@@ -1,5 +1,3 @@
-// src/features/applicants/api/applicant.api.ts
-
 import http from '@shared/api/http'
 import type {
   Applicant,
@@ -34,6 +32,11 @@ export const applicantApi = {
   async update(id: number, payload: UpdateApplicantPayload): Promise<Applicant> {
     const res = await http.put<Applicant>(`${BASE}/${id}`, payload)
     return res.data
+  },
+
+  // Alias for compatibility
+  async updateApplicant(id: number, payload: UpdateApplicantPayload): Promise<Applicant> {
+    return this.update(id, payload)
   },
 
   async remove(id: number): Promise<void> {
@@ -139,6 +142,25 @@ export const applicantApi = {
     const link = document.createElement('a')
     link.href = url
     link.download = `PDOS_Certificates_${pdosDate}.docx`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  },
+
+  // ─── AIS Word Export (.docx) ───────────────────────────────────────────────
+  async downloadAisWord(id: number, applicantCode?: string): Promise<void> {
+    const response = await http.get(`${BASE}/${id}/ais-word`, {
+      responseType: 'blob',
+    })
+
+    const blob = new Blob([response.data], {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `AIS_${applicantCode ?? id}.docx`
     document.body.appendChild(link)
     link.click()
     link.remove()

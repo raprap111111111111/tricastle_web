@@ -1,7 +1,7 @@
 // ─── Enums / Literals ─────────────────────────────────────────────────────────
 
 export type ApplicantStatus =
-
+  | 'self_registered'
   | 'pending'
   | 'under_review'
   | 'verified'
@@ -17,7 +17,7 @@ export type CivilStatus =
   | 'widowed'
   | 'separated'
   | 'divorced'
-  | 'live_in_partner' // 👈 Added 'live_in_partner'
+  | 'live_in_partner'
 
 export type DominantHand = 'left' | 'right' | 'both'
 export type BloodType = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-'
@@ -79,6 +79,7 @@ export interface GroupedPassportOffices {
 
 export interface StaffRef {
   id: number
+  name?: string | null
   full_name: string
   first_name?: string | null
   last_name?: string | null
@@ -147,7 +148,7 @@ export interface ApplicantBatch {
   updated_at: string
 }
 
-// ─── Phase 1: Japan Deployment Profile ───────────────────────────────────────
+// ─── Japan Deployment Profile ────────────────────────────────────────────────
 
 export interface ApplicantLanguage {
   understands_basic_english: boolean
@@ -191,10 +192,15 @@ export interface EmergencyContact {
 }
 
 export interface ApplicantFamily {
-  father:            FamilyMember
-  mother:            FamilyMember
-  spouse:            SpouseMember
-  emergency_contact: EmergencyContact
+  living_arrangement?:   string | null
+  living_situation?:     string | null
+  birth_order?:          number | null
+  siblings_count?:       number | null
+  siblings_description?: string | null
+  father?:               FamilyMember | null
+  mother?:               FamilyMember | null
+  spouse?:               SpouseMember | null
+  emergency_contact?:    EmergencyContact | null
 }
 
 // ─── Japan Contacts ───────────────────────────────────────────────────────────
@@ -222,7 +228,7 @@ export interface Applicant {
   trade_test_date?:  string | null
   birthplace?:       string | null
   religion?:         string | null
-  english_proficiency_pct?: number
+  english_proficiency_pct?: number | null
 
   // Personal
   first_name:         string
@@ -256,8 +262,8 @@ export interface Applicant {
   // Passport / IDs
   passport_number:            string | null
   passport_expiry:            string | null
-  passport_issuing_office_id: number | null               // 👈 Added ID
-  passport_office?:           PassportIssuingOffice | null // 👈 Added Relation
+  passport_issuing_office_id: number | null
+  passport_office?:           PassportIssuingOffice | null
   sss_number:                 string | null
   tin_number:                 string | null
   philhealth_number:          string | null
@@ -266,8 +272,8 @@ export interface Applicant {
   // Status
   status:           ApplicantStatus
   rejection_reason: string | null
-  remarks?:          string | null
-  registered_at?:   string | null 
+  remarks?:         string | null
+  registered_at?:   string | null
   final_listed_at:  string | null
   rejected_at:      string | null
 
@@ -307,8 +313,8 @@ export interface Applicant {
 // ─── Lifestyle ────────────────────────────────────────────────────────────────
 
 export interface ApplicantLifestyle {
-  id: number
-  applicant_id: number
+  id?: number
+  applicant_id?: number
   is_smoking: boolean
   is_drinking_alcohol: boolean
   is_using_drugs: boolean
@@ -322,15 +328,15 @@ export interface ApplicantLifestyle {
   medical_notes:         string | null
   has_allergies:         boolean
   allergies_notes:       string | null
-  created_at: string
-  updated_at: string
+  created_at?: string
+  updated_at?: string
 }
 
 // ─── Education ────────────────────────────────────────────────────────────────
 
 export interface ApplicantEducation {
-  id: number
-  applicant_id:     number
+  id?: number
+  applicant_id?:    number
   education_level:  EducationLevel
   education_status: EducationStatus
   school_name:      string
@@ -339,15 +345,15 @@ export interface ApplicantEducation {
   year_ended:       number | null
   honors:           string | null
   remarks?:         string | null
-  created_at: string
-  updated_at: string
+  created_at?: string
+  updated_at?: string
 }
 
 // ─── Employment ───────────────────────────────────────────────────────────────
 
 export interface ApplicantEmployment {
-  id: number
-  applicant_id:       number
+  id?: number
+  applicant_id?:       number
   company_name:       string
   position:           string
   industry:           string | null
@@ -362,22 +368,22 @@ export interface ApplicantEmployment {
   salary_currency:    string
   salary_unit?:       SalaryUnit | null
   reason_for_leaving: string | null
-  created_at: string
-  updated_at: string
+  created_at?: string
+  updated_at?: string
 }
 
 // ─── Tattoo ───────────────────────────────────────────────────────────────────
 
 export interface ApplicantTattoo {
-  id: number
-  applicant_id: number
+  id?: number
+  applicant_id?: number
   location:     string
   size:         TattooSize | null
   description:  string | null
   photo_path:   string | null
   is_visible:   boolean
-  created_at: string
-  updated_at: string
+  created_at?: string
+  updated_at?: string
 }
 
 // ─── Create / Update Payloads ─────────────────────────────────────────────────
@@ -388,7 +394,7 @@ export interface CreateApplicantPayload {
   trade_test_date?:  string | null
   birthplace?:       string | null
   religion?:         string | null
-  english_proficiency_pct?: number
+  english_proficiency_pct?: number | null
 
   first_name:         string
   middle_name?:       string | null
@@ -416,7 +422,7 @@ export interface CreateApplicantPayload {
 
   passport_number?:            string | null
   passport_expiry?:            string | null
-  passport_issuing_office_id?: number | null // 👈 Added
+  passport_issuing_office_id?: number | null
   sss_number?:                 string | null
   tin_number?:                 string | null
   philhealth_number?:          string | null
@@ -444,6 +450,13 @@ export interface CreateApplicantPayload {
   current_salary?:           number | null
   current_salary_currency?:  string
 
+  // Family Background
+  living_arrangement?:   string | null
+  living_situation?:     string | null
+  birth_order?:          number | null
+  siblings_count?:       number | null
+  siblings_description?: string | null
+
   father_name?:        string | null
   father_occupation?:  string | null
   father_contact?:     string | null
@@ -456,7 +469,25 @@ export interface CreateApplicantPayload {
   spouse_salary?:      number | null
   spouse_salary_unit?: SalaryUnit | null
 
+  // Lifestyle
+  is_smoking?:           boolean
+  smoking_frequency?:    string | null
+  is_drinking_alcohol?:  boolean
+  drinking_frequency?:   string | null
+  is_using_drugs?:       boolean
+  drugs_notes?:          string | null
+  was_smoking?:          boolean
+  was_drinking_alcohol?: boolean
+  was_using_drugs?:      boolean
+  has_medical_condition?: boolean
+  medical_notes?:         string | null
+  has_allergies?:         boolean
+  allergies_notes?:       string | null
+
   japan_contacts?: ApplicantJapanContact[]
+  educations?:     ApplicantEducation[]
+  employments?:    ApplicantEmployment[]
+  tattoos?:        ApplicantTattoo[]
 
   emergency_contact_name?:         string | null
   emergency_contact_relationship?: string | null
@@ -474,108 +505,45 @@ export interface UpdateApplicantPayload extends Partial<CreateApplicantPayload> 
   quality_grade?:    QualityGrade
 }
 
-// ─── Sub-resource Payloads ────────────────────────────────────────────────────
-
-export interface UpsertLifestylePayload {
-  applicant_id: number
-  is_smoking?: boolean
-  is_drinking_alcohol?: boolean
-  is_using_drugs?: boolean
-  was_smoking?: boolean
-  was_drinking_alcohol?: boolean
-  was_using_drugs?: boolean
-  smoking_frequency?:  string | null
-  drinking_frequency?: string | null
-  drugs_notes?:        string | null
-  has_medical_condition?: boolean
-  medical_notes?:         string | null
-  has_allergies?:         boolean
-  allergies_notes?:       string | null
-}
-
-export interface CreateEducationPayload {
-  applicant_id:     number
-  education_level:  EducationLevel
-  education_status?: EducationStatus
-  school_name:  string
-  course?:      string | null
-  year_started?: number | null
-  year_ended?:   number | null
-  honors?:       string | null
-  remarks?:      string | null
-}
-
-export type UpdateEducationPayload = Partial<Omit<CreateEducationPayload, 'applicant_id'>>
-
-export interface CreateEmploymentPayload {
-  applicant_id:    number
-  company_name:    string
-  position:        string
-  industry?:       string | null
-  job_description?: string | null
-  date_started:    string
-  date_ended?:     string | null
-  is_current?:     boolean
-  country?:        string
-  city?:           string | null
-  is_overseas?:    boolean
-  salary?:         number | null
-  salary_currency?: string
-  salary_unit?:    SalaryUnit | null
-  reason_for_leaving?: string | null
-}
-
-export type UpdateEmploymentPayload = Partial<Omit<CreateEmploymentPayload, 'applicant_id'>>
-
-export interface CreateTattooPayload {
-  applicant_id: number
-  location:     string
-  size?:        TattooSize | null
-  description?: string | null
-  photo_path?:  string | null
-  is_visible?:  boolean
-}
-
-export type UpdateTattooPayload = Partial<Omit<CreateTattooPayload, 'applicant_id'>>
+export type UpdateEducationPayload  = Partial<Omit<ApplicantEducation, 'id' | 'applicant_id'>>
+export type UpdateEmploymentPayload = Partial<Omit<ApplicantEmployment, 'id' | 'applicant_id'>>
+export type UpdateTattooPayload     = Partial<Omit<ApplicantTattoo, 'id' | 'applicant_id'>>
 
 // ─── Filters ──────────────────────────────────────────────────────────────────
 
 export interface ApplicantFilters {
-  search?:        string
-  offset?:        number
-  limit?:         number
-  page?:          number | null
-  order_by?:      string
-  order_dir?:     'asc' | 'desc'
-  status?:        ApplicantStatus | ''
-  exclude_statuses?: string
-  gender?:        ApplicantGender | ''
-  civil_status?:  CivilStatus | ''
-  nationality?:   string
-  quality_grade?: QualityGrade | ''
-  assigned_staff_id?:          number | null
-  passport_issuing_office_id?: number | null // 👈 Added filter
-  batch_id?:                   number | null
-  batch_status?:               ApplicantBatchStatus | ''
+  search?:            string
+  offset?:            number
+  limit?:             number
+  page?:              number | null
+  order_by?:          string
+  order_dir?:         'asc' | 'desc'
+  status?:            ApplicantStatus | ''
+  exclude_statuses?:  string
+  gender?:            ApplicantGender | ''
+  civil_status?:      CivilStatus | ''
+  nationality?:       string
+  quality_grade?:     QualityGrade | ''
+  assigned_staff_id?: number | null
+  passport_issuing_office_id?: number | null
+  batch_id?:          number | null
+  batch_status?:      ApplicantBatchStatus | ''
   passport_expiring_within_months?: number | null
 
-  // Location
   city?:     string
   province?: string
   address?:  string
 
-  // AIS filters
-  applied_position?:          string
-  trade_test_try?:            string
-  trade_test_date_from?:      string
-  trade_test_date_to?:        string
-  birthplace?:                string
-  religion?:                  string
-  min_english_proficiency?:   number | null
-  has_marucon_contact?:       boolean | ''
-  has_japan_contact?:         boolean | ''
+  applied_position?:        string
+  trade_test_try?:          string
+  trade_test_date_from?:    string
+  trade_test_date_to?:      string
+  birthplace?:              string
+  religion?:                string
+  min_english_proficiency?: number | null
+  has_marucon_contact?:     boolean | ''
+  has_japan_contact?:       boolean | ''
 
-  // Deployment filters
   skill_category?:             SkillCategory | ''
   jlpt_level?:                 JlptLevel | ''
   trade_or_occupation?:        string
@@ -669,55 +637,4 @@ export interface DuplicateCheckPayload {
   passport_number?: string
   batch_id?:        number
   exclude_id?:      number
-}
-
-// ─── PSGC ─────────────────────────────────────────────────────────────────────
-
-export interface PsgcRegion {
-  code:       string
-  name:       string
-  regionName: string
-}
-
-export interface PsgcProvince {
-  code:       string
-  name:       string
-  regionCode: string
-}
-
-export interface PsgcCity {
-  code:           string
-  name:           string
-  provinceCode:   string
-  isCity?:        boolean
-  isMunicipality?: boolean
-}
-
-export interface PsgcBarangay {
-  code:     string
-  name:     string
-  cityCode: string
-}
-
-// ─── Final List ───────────────────────────────────────────────────────────────
-
-export interface FinalListFolder {
-  key:          string
-  label:        string
-  year:         number
-  month?:       number
-  day?:         number
-  count:        number
-  applicants:   Applicant[]
-  latest_date:  string
-}
-
-export type FinalListGroupBy = 'day' | 'week' | 'month' | 'year'
-
-export interface FinalListStats {
-  total:           number
-  this_month:      number
-  this_week:       number
-  today:           number
-  ready_for_batch: number
 }

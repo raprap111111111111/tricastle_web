@@ -109,18 +109,18 @@ const skilledCount = computed(
   () => store.applicants.filter((a) => (a as any).skill_category === 'skilled').length,
 )
 const readyDeployCount = computed(
-  () => store.applicants.filter((a) => (a as any).willing_to_be_deployed).length,
+  () => store.applicants.filter((a) => (a as any).willing_to_be_deployed || (a as any).deployment?.willing_to_be_deployed).length,
 )
 const japanExpCount = computed(
-  () => store.applicants.filter((a) => (a as any).previous_japan_experience).length,
+  () => store.applicants.filter((a) => (a as any).previous_japan_experience || (a as any).deployment?.previous_japan_experience).length,
 )
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 🔍 PROFILE REVIEW MODAL
 // ═══════════════════════════════════════════════════════════════════════════
 const showReviewDialog = ref(false)
-const selectedApplicant = ref<Applicant | null>(null)
-const activeTab = ref<'personal' | 'passport' | 'deployment' | 'family'>('personal')
+const selectedApplicant = ref<any | null>(null)
+const activeTab = ref<'all' | 'personal' | 'documents_deployment' | 'family_lifestyle' | 'education_work' | 'tattoos_japan'>('all')
 
 const isProcessing = ref(false)
 const showRejectPrompt = ref(false)
@@ -128,7 +128,7 @@ const rejectionReason = ref('')
 
 function openReviewModal(applicant: Applicant) {
   selectedApplicant.value = applicant
-  activeTab.value = 'personal'
+  activeTab.value = 'all'
   showRejectPrompt.value = false
   rejectionReason.value = ''
   showReviewDialog.value = true
@@ -257,7 +257,23 @@ async function handleBulkApprove() {
   })
 }
 
-// ─── Helpers ──────────────────────────────────────────
+// ─── Review Display Helpers ───────────────────────────
+function displayVal(val: any, fallback = '—'): string {
+  if (val === null || val === undefined || val === '') return fallback
+  return String(val)
+}
+
+function displayCurrency(amount: any, currency = 'PHP'): string {
+  if (amount === null || amount === undefined || amount === '') return '—'
+  return `${currency} ${Number(amount).toLocaleString()}`
+}
+
+function displayBool(val: any): string {
+  if (val === true || val === 'true' || val === 1 || val === '1') return 'Yes'
+  if (val === false || val === 'false' || val === 0 || val === '0') return 'No'
+  return '—'
+}
+
 function getInitials(first = '', last = ''): string {
   return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'AP'
 }
@@ -475,7 +491,6 @@ async function handleDownload(): Promise<void> {
 
         <Column selection-mode="multiple" header-style="width: 3rem" />
 
-        <!-- 🟢 Code Column with fixed width & nowrap -->
         <Column header="Code" field="applicant_code" header-style="min-width: 140px;">
           <template #body="{ data }">
             <span class="font-mono text-xs font-bold text-apricot-800 bg-apricot-50 px-2 py-1 rounded-md border border-apricot-200 whitespace-nowrap inline-block">
@@ -605,13 +620,13 @@ async function handleDownload(): Promise<void> {
     </AppCard>
 
     <!-- ═══════════════════════════════════════════════════
-         🔍 PROFILE REVIEW DIALOG
+         🔍 COMPLETE AIS REVIEW DIALOG (MATCHING ReviewTab.vue)
         ════════════════════════════════════════════════════ -->
     <Dialog
       v-model:visible="showReviewDialog"
       modal
       :draggable="false"
-      :style="{ width: '740px' }"
+      :style="{ width: '920px' }"
       :closable="!isProcessing"
       :pt="{
         root: { class: 'rounded-2xl overflow-hidden' },
@@ -620,24 +635,27 @@ async function handleDownload(): Promise<void> {
       }"
     >
       <template #container>
-        <div v-if="selectedApplicant" class="bg-white rounded-2xl overflow-hidden flex flex-col max-h-[90vh]">
-          <!-- Dialog Header -->
-          <div class="flex items-center justify-between p-6 border-b border-appleCore-100 bg-apricot-50/40">
+        <div v-if="selectedApplicant" class="bg-slate-50/50 rounded-2xl overflow-hidden flex flex-col max-h-[92vh]">
+          <!-- Dialog Header Banner -->
+          <div class="flex items-center justify-between p-5 border-b border-appleCore-100 bg-white">
             <div class="flex items-center gap-3.5">
-              <div class="w-12 h-12 rounded-xl bg-apricot-100 text-apricot-800 font-bold text-sm flex items-center justify-center border border-apricot-200">
+              <div class="w-12 h-12 rounded-xl bg-apricot-100 text-apricot-800 font-bold text-base flex items-center justify-center border border-apricot-200 shadow-xs">
                 {{ getInitials(selectedApplicant.first_name, selectedApplicant.last_name) }}
               </div>
               <div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2.5">
                   <h3 class="text-base font-bold text-blueberry-900">
-                    {{ selectedApplicant.full_name || `${selectedApplicant.first_name} ${selectedApplicant.last_name}` }}
+                    {{ displayVal(selectedApplicant.first_name) }}
+                    {{ selectedApplicant.middle_name ? selectedApplicant.middle_name + ' ' : '' }}
+                    {{ displayVal(selectedApplicant.last_name) }}
+                    {{ selectedApplicant.suffix ? selectedApplicant.suffix : '' }}
                   </h3>
                   <span class="font-mono text-xs font-bold text-apricot-800 bg-apricot-50 px-2 py-0.5 rounded border border-apricot-200">
                     {{ selectedApplicant.applicant_code }}
                   </span>
                 </div>
-                <p class="text-xs text-blueberry-500">
-                  Submitted on {{ formatDate(selectedApplicant.created_at || selectedApplicant.registered_at) }} • Status: <strong class="text-amber-700">Self-Registered</strong>
+                <p class="text-xs text-blueberry-500 mt-0.5">
+                  Registered: {{ formatDate(selectedApplicant.created_at || selectedApplicant.registered_at) }} • Status: <strong class="text-amber-700">Self-Registered</strong>
                 </p>
               </div>
             </div>
@@ -651,18 +669,20 @@ async function handleDownload(): Promise<void> {
           </div>
 
           <!-- Section Navigation Tabs -->
-          <div class="flex border-b border-appleCore-100 bg-white px-6">
+          <div class="flex border-b border-appleCore-100 bg-white px-5 overflow-x-auto">
             <button
               v-for="tab in [
-                { key: 'personal', label: 'Personal & Contact', icon: 'pi-user' },
-                { key: 'passport', label: 'Passport & IDs', icon: 'pi-id-card' },
-                { key: 'deployment', label: 'Skills & Readiness', icon: 'pi-briefcase' },
-                { key: 'family', label: 'Family & Emergency', icon: 'pi-users' },
+                { key: 'all', label: 'All Details', icon: 'pi-list' },
+                { key: 'personal', label: 'Personal & Address', icon: 'pi-user' },
+                { key: 'documents_deployment', label: 'Docs & Deployment', icon: 'pi-id-card' },
+                { key: 'family_lifestyle', label: 'Family & Lifestyle', icon: 'pi-users' },
+                { key: 'education_work', label: 'Education & Work', icon: 'pi-briefcase' },
+                { key: 'tattoos_japan', label: 'Tattoos & Japan Contacts', icon: 'pi-globe' },
               ]"
               :key="tab.key"
               type="button"
-              class="flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-bold transition-all"
-              :class="activeTab === tab.key ? 'border-apricot-500 text-apricot-700 bg-apricot-50/40' : 'border-transparent text-blueberry-500 hover:text-blueberry-800'"
+              class="flex items-center gap-2 py-3 px-3.5 border-b-2 text-xs font-bold whitespace-nowrap transition-all"
+              :class="activeTab === tab.key ? 'border-apricot-500 text-apricot-700 bg-apricot-50/30' : 'border-transparent text-blueberry-500 hover:text-blueberry-800'"
               @click="activeTab = tab.key as any"
             >
               <i :class="`pi ${tab.icon} text-xs`" />
@@ -671,122 +691,461 @@ async function handleDownload(): Promise<void> {
           </div>
 
           <!-- Dialog Body Content -->
-          <div class="flex-1 overflow-y-auto p-6 space-y-4">
-            <!-- TAB 1: Personal & Contact -->
-            <div v-if="activeTab === 'personal'" class="grid grid-cols-2 gap-4 text-xs">
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">Full Name</span>
-                <span class="font-semibold text-blueberry-900">{{ selectedApplicant.first_name }} {{ selectedApplicant.middle_name ? selectedApplicant.middle_name + ' ' : '' }}{{ selectedApplicant.last_name }} {{ selectedApplicant.suffix || '' }}</span>
+          <div class="flex-1 overflow-y-auto p-5 space-y-5">
+            <!-- 1️⃣ Personal Information (Matches ReviewTab) -->
+            <section
+              v-if="activeTab === 'all' || activeTab === 'personal'"
+              class="bg-white rounded-xl border border-appleCore-100 p-5 shadow-xs"
+            >
+              <div class="flex items-center justify-between mb-3 border-b border-appleCore-100 pb-2.5">
+                <h4 class="text-sm font-serif font-semibold text-blueberry-800 flex items-center gap-2">
+                  <i class="pi pi-user text-apricot-500" />
+                  Personal Information
+                </h4>
               </div>
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">Email</span>
-                <span class="font-semibold text-blueberry-900">{{ selectedApplicant.email }}</span>
-              </div>
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">Phone / Mobile</span>
-                <span class="font-semibold text-blueberry-900">{{ selectedApplicant.mobile || selectedApplicant.phone || '—' }}</span>
-              </div>
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">Birthdate & Age</span>
-                <span class="font-semibold text-blueberry-900">{{ formatDate(selectedApplicant.date_of_birth) }} {{ selectedApplicant.age ? `(${selectedApplicant.age} y/o)` : '' }}</span>
-              </div>
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">Gender / Civil Status</span>
-                <span class="font-semibold text-blueberry-900 capitalize">{{ selectedApplicant.gender || '—' }} / {{ selectedApplicant.civil_status || '—' }}</span>
-              </div>
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">Nationality / Religion</span>
-                <span class="font-semibold text-blueberry-900">{{ selectedApplicant.nationality || 'Filipino' }} / {{ selectedApplicant.religion || '—' }}</span>
-              </div>
-              <div class="col-span-2 p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">Current Address</span>
-                <span class="font-semibold text-blueberry-900">{{ selectedApplicant.current_address || '—' }} ({{ [selectedApplicant.city, selectedApplicant.province].filter(Boolean).join(', ') }})</span>
-              </div>
-            </div>
 
-            <!-- TAB 2: Passport & IDs -->
-            <div v-else-if="activeTab === 'passport'" class="grid grid-cols-2 gap-4 text-xs">
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">Passport Number</span>
-                <span class="font-semibold text-blueberry-900 font-mono">{{ selectedApplicant.passport_number || 'No Passport Provided' }}</span>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Name</span>
+                  <p class="font-medium text-blueberry-900">
+                    {{ displayVal(selectedApplicant.first_name) }}
+                    {{ selectedApplicant.middle_name ? selectedApplicant.middle_name + ' ' : '' }}
+                    {{ displayVal(selectedApplicant.last_name) }}
+                    {{ selectedApplicant.suffix ? selectedApplicant.suffix : '' }}
+                  </p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Email</span>
+                  <p class="font-medium text-blueberry-900 truncate">{{ displayVal(selectedApplicant.email) }}</p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Phone</span>
+                  <p class="font-medium text-blueberry-900 font-mono">{{ displayVal(selectedApplicant.mobile || selectedApplicant.phone) }}</p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Gender</span>
+                  <p class="font-medium text-blueberry-900 capitalize">{{ displayVal(selectedApplicant.gender) }}</p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Civil Status</span>
+                  <p class="font-medium text-blueberry-900 capitalize">{{ displayVal(selectedApplicant.civil_status) }}</p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Date of Birth & Age</span>
+                  <p class="font-medium text-blueberry-900">
+                    {{ formatDate(selectedApplicant.date_of_birth) }}
+                    <span v-if="selectedApplicant.age">({{ selectedApplicant.age }} yrs)</span>
+                  </p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Children</span>
+                  <p class="font-medium text-blueberry-900">{{ selectedApplicant.number_of_children ?? 0 }} Child(ren)</p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Nationality & Religion</span>
+                  <p class="font-medium text-blueberry-900">{{ displayVal(selectedApplicant.nationality, 'Filipino') }} · {{ displayVal(selectedApplicant.religion) }}</p>
+                </div>
               </div>
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">Passport Expiry</span>
-                <span class="font-semibold text-blueberry-900">{{ formatDate(selectedApplicant.passport_expiry) }}</span>
-              </div>
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">SSS Number</span>
-                <span class="font-semibold text-blueberry-900 font-mono">{{ selectedApplicant.sss_number || '—' }}</span>
-              </div>
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">PhilHealth Number</span>
-                <span class="font-semibold text-blueberry-900 font-mono">{{ selectedApplicant.philhealth_number || '—' }}</span>
-              </div>
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">Pag-IBIG Number</span>
-                <span class="font-semibold text-blueberry-900 font-mono">{{ selectedApplicant.pagibig_number || '—' }}</span>
-              </div>
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">TIN Number</span>
-                <span class="font-semibold text-blueberry-900 font-mono">{{ selectedApplicant.tin_number || '—' }}</span>
-              </div>
-            </div>
+            </section>
 
-            <!-- TAB 3: Skills & Readiness -->
-            <div v-else-if="activeTab === 'deployment'" class="grid grid-cols-2 gap-4 text-xs">
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">Applied Position / Trade</span>
-                <span class="font-semibold text-blueberry-900">{{ selectedApplicant.applied_position || selectedApplicant.trade_or_occupation || 'General Worker' }}</span>
+            <!-- 2️⃣ Physical & Address (Matches ReviewTab) -->
+            <section
+              v-if="activeTab === 'all' || activeTab === 'personal'"
+              class="bg-white rounded-xl border border-appleCore-100 p-5 shadow-xs"
+            >
+              <div class="flex items-center justify-between mb-3 border-b border-appleCore-100 pb-2.5">
+                <h4 class="text-sm font-serif font-semibold text-blueberry-800 flex items-center gap-2">
+                  <i class="pi pi-heart text-apricot-500" />
+                  Physical & Address
+                </h4>
               </div>
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">Skill Category</span>
-                <span class="font-semibold text-blueberry-900 capitalize">{{ selectedApplicant.skill_category || 'Unspecified' }}</span>
-              </div>
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">Willing To Be Deployed</span>
-                <span class="font-semibold" :class="selectedApplicant.deployment?.willing_to_be_deployed ? 'text-emerald-700' : 'text-slate-600'">
-                  {{ selectedApplicant.deployment?.willing_to_be_deployed ? 'Yes (Ready)' : 'No' }}
-                </span>
-              </div>
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">Previous Japan Experience</span>
-                <span class="font-semibold text-blueberry-900">
-                  {{ selectedApplicant.deployment?.previous_japan_experience ? `Yes (${selectedApplicant.deployment?.years_japan_experience ?? 0} yrs)` : 'None' }}
-                </span>
-              </div>
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">TITP Certificate / SSW Eligible</span>
-                <span class="font-semibold text-blueberry-900">
-                  TITP: {{ selectedApplicant.deployment?.has_titp_certificate ? 'Yes' : 'No' }} | SSW: {{ selectedApplicant.deployment?.ssw_eligible ? 'Yes' : 'No' }}
-                </span>
-              </div>
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">JLPT Level / English</span>
-                <span class="font-semibold text-blueberry-900">
-                  JLPT: {{ selectedApplicant.language?.jlpt_level || 'None' }} | English: {{ selectedApplicant.english_proficiency_pct ?? '—' }}%
-                </span>
-              </div>
-            </div>
 
-            <!-- TAB 4: Family & Emergency -->
-            <div v-else-if="activeTab === 'family'" class="grid grid-cols-2 gap-4 text-xs">
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">Father's Name & Contact</span>
-                <span class="font-semibold text-blueberry-900">{{ selectedApplicant.family?.father?.name || '—' }} ({{ selectedApplicant.family?.father?.contact || 'No contact' }})</span>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Height</span>
+                  <p class="font-medium text-blueberry-900">{{ selectedApplicant.height_cm ? `${selectedApplicant.height_cm} cm` : '—' }}</p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Weight</span>
+                  <p class="font-medium text-blueberry-900">{{ selectedApplicant.weight_kg ? `${selectedApplicant.weight_kg} kg` : '—' }}</p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Blood Type</span>
+                  <p class="font-medium text-blueberry-900">Type {{ displayVal(selectedApplicant.blood_type) }}</p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Dominant Hand</span>
+                  <p class="font-medium text-blueberry-900 capitalize">{{ displayVal(selectedApplicant.dominant_hand, 'Right') }} Hand</p>
+                </div>
+                <div class="md:col-span-2">
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Current Address</span>
+                  <p class="font-medium text-blueberry-900">{{ displayVal(selectedApplicant.current_address) }}</p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">City</span>
+                  <p class="font-medium text-blueberry-900">{{ displayVal(selectedApplicant.city) }}</p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Province</span>
+                  <p class="font-medium text-blueberry-900">{{ displayVal(selectedApplicant.province) }}</p>
+                </div>
               </div>
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">Mother's Name & Contact</span>
-                <span class="font-semibold text-blueberry-900">{{ selectedApplicant.family?.mother?.name || '—' }} ({{ selectedApplicant.family?.mother?.contact || 'No contact' }})</span>
+            </section>
+
+            <!-- 3️⃣ Documents (Matches ReviewTab) -->
+            <section
+              v-if="activeTab === 'all' || activeTab === 'documents_deployment'"
+              class="bg-white rounded-xl border border-appleCore-100 p-5 shadow-xs"
+            >
+              <div class="flex items-center justify-between mb-3 border-b border-appleCore-100 pb-2.5">
+                <h4 class="text-sm font-serif font-semibold text-blueberry-800 flex items-center gap-2">
+                  <i class="pi pi-id-card text-apricot-500" />
+                  Documents & Identification
+                </h4>
               </div>
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">Spouse Name</span>
-                <span class="font-semibold text-blueberry-900">{{ selectedApplicant.family?.spouse?.name || '—' }}</span>
+
+              <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Passport Number</span>
+                  <p class="font-medium font-mono text-apricot-700 font-bold">{{ displayVal(selectedApplicant.passport_number) }}</p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Passport Expiry</span>
+                  <p class="font-medium text-blueberry-900">{{ formatDate(selectedApplicant.passport_expiry) }}</p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">DFA Issuing Office</span>
+                  <p class="font-medium text-blueberry-900">{{ displayVal(selectedApplicant.passport_office?.name || selectedApplicant.passport_office_id) }}</p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">SSS Number</span>
+                  <p class="font-medium font-mono text-blueberry-900">{{ displayVal(selectedApplicant.sss_number) }}</p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">TIN Number</span>
+                  <p class="font-medium font-mono text-blueberry-900">{{ displayVal(selectedApplicant.tin_number) }}</p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">PhilHealth Number</span>
+                  <p class="font-medium font-mono text-blueberry-900">{{ displayVal(selectedApplicant.philhealth_number) }}</p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Pag-IBIG Number</span>
+                  <p class="font-medium font-mono text-blueberry-900">{{ displayVal(selectedApplicant.pagibig_number) }}</p>
+                </div>
               </div>
-              <div class="p-3 bg-appleCore-50/60 rounded-xl">
-                <span class="text-blueberry-400 block text-[10px] uppercase font-bold tracking-wider">Emergency Contact Person</span>
-                <span class="font-semibold text-blueberry-900">{{ selectedApplicant.family?.emergency_contact?.name || '—' }} ({{ selectedApplicant.family?.emergency_contact?.relationship || '—' }})</span>
+            </section>
+
+            <!-- 4️⃣ Japan Deployment Profile (Matches ReviewTab) -->
+            <section
+              v-if="activeTab === 'all' || activeTab === 'documents_deployment'"
+              class="bg-white rounded-xl border border-appleCore-100 p-5 shadow-xs"
+            >
+              <div class="flex items-center justify-between mb-3 border-b border-appleCore-100 pb-2.5">
+                <h4 class="text-sm font-serif font-semibold text-blueberry-800 flex items-center gap-2">
+                  <i class="pi pi-send text-apricot-500" />
+                  Japan Deployment Profile
+                </h4>
               </div>
-            </div>
+
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Skill Category</span>
+                  <p class="font-medium capitalize text-blueberry-900">
+                    {{ displayVal(selectedApplicant.deployment?.skill_category || selectedApplicant.skill_category)?.replace('_', '-') }}
+                  </p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Occupation / Trade</span>
+                  <p class="font-medium text-blueberry-900">
+                    {{ displayVal(selectedApplicant.deployment?.trade_or_occupation || selectedApplicant.trade_or_occupation || selectedApplicant.applied_position) }}
+                  </p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Basic English</span>
+                  <p class="font-medium text-blueberry-900">
+                    {{ displayBool(selectedApplicant.deployment?.understands_basic_english ?? selectedApplicant.understands_basic_english) }}
+                    <span v-if="selectedApplicant.english_proficiency_pct">({{ selectedApplicant.english_proficiency_pct }}%)</span>
+                  </p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">JLPT Level</span>
+                  <p class="font-medium text-blueberry-900 font-mono">
+                    {{ displayVal(selectedApplicant.deployment?.jlpt_level || selectedApplicant.language?.jlpt_level, 'None') }}
+                  </p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Willing to Deploy</span>
+                  <p class="font-medium" :class="(selectedApplicant.deployment?.willing_to_be_deployed ?? selectedApplicant.willing_to_be_deployed) ? 'text-emerald-700 font-bold' : 'text-slate-600'">
+                    {{ displayBool(selectedApplicant.deployment?.willing_to_be_deployed ?? selectedApplicant.willing_to_be_deployed) }}
+                  </p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Preferred Location</span>
+                  <p class="font-medium text-blueberry-900">
+                    {{ displayVal(selectedApplicant.deployment?.preferred_work_location || selectedApplicant.preferred_work_location) }}
+                  </p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Japan Experience</span>
+                  <p class="font-medium text-blueberry-900">
+                    {{ displayBool(selectedApplicant.deployment?.previous_japan_experience ?? selectedApplicant.previous_japan_experience) }}
+                    <span v-if="selectedApplicant.deployment?.years_japan_experience || selectedApplicant.years_japan_experience">
+                      ({{ selectedApplicant.deployment?.years_japan_experience || selectedApplicant.years_japan_experience }} yrs)
+                    </span>
+                  </p>
+                </div>
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">TITP Certificate</span>
+                  <p class="font-medium text-blueberry-900">
+                    {{ displayBool(selectedApplicant.deployment?.has_titp_certificate ?? selectedApplicant.has_titp_certificate) }}
+                    <span v-if="selectedApplicant.deployment?.titp_occupation || selectedApplicant.titp_occupation">
+                      ({{ selectedApplicant.deployment?.titp_occupation || selectedApplicant.titp_occupation }})
+                    </span>
+                  </p>
+                </div>
+                <div class="col-span-2">
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Expected Salary</span>
+                  <p class="font-medium text-emerald-700">
+                    {{ displayCurrency(selectedApplicant.deployment?.expected_salary ?? selectedApplicant.expected_salary, selectedApplicant.deployment?.expected_salary_currency || selectedApplicant.expected_salary_currency || 'JPY') }}
+                  </p>
+                </div>
+                <div class="col-span-2">
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Current Salary</span>
+                  <p class="font-medium text-blue-700">
+                    {{ displayCurrency(selectedApplicant.deployment?.current_salary ?? selectedApplicant.current_salary, selectedApplicant.deployment?.current_salary_currency || selectedApplicant.current_salary_currency || 'PHP') }}
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <!-- 5️⃣ Family Background (Matches ReviewTab) -->
+            <section
+              v-if="activeTab === 'all' || activeTab === 'family_lifestyle'"
+              class="bg-white rounded-xl border border-appleCore-100 p-5 shadow-xs"
+            >
+              <div class="flex items-center justify-between mb-3 border-b border-appleCore-100 pb-2.5">
+                <h4 class="text-sm font-serif font-semibold text-blueberry-800 flex items-center gap-2">
+                  <i class="pi pi-users text-apricot-500" />
+                  Family Background
+                </h4>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <div class="md:col-span-3 bg-appleCore-50/70 p-3 rounded-lg border border-appleCore-100">
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Living Situation & Siblings</span>
+                  <p class="font-medium text-blueberry-900">
+                    {{ displayVal(selectedApplicant.family?.living_arrangement || selectedApplicant.family?.living_situation || selectedApplicant.living_arrangement || selectedApplicant.living_situation, 'Living with parents') }}
+                  </p>
+                  <p v-if="selectedApplicant.family?.birth_order" class="text-blueberry-700 mt-1">
+                    <strong>Birth Order:</strong> Child #{{ selectedApplicant.family.birth_order }} of {{ selectedApplicant.family.siblings_count ?? '—' }} siblings
+                    <span v-if="selectedApplicant.family.siblings_description">({{ selectedApplicant.family.siblings_description }})</span>
+                  </p>
+                </div>
+
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-1 border-b border-appleCore-100 pb-1">Father</span>
+                  <p class="font-medium text-blueberry-900">{{ displayVal(selectedApplicant.family?.father?.name || selectedApplicant.family?.father_name) }}</p>
+                  <p class="text-[11px] text-blueberry-500">{{ displayVal(selectedApplicant.family?.father?.occupation || selectedApplicant.family?.father_occupation) }}</p>
+                  <p class="text-[11px] text-blueberry-600 font-mono mt-0.5">{{ displayVal(selectedApplicant.family?.father?.contact || selectedApplicant.family?.father_contact) }}</p>
+                </div>
+
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-1 border-b border-appleCore-100 pb-1">Mother</span>
+                  <p class="font-medium text-blueberry-900">{{ displayVal(selectedApplicant.family?.mother?.name || selectedApplicant.family?.mother_name) }}</p>
+                  <p class="text-[11px] text-blueberry-500">{{ displayVal(selectedApplicant.family?.mother?.occupation || selectedApplicant.family?.mother_occupation) }}</p>
+                  <p class="text-[11px] text-blueberry-600 font-mono mt-0.5">{{ displayVal(selectedApplicant.family?.mother?.contact || selectedApplicant.family?.mother_contact) }}</p>
+                </div>
+
+                <div>
+                  <span class="text-blueberry-500 block text-[10px] uppercase font-bold tracking-wider mb-1 border-b border-appleCore-100 pb-1">Spouse</span>
+                  <p class="font-medium text-blueberry-900">{{ displayVal(selectedApplicant.family?.spouse?.name || selectedApplicant.family?.spouse_name, 'None') }}</p>
+                  <p class="text-[11px] text-blueberry-500">{{ displayVal(selectedApplicant.family?.spouse?.occupation || selectedApplicant.family?.spouse_occupation) }}</p>
+                  <p v-if="selectedApplicant.family?.spouse?.salary || selectedApplicant.family?.spouse_salary" class="text-emerald-700 font-medium text-[11px] mt-0.5">
+                    {{ displayCurrency(selectedApplicant.family?.spouse?.salary || selectedApplicant.family?.spouse_salary) }}/mo
+                  </p>
+                </div>
+
+                <div class="md:col-span-3 mt-1 border-t border-appleCore-100 pt-3">
+                  <span class="text-red-700 block text-[10px] uppercase font-bold tracking-wider mb-1">Emergency Contact</span>
+                  <p class="font-bold text-blueberry-900">
+                    {{ displayVal(selectedApplicant.family?.emergency_contact?.name || selectedApplicant.family?.emergency_contact_name) }}
+                    <span class="font-normal text-xs text-blueberry-500 ml-1">
+                      ({{ displayVal(selectedApplicant.family?.emergency_contact?.relationship || selectedApplicant.family?.emergency_contact_relationship) }})
+                    </span>
+                  </p>
+                  <p class="font-medium text-red-700 mt-0.5">
+                    <i class="pi pi-phone text-xs mr-1" />
+                    {{ displayVal(selectedApplicant.family?.emergency_contact?.phone || selectedApplicant.family?.emergency_contact_phone) }}
+                  </p>
+                  <p class="text-xs text-blueberry-500 mt-0.5">
+                    {{ displayVal(selectedApplicant.family?.emergency_contact?.address || selectedApplicant.family?.emergency_contact_address) }}
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <!-- 6️⃣ Lifestyle (Matches ReviewTab) -->
+            <section
+              v-if="activeTab === 'all' || activeTab === 'family_lifestyle'"
+              class="bg-white rounded-xl border border-appleCore-100 p-5 shadow-xs"
+            >
+              <div class="flex items-center justify-between mb-3 border-b border-appleCore-100 pb-2.5">
+                <h4 class="text-sm font-serif font-semibold text-blueberry-800 flex items-center gap-2">
+                  <i class="pi pi-shield text-apricot-500" />
+                  Lifestyle & Health
+                </h4>
+              </div>
+
+              <div class="flex flex-wrap gap-2.5 text-xs">
+                <span
+                  v-if="selectedApplicant.lifestyle?.is_smoking"
+                  class="px-3 py-1.5 bg-orange-50 text-orange-800 rounded-lg border border-orange-200 shadow-xs font-medium"
+                >
+                  🚬 Smoking <span v-if="selectedApplicant.lifestyle.smoking_frequency">({{ selectedApplicant.lifestyle.smoking_frequency }})</span>
+                </span>
+                <span
+                  v-if="selectedApplicant.lifestyle?.is_drinking_alcohol"
+                  class="px-3 py-1.5 bg-blue-50 text-blue-800 rounded-lg border border-blue-200 shadow-xs font-medium"
+                >
+                  🍺 Drinking <span v-if="selectedApplicant.lifestyle.drinking_frequency">({{ selectedApplicant.lifestyle.drinking_frequency }})</span>
+                </span>
+                <span
+                  v-if="selectedApplicant.lifestyle?.has_medical_condition"
+                  class="px-3 py-1.5 bg-red-50 text-red-800 rounded-lg border border-red-200 shadow-xs font-semibold"
+                >
+                  🏥 Medical Condition: {{ selectedApplicant.lifestyle.medical_condition_details || 'Yes' }}
+                </span>
+                <span
+                  v-if="selectedApplicant.lifestyle?.has_allergies"
+                  class="px-3 py-1.5 bg-yellow-50 text-yellow-800 rounded-lg border border-yellow-200 shadow-xs font-semibold"
+                >
+                  ⚠️ Allergies: {{ selectedApplicant.lifestyle.allergies_details || 'Yes' }}
+                </span>
+                <span
+                  v-if="!selectedApplicant.lifestyle?.is_smoking && !selectedApplicant.lifestyle?.is_drinking_alcohol && !selectedApplicant.lifestyle?.has_medical_condition && !selectedApplicant.lifestyle?.has_allergies"
+                  class="text-blueberry-500 italic bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200"
+                >
+                  No notable lifestyle habits or medical concerns reported
+                </span>
+              </div>
+            </section>
+
+            <!-- 7️⃣ Education & Work Records -->
+            <section
+              v-if="activeTab === 'all' || activeTab === 'education_work'"
+              class="bg-white rounded-xl border border-appleCore-100 p-5 shadow-xs space-y-4"
+            >
+              <div class="flex items-center justify-between border-b border-appleCore-100 pb-2.5">
+                <h4 class="text-sm font-serif font-semibold text-blueberry-800 flex items-center gap-2">
+                  <i class="pi pi-book text-apricot-500" />
+                  Education & Work Experience
+                </h4>
+              </div>
+
+              <!-- Education History -->
+              <div>
+                <span class="text-blueberry-600 block text-[11px] uppercase font-bold tracking-wider mb-2">Education History ({{ selectedApplicant.educations?.length ?? 0 }})</span>
+                <div v-if="selectedApplicant.educations?.length" class="space-y-2">
+                  <div
+                    v-for="edu in selectedApplicant.educations"
+                    :key="edu.id"
+                    class="p-3 bg-appleCore-50/60 rounded-xl border border-appleCore-100 flex items-center justify-between text-xs"
+                  >
+                    <div>
+                      <span class="font-semibold text-blueberry-900">{{ edu.school_name }}</span>
+                      <p class="text-[11px] text-blueberry-500 capitalize">{{ edu.education_level }} <span v-if="edu.course">· {{ edu.course }}</span></p>
+                    </div>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700">
+                      {{ edu.education_status || 'GRADUATED' }}
+                    </span>
+                  </div>
+                </div>
+                <p v-else class="text-blueberry-400 italic text-xs">No education records provided.</p>
+              </div>
+
+              <!-- Employment History -->
+              <div class="pt-3 border-t border-appleCore-100">
+                <span class="text-blueberry-600 block text-[11px] uppercase font-bold tracking-wider mb-2">Work Experience ({{ selectedApplicant.employments?.length ?? 0 }})</span>
+                <div v-if="selectedApplicant.employments?.length" class="space-y-2">
+                  <div
+                    v-for="emp in selectedApplicant.employments"
+                    :key="emp.id"
+                    class="p-3 bg-appleCore-50/60 rounded-xl border border-appleCore-100 flex items-center justify-between text-xs"
+                  >
+                    <div>
+                      <span class="font-semibold text-blueberry-900">{{ emp.position }}</span>
+                      <p class="text-[11px] text-blueberry-500">{{ emp.company_name }} <span v-if="emp.country">({{ emp.country }})</span></p>
+                    </div>
+                    <span v-if="emp.is_current" class="px-2 py-0.5 rounded text-[10px] font-bold bg-green-50 text-green-700">Current</span>
+                  </div>
+                </div>
+                <p v-else class="text-blueberry-400 italic text-xs">No previous employment records provided.</p>
+              </div>
+            </section>
+
+            <!-- 8️⃣ Tattoos & Japan Contacts (AIS Specific) -->
+            <section
+              v-if="activeTab === 'all' || activeTab === 'tattoos_japan'"
+              class="bg-white rounded-xl border border-appleCore-100 p-5 shadow-xs space-y-4"
+            >
+              <div class="flex items-center justify-between border-b border-appleCore-100 pb-2.5">
+                <h4 class="text-sm font-serif font-semibold text-blueberry-800 flex items-center gap-2">
+                  <i class="pi pi-globe text-apricot-500" />
+                  Tattoos & Japan Contacts
+                </h4>
+              </div>
+
+              <!-- Tattoos Section -->
+              <div>
+                <span class="text-blueberry-600 block text-[11px] uppercase font-bold tracking-wider mb-2">Tattoo Records ({{ selectedApplicant.tattoos?.length ?? 0 }})</span>
+                <div v-if="selectedApplicant.tattoos?.length" class="space-y-2">
+                  <div
+                    v-for="tat in selectedApplicant.tattoos"
+                    :key="tat.id"
+                    class="p-3 bg-appleCore-50/60 rounded-xl border border-appleCore-100 flex items-center justify-between text-xs"
+                  >
+                    <div>
+                      <span class="font-semibold text-blueberry-900">Location: {{ tat.location || 'Body' }}</span>
+                      <p class="text-[11px] text-blueberry-500">{{ tat.description }}</p>
+                    </div>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800">
+                      {{ tat.can_be_removed ? 'Removable' : 'Permanent' }}
+                    </span>
+                  </div>
+                </div>
+                <p v-else class="text-blueberry-400 italic text-xs">No tattoos declared.</p>
+              </div>
+
+              <!-- Japan Contacts -->
+              <div class="pt-3 border-t border-appleCore-100 space-y-3">
+                <span class="text-blueberry-600 block text-[11px] uppercase font-bold tracking-wider">Japan Connections</span>
+
+                <!-- Marucon -->
+                <div class="p-3 bg-appleCore-50/60 rounded-xl text-xs">
+                  <span class="text-blueberry-700 block text-[10px] font-bold uppercase tracking-wider mb-1.5">Marucon Japan Contact</span>
+                  <div v-if="selectedApplicant.japan_contacts?.find((jc: any) => jc.affiliation_type === 'marucon')" class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <div><span class="text-blueberry-400 block text-[10px]">Name</span><strong class="text-blueberry-900">{{ selectedApplicant.japan_contacts.find((jc: any) => jc.affiliation_type === 'marucon')?.name }}</strong></div>
+                    <div><span class="text-blueberry-400 block text-[10px]">Batch</span><strong class="text-blueberry-900">{{ selectedApplicant.japan_contacts.find((jc: any) => jc.affiliation_type === 'marucon')?.batch_no || '—' }}</strong></div>
+                    <div><span class="text-blueberry-400 block text-[10px]">Company</span><strong class="text-blueberry-900">{{ selectedApplicant.japan_contacts.find((jc: any) => jc.affiliation_type === 'marucon')?.company_name || '—' }}</strong></div>
+                    <div><span class="text-blueberry-400 block text-[10px]">Relation</span><strong class="text-blueberry-900">{{ selectedApplicant.japan_contacts.find((jc: any) => jc.affiliation_type === 'marucon')?.relation || '—' }}</strong></div>
+                  </div>
+                  <p v-else class="text-blueberry-400 italic text-xs">No Marucon contacts declared.</p>
+                </div>
+
+                <!-- Non-Marucon -->
+                <div class="p-3 bg-appleCore-50/60 rounded-xl text-xs">
+                  <span class="text-blueberry-700 block text-[10px] font-bold uppercase tracking-wider mb-1.5">Non-Marucon Japan Contact</span>
+                  <div v-if="selectedApplicant.japan_contacts?.find((jc: any) => jc.affiliation_type === 'non_marucon')" class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <div><span class="text-blueberry-400 block text-[10px]">Name</span><strong class="text-blueberry-900">{{ selectedApplicant.japan_contacts.find((jc: any) => jc.affiliation_type === 'non_marucon')?.name }}</strong></div>
+                    <div><span class="text-blueberry-400 block text-[10px]">Contact</span><strong class="text-blueberry-900">{{ selectedApplicant.japan_contacts.find((jc: any) => jc.affiliation_type === 'non_marucon')?.contact_number || '—' }}</strong></div>
+                    <div><span class="text-blueberry-400 block text-[10px]">Company</span><strong class="text-blueberry-900">{{ selectedApplicant.japan_contacts.find((jc: any) => jc.affiliation_type === 'non_marucon')?.company_name || '—' }}</strong></div>
+                    <div><span class="text-blueberry-400 block text-[10px]">Relation</span><strong class="text-blueberry-900">{{ selectedApplicant.japan_contacts.find((jc: any) => jc.affiliation_type === 'non_marucon')?.relation || '—' }}</strong></div>
+                  </div>
+                  <p v-else class="text-blueberry-400 italic text-xs">No non-Marucon contacts declared.</p>
+                </div>
+              </div>
+            </section>
 
             <!-- Rejection Prompt Accordion -->
             <div v-if="showRejectPrompt" class="p-4 bg-red-50 border border-red-200 rounded-xl space-y-2.5">
@@ -812,7 +1171,7 @@ async function handleDownload(): Promise<void> {
           </div>
 
           <!-- Dialog Footer Actions (Approve / Reject) -->
-          <div class="flex items-center justify-between p-5 border-t border-appleCore-100 bg-appleCore-50/50 shrink-0">
+          <div class="flex items-center justify-between p-4 border-t border-appleCore-100 bg-white shrink-0">
             <Button
               v-if="!showRejectPrompt"
               label="Reject Application"
@@ -835,7 +1194,7 @@ async function handleDownload(): Promise<void> {
                 @click="closeReviewModal"
               />
               <Button
-                label="Approve Applicant"
+                label="Approve & Activate Account"
                 icon="pi pi-check"
                 :loading="isProcessing"
                 class="!bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600 !text-white !font-bold !text-xs !px-5 !py-2.5 !rounded-xl shadow-md"

@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Skeleton from 'primevue/skeleton'
+import { applicantApi } from '../api/applicant.api'
 
 // Stores & Composables
 import { useApplicantStore } from '../stores/applicant.store'
@@ -84,8 +85,8 @@ const primaryFlowAction = computed(() => {
   const label = !isGuarantorsComplete.value
     ? 'Start MOA Wizard'
     : !isInternshipComplete.value
-      ? 'Continue MOA Wizard'
-      : 'Generate MOA'
+    ? 'Continue MOA Wizard'
+    : 'Generate MOA'
 
   return {
     label,
@@ -133,9 +134,54 @@ async function handleDirectDownloadMoa() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// AIS PDF GENERATION
+// AIS EXPORTS (WORD & PDF)
 // ═══════════════════════════════════════════════════════════════════════════
+const generatingAisWord = ref(false)
 const generatingAIS = ref(false)
+
+async function handleDownloadAISWord() {
+  if (!a.value || generatingAisWord.value) return
+  generatingAisWord.value = true
+  try {
+    if (typeof (applicantApi as any).downloadAisWord === 'function') {
+      await (applicantApi as any).downloadAisWord(a.value.id, a.value.applicant_code)
+    } else {
+      const response = await fetch(`/api/v1/applicants/${a.value.id}/ais-word`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token') ?? ''}`,
+          Accept: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/octet-stream',
+        },
+      })
+      if (!response.ok) throw new Error('Failed to download Word document')
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `AIS_${a.value.applicant_code || a.value.id}.docx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    }
+
+    toast.add({
+      severity: 'success',
+      summary: 'AIS Word Downloaded',
+      detail: `${a.value.applicant_code} Word document generated`,
+      life: 3000,
+    })
+  } catch (err) {
+    console.error('[AIS Word] Generation failed:', err)
+    toast.add({
+      severity: 'error',
+      summary: 'AIS Word Failed',
+      detail: 'Could not generate official Word information sheet.',
+      life: 4000,
+    })
+  } finally {
+    generatingAisWord.value = false
+  }
+}
 
 async function urlToBase64(url: string): Promise<string | null> {
   try {
@@ -192,10 +238,15 @@ const applicantDeployments = computed(() => {
     .filter((ab: any) => ab.deployment_country || ab.deployed_at)
     .map((ab: any) => ({
       id: ab.id,
-      status: ab.cancelled_at ? 'cancelled'
-        : ab.completed_at ? 'completed'
-          : ab.returned_at ? 'returned'
-            : ab.status === 'deployed' ? 'deployed' : 'active',
+      status: ab.cancelled_at
+        ? 'cancelled'
+        : ab.completed_at
+        ? 'completed'
+        : ab.returned_at
+        ? 'returned'
+        : ab.status === 'deployed'
+        ? 'deployed'
+        : 'active',
       deployment_country: ab.deployment_country,
       deployment_company: ab.deployment_company,
       deployment_position: ab.deployment_position,
@@ -228,17 +279,6 @@ function formatDate(dateStr: string | null | undefined): string {
     if (isNaN(d.getTime())) return '—'
     return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   } catch { return '—' }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// SMART BACK NAVIGATION
-// ═══════════════════════════════════════════════════════════════════════════
-function goBack(): void {
-  if (window.history.state?.back) {
-    router.back()
-  } else {
-    router.push({ name: 'applicants.index' })
-  }
 }
 
 function formatDateTime(dateStr: string | null | undefined): string {
@@ -307,6 +347,17 @@ function batchStatusColor(status?: string): string {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// SMART BACK NAVIGATION
+// ═══════════════════════════════════════════════════════════════════════════
+function goBack(): void {
+  if (window.history.state?.back) {
+    router.back()
+  } else {
+    router.push({ name: 'applicants.index' })
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // LIFECYCLE
 // ═══════════════════════════════════════════════════════════════════════════
 onMounted(async () => {
@@ -339,15 +390,16 @@ onMounted(async () => {
           @click="toggleMap"
         />
 
+        <!-- AIS Word Template Download (Backend Generated from AIS_FINAL.docx) -->
         <Button
-          label="Generate AIS"
-          icon="pi pi-file-pdf"
+          label="AIS Word"
+          icon="pi pi-file-word"
           severity="secondary"
           outlined
-          :loading="generatingAIS"
-          class="!text-red-600 !border-red-300 hover:!bg-red-50"
-          v-tooltip.top="'Download Information Sheet (PDF)'"
-          @click="handleGenerateAIS"
+          :loading="generatingAisWord"
+          class="!text-blue-600 !border-blue-300 hover:!bg-blue-50"
+          v-tooltip.top="'Download Official AIS Information Sheet (Word Document)'"
+          @click="handleDownloadAISWord"
         />
 
         <Button
@@ -449,8 +501,8 @@ onMounted(async () => {
             :class="isGuarantorsComplete
               ? 'bg-emerald-50 border-emerald-200'
               : flowStep === 1
-                ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-200'
-                : 'bg-gray-50 border-gray-200'"
+              ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-200'
+              : 'bg-gray-50 border-gray-200'"
             @click="showMoaWizard = true"
           >
             <div class="flex items-center gap-3 mb-2">
@@ -484,8 +536,8 @@ onMounted(async () => {
             :class="isInternshipComplete
               ? 'bg-emerald-50 border-emerald-200'
               : flowStep === 2
-                ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-200'
-                : 'bg-gray-50 border-gray-200 opacity-70'"
+              ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-200'
+              : 'bg-gray-50 border-gray-200 opacity-70'"
             :disabled="!isGuarantorsComplete"
             @click="isGuarantorsComplete && (showMoaWizard = true)"
           >
@@ -495,8 +547,8 @@ onMounted(async () => {
                 :class="isInternshipComplete
                   ? 'bg-emerald-500 text-white'
                   : isGuarantorsComplete
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-300 text-gray-500'"
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-300 text-gray-500'"
               >
                 <i v-if="isInternshipComplete" class="pi pi-check text-[11px]" />
                 <span v-else>2</span>
@@ -636,7 +688,9 @@ onMounted(async () => {
       <!-- ─── PROFILE HEADER ─── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
         <div class="flex items-start gap-5">
-          <div class="w-24 h-24 rounded-full bg-appleCore-50 border border-appleCore-200 flex-shrink-0 shadow-sm overflow-hidden flex items-center justify-center">
+          <div
+            class="w-24 h-24 rounded-full bg-appleCore-50 border border-appleCore-200 flex-shrink-0 shadow-sm overflow-hidden flex items-center justify-center"
+          >
             <img
               :src="getApplicantPhoto(a)"
               :alt="a.full_name || `${a.first_name} ${a.last_name}`"
@@ -700,8 +754,14 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div v-if="a.final_listed_at || a.rejected_at || a.rejection_reason" class="mt-4 pt-4 border-t border-appleCore-100">
-          <div v-if="a.status === 'final_list' && a.final_listed_at" class="flex items-center gap-2 text-sm text-green-700 bg-green-50 px-3 py-2 rounded-lg">
+        <div
+          v-if="a.final_listed_at || a.rejected_at || a.rejection_reason"
+          class="mt-4 pt-4 border-t border-appleCore-100"
+        >
+          <div
+            v-if="a.status === 'final_list' && a.final_listed_at"
+            class="flex items-center gap-2 text-sm text-green-700 bg-green-50 px-3 py-2 rounded-lg"
+          >
             <i class="pi pi-check-circle text-green-600" />
             <span>
               Moved to Final List on <strong>{{ formatDateTime(a.final_listed_at) }}</strong>
@@ -743,13 +803,34 @@ onMounted(async () => {
           Personal Information
         </h3>
         <dl class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">First Name</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.first_name) }}</dd></div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Middle Name</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.middle_name) }}</dd></div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Last Name</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.last_name) }}</dd></div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Suffix</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.suffix) }}</dd></div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Email</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.email) }}</dd></div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Phone</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.phone) }}</dd></div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Mobile</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.mobile) }}</dd></div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">First Name</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.first_name) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Middle Name</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.middle_name) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Last Name</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.last_name) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Suffix</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.suffix) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Email</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.email) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Phone</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.phone) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Mobile</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.mobile) }}</dd>
+          </div>
           <div>
             <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Date of Birth</dt>
             <dd class="text-sm font-medium text-blueberry-800 mt-1">
@@ -757,10 +838,22 @@ onMounted(async () => {
               <span v-if="a.age" class="text-blueberry-500 text-xs">({{ a.age }} yrs)</span>
             </dd>
           </div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Gender</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ capitalize(a.gender) }}</dd></div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Civil Status</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ capitalize(a.civil_status) }}</dd></div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Children</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ a.number_of_children ?? 0 }}</dd></div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Nationality</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.nationality) }}</dd></div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Gender</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ capitalize(a.gender) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Civil Status</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ capitalize(a.civil_status) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Children</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ a.number_of_children ?? 0 }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Nationality</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.nationality) }}</dd>
+          </div>
         </dl>
       </section>
 
@@ -771,10 +864,22 @@ onMounted(async () => {
           Physical Information
         </h3>
         <dl class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Height</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ a.height_cm ? `${a.height_cm} cm` : '—' }}</dd></div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Weight</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ a.weight_kg ? `${a.weight_kg} kg` : '—' }}</dd></div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Blood Type</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.blood_type) }}</dd></div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Dominant Hand</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ capitalize(a.dominant_hand) }}</dd></div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Height</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ a.height_cm ? `${a.height_cm} cm` : '—' }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Weight</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ a.weight_kg ? `${a.weight_kg} kg` : '—' }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Blood Type</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.blood_type) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Dominant Hand</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ capitalize(a.dominant_hand) }}</dd>
+          </div>
         </dl>
       </section>
 
@@ -796,31 +901,52 @@ onMounted(async () => {
           </button>
         </div>
         <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Current Address</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.current_address) }}</dd></div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Permanent Address</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.permanent_address) }}</dd></div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">City</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.city) }}</dd></div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Province</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.province) }}</dd></div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Postal Code</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.postal_code) }}</dd></div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Current Address</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.current_address) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Permanent Address</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.permanent_address) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">City</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.city) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Province</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.province) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Postal Code</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.postal_code) }}</dd>
+          </div>
         </dl>
       </section>
 
-       <!-- ─── DOCUMENTS & GOVERNMENT IDs ─── -->
+      <!-- ─── DOCUMENTS & GOVERNMENT IDs ─── -->
       <section class="bg-white rounded-2xl border border-appleCore-100 p-6">
         <h3 class="text-base font-serif font-semibold text-blueberry-800 mb-4 flex items-center gap-2">
           <i class="pi pi-id-card text-apricot-500" />
           Documents &amp; Government IDs
         </h3>
         <dl class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Passport Number</dt><dd class="text-sm font-medium text-blueberry-800 mt-1 font-mono">{{ display(a.passport_number) }}</dd></div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Passport Expiry</dt><dd class="text-sm font-medium text-blueberry-800 mt-1">{{ formatDate(a.passport_expiry) }}</dd></div>
-          
-          <!-- 🎯 NEW: DFA Issuing Location -->
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Passport Number</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1 font-mono">{{ display(a.passport_number) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Passport Expiry</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ formatDate(a.passport_expiry) }}</dd>
+          </div>
           <div>
             <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Issuing Location (DFA)</dt>
             <dd class="text-sm font-medium text-blueberry-800 mt-1">
               <template v-if="a.passport_office">
                 <span class="block">{{ a.passport_office.name }}</span>
-                <span class="text-[10px] text-blueberry-500 uppercase tracking-wider">{{ a.passport_office.region }}</span>
+                <span class="text-[10px] text-blueberry-500 uppercase tracking-wider">
+                  {{ a.passport_office.region }}
+                </span>
               </template>
               <span v-else class="text-amber-600 text-xs font-medium">
                 <i class="pi pi-exclamation-triangle text-[10px] mr-0.5" />
@@ -828,11 +954,22 @@ onMounted(async () => {
               </span>
             </dd>
           </div>
-
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">SSS Number</dt><dd class="text-sm font-medium text-blueberry-800 mt-1 font-mono">{{ display(a.sss_number) }}</dd></div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">TIN Number</dt><dd class="text-sm font-medium text-blueberry-800 mt-1 font-mono">{{ display(a.tin_number) }}</dd></div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">PhilHealth Number</dt><dd class="text-sm font-medium text-blueberry-800 mt-1 font-mono">{{ display(a.philhealth_number) }}</dd></div>
-          <div><dt class="text-xs text-blueberry-400 uppercase tracking-wider">Pag-IBIG Number</dt><dd class="text-sm font-medium text-blueberry-800 mt-1 font-mono">{{ display(a.pagibig_number) }}</dd></div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">SSS Number</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1 font-mono">{{ display(a.sss_number) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">TIN Number</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1 font-mono">{{ display(a.tin_number) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">PhilHealth Number</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1 font-mono">{{ display(a.philhealth_number) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Pag-IBIG Number</dt>
+            <dd class="text-sm font-medium text-blueberry-800 mt-1 font-mono">{{ display(a.pagibig_number) }}</dd>
+          </div>
         </dl>
       </section>
 
@@ -842,7 +979,6 @@ onMounted(async () => {
           <i class="pi pi-send text-apricot-500" />
           Japan Deployment Profile
         </h3>
-
         <div class="mb-5">
           <p class="text-[11px] font-bold text-blueberry-400 uppercase tracking-wider mb-3">Skill &amp; Trade</p>
           <dl class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
@@ -878,7 +1014,10 @@ onMounted(async () => {
                     ? 'bg-green-50 text-green-700 ring-green-200'
                     : 'bg-red-50 text-red-600 ring-red-200'"
                 >
-                  <i :class="a.language?.understands_basic_english ? 'pi pi-check' : 'pi pi-times'" class="text-[10px]" />
+                  <i
+                    :class="a.language?.understands_basic_english ? 'pi pi-check' : 'pi pi-times'"
+                    class="text-[10px]"
+                  />
                   {{ a.language?.understands_basic_english ? 'Yes' : 'No' }}
                 </span>
               </dd>
@@ -900,24 +1039,34 @@ onMounted(async () => {
 
         <div class="mb-5 pt-4 border-t border-appleCore-100">
           <p class="text-[11px] font-bold text-blueberry-400 uppercase tracking-wider mb-3">Deployment Readiness</p>
-
           <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
             <div class="flex items-center gap-2 p-3 rounded-lg bg-appleCore-50">
-              <i class="text-sm" :class="a.deployment?.willing_to_be_deployed ? 'pi pi-check-circle text-green-500' : 'pi pi-times-circle text-red-400'" />
+              <i
+                class="text-sm"
+                :class="a.deployment?.willing_to_be_deployed ? 'pi pi-check-circle text-green-500' : 'pi pi-times-circle text-red-400'"
+              />
               <div>
                 <p class="text-xs font-semibold text-blueberry-700">Willing to Deploy</p>
                 <p class="text-xs text-blueberry-500">{{ a.deployment?.willing_to_be_deployed ? 'Yes' : 'No' }}</p>
               </div>
             </div>
             <div class="flex items-center gap-2 p-3 rounded-lg bg-appleCore-50">
-              <i class="text-sm" :class="a.deployment?.japan_deployment_ready ? 'pi pi-check-circle text-green-500' : 'pi pi-clock text-amber-400'" />
+              <i
+                class="text-sm"
+                :class="a.deployment?.japan_deployment_ready ? 'pi pi-check-circle text-green-500' : 'pi pi-clock text-amber-400'"
+              />
               <div>
                 <p class="text-xs font-semibold text-blueberry-700">Deployment Ready</p>
-                <p class="text-xs text-blueberry-500">{{ a.deployment?.japan_deployment_ready ? 'Cleared' : 'Pending' }}</p>
+                <p class="text-xs text-blueberry-500">
+                  {{ a.deployment?.japan_deployment_ready ? 'Cleared' : 'Pending' }}
+                </p>
               </div>
             </div>
             <div class="flex items-center gap-2 p-3 rounded-lg bg-appleCore-50">
-              <i class="text-sm" :class="a.deployment?.ssw_eligible ? 'pi pi-check-circle text-green-500' : 'pi pi-times-circle text-red-400'" />
+              <i
+                class="text-sm"
+                :class="a.deployment?.ssw_eligible ? 'pi pi-check-circle text-green-500' : 'pi pi-times-circle text-red-400'"
+              />
               <div>
                 <p class="text-xs font-semibold text-blueberry-700">SSW Eligible</p>
                 <p class="text-xs text-blueberry-500">{{ a.deployment?.ssw_eligible ? 'Yes' : 'No' }}</p>
@@ -928,14 +1077,16 @@ onMounted(async () => {
           <dl class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
             <div>
               <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Preferred Location</dt>
-              <dd class="text-sm font-medium text-blueberry-800 mt-1">{{ display(a.deployment?.preferred_work_location) }}</dd>
+              <dd class="text-sm font-medium text-blueberry-800 mt-1">
+                {{ display(a.deployment?.preferred_work_location) }}
+              </dd>
             </div>
             <div>
               <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Japan Experience</dt>
               <dd class="text-sm font-medium text-blueberry-800 mt-1">
                 <span v-if="a.deployment?.previous_japan_experience">
-                  ✅ Yes — <strong>{{ a.deployment.years_japan_experience }}</strong>
-                  yr{{ a.deployment.years_japan_experience !== 1 ? 's' : '' }}
+                  ✅ Yes — <strong>{{ a.deployment?.years_japan_experience }}</strong>
+                  yr{{ a.deployment?.years_japan_experience !== 1 ? 's' : '' }}
                 </span>
                 <span v-else class="text-blueberry-400">None</span>
               </dd>
@@ -944,7 +1095,7 @@ onMounted(async () => {
               <dt class="text-xs text-blueberry-400 uppercase tracking-wider">TITP Certificate</dt>
               <dd class="text-sm font-medium text-blueberry-800 mt-1">
                 <span v-if="a.deployment?.has_titp_certificate">
-                  ✅ {{ display(a.deployment.titp_occupation) }}
+                  ✅ {{ display(a.deployment?.titp_occupation) }}
                 </span>
                 <span v-else class="text-blueberry-400">None</span>
               </dd>
@@ -959,7 +1110,7 @@ onMounted(async () => {
               <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Expected Salary</dt>
               <dd class="text-sm font-medium text-blueberry-800 mt-1">
                 <span v-if="a.salary?.expected_salary">
-                  {{ a.salary.expected_salary_currency }} {{ a.salary.expected_salary.toLocaleString() }}
+                  {{ a.salary?.expected_salary_currency }} {{ a.salary?.expected_salary?.toLocaleString() }}
                 </span>
                 <span v-else class="text-blueberry-400">—</span>
               </dd>
@@ -968,7 +1119,7 @@ onMounted(async () => {
               <dt class="text-xs text-blueberry-400 uppercase tracking-wider">Current Salary</dt>
               <dd class="text-sm font-medium text-blueberry-800 mt-1">
                 <span v-if="a.salary?.current_salary">
-                  {{ a.salary.current_salary_currency }} {{ a.salary.current_salary.toLocaleString() }}
+                  {{ a.salary?.current_salary_currency }} {{ a.salary?.current_salary?.toLocaleString() }}
                 </span>
                 <span v-else class="text-blueberry-400">—</span>
               </dd>
@@ -983,66 +1134,86 @@ onMounted(async () => {
           <i class="pi pi-users text-apricot-500" />
           Family &amp; Emergency Contact
         </h3>
-
         <template v-if="a.family">
+          <!-- Living Arrangement & Sibling Summary -->
+          <div
+            v-if="a.family.living_arrangement || a.family.living_situation || a.family.birth_order"
+            class="mb-4 p-3.5 bg-appleCore-50/70 border border-appleCore-100 rounded-xl text-xs text-blueberry-700 flex flex-wrap items-center gap-x-4 gap-y-1.5"
+          >
+            <span v-if="a.family.living_arrangement || a.family.living_situation">
+              <strong class="font-semibold text-blueberry-800">Living Situation:</strong>
+              {{ a.family.living_arrangement || a.family.living_situation }}
+            </span>
+            <span v-if="a.family.birth_order">
+              <strong class="font-semibold text-blueberry-800">Birth Order:</strong>
+              Child #{{ a.family.birth_order }}
+              <span v-if="a.family.siblings_count"> of {{ a.family.siblings_count }} siblings</span>
+              <span v-if="a.family.siblings_description"> ({{ a.family.siblings_description }})</span>
+            </span>
+          </div>
+
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div class="border border-appleCore-100 rounded-lg p-4">
               <p class="text-xs font-bold text-blueberry-500 uppercase tracking-wider mb-2">Father</p>
-              <p class="text-sm font-semibold text-blueberry-800">{{ display(a.family.father.name) }}</p>
-              <p class="text-xs text-blueberry-500 mt-0.5">{{ display(a.family.father.occupation) }}</p>
-              <p v-if="a.family.father.contact" class="text-xs text-blueberry-500 mt-1 flex items-center gap-1">
+              <p class="text-sm font-semibold text-blueberry-800">{{ display(a.family.father?.name) }}</p>
+              <p class="text-xs text-blueberry-500 mt-0.5">{{ display(a.family.father?.occupation) }}</p>
+              <p v-if="a.family.father?.contact" class="text-xs text-blueberry-500 mt-1 flex items-center gap-1">
                 <i class="pi pi-phone text-[10px]" />
-                {{ a.family.father.contact }}
+                {{ a.family.father?.contact }}
               </p>
             </div>
-
             <div class="border border-appleCore-100 rounded-lg p-4">
               <p class="text-xs font-bold text-blueberry-500 uppercase tracking-wider mb-2">Mother</p>
-              <p class="text-sm font-semibold text-blueberry-800">{{ display(a.family.mother.name) }}</p>
-              <p class="text-xs text-blueberry-500 mt-0.5">{{ display(a.family.mother.occupation) }}</p>
-              <p v-if="a.family.mother.contact" class="text-xs text-blueberry-500 mt-1 flex items-center gap-1">
+              <p class="text-sm font-semibold text-blueberry-800">{{ display(a.family.mother?.name) }}</p>
+              <p class="text-xs text-blueberry-500 mt-0.5">{{ display(a.family.mother?.occupation) }}</p>
+              <p v-if="a.family.mother?.contact" class="text-xs text-blueberry-500 mt-1 flex items-center gap-1">
                 <i class="pi pi-phone text-[10px]" />
-                {{ a.family.mother.contact }}
+                {{ a.family.mother?.contact }}
               </p>
             </div>
-
             <div
-              v-if="a.civil_status === 'married' || a.family.spouse.name"
+              v-if="a.civil_status === 'married' || a.family.spouse?.name"
               class="border border-appleCore-100 rounded-lg p-4"
             >
               <p class="text-xs font-bold text-blueberry-500 uppercase tracking-wider mb-2">Spouse</p>
-              <p class="text-sm font-semibold text-blueberry-800">{{ display(a.family.spouse.name) }}</p>
-              <p class="text-xs text-blueberry-500 mt-0.5">{{ display(a.family.spouse.occupation) }}</p>
-              <p v-if="a.family.spouse.contact" class="text-xs text-blueberry-500 mt-1 flex items-center gap-1">
+              <p class="text-sm font-semibold text-blueberry-800">{{ display(a.family.spouse?.name) }}</p>
+              <p class="text-xs text-blueberry-500 mt-0.5">{{ display(a.family.spouse?.occupation) }}</p>
+              <p v-if="a.family.spouse?.contact" class="text-xs text-blueberry-500 mt-1 flex items-center gap-1">
                 <i class="pi pi-phone text-[10px]" />
-                {{ a.family.spouse.contact }}
+                {{ a.family.spouse?.contact }}
               </p>
             </div>
           </div>
-
-          <div v-if="a.family.emergency_contact.name" class="mt-2 pt-4 border-t border-appleCore-100">
+          <div v-if="a.family.emergency_contact?.name" class="mt-2 pt-4 border-t border-appleCore-100">
             <p class="text-xs font-bold text-blueberry-500 uppercase tracking-wider mb-3">Emergency Contact</p>
             <div class="flex flex-wrap gap-4 p-4 bg-red-50 border border-red-100 rounded-lg">
               <div>
                 <p class="text-xs text-blueberry-400">Name</p>
-                <p class="text-sm font-semibold text-blueberry-800 mt-0.5">{{ display(a.family.emergency_contact.name) }}</p>
+                <p class="text-sm font-semibold text-blueberry-800 mt-0.5">
+                  {{ display(a.family.emergency_contact?.name) }}
+                </p>
               </div>
               <div>
                 <p class="text-xs text-blueberry-400">Relationship</p>
-                <p class="text-sm font-semibold text-blueberry-800 mt-0.5">{{ display(a.family.emergency_contact.relationship) }}</p>
+                <p class="text-sm font-semibold text-blueberry-800 mt-0.5">
+                  {{ display(a.family.emergency_contact?.relationship) }}
+                </p>
               </div>
               <div>
                 <p class="text-xs text-blueberry-400">Phone</p>
-                <p class="text-sm font-semibold text-blueberry-800 mt-0.5">{{ display(a.family.emergency_contact.phone) }}</p>
+                <p class="text-sm font-semibold text-blueberry-800 mt-0.5">
+                  {{ display(a.family.emergency_contact?.phone) }}
+                </p>
               </div>
-              <div v-if="a.family.emergency_contact.address">
+              <div v-if="a.family.emergency_contact?.address">
                 <p class="text-xs text-blueberry-400">Address</p>
-                <p class="text-sm font-semibold text-blueberry-800 mt-0.5">{{ a.family.emergency_contact.address }}</p>
+                <p class="text-sm font-semibold text-blueberry-800 mt-0.5">
+                  {{ a.family.emergency_contact?.address }}
+                </p>
               </div>
             </div>
           </div>
         </template>
-
         <p v-else class="text-blueberry-400 italic text-sm">No family information recorded</p>
       </section>
 
@@ -1056,45 +1227,93 @@ onMounted(async () => {
           <div class="mb-4">
             <p class="text-xs text-blueberry-400 uppercase tracking-wider mb-2">Current Habits</p>
             <div class="flex flex-wrap gap-2">
-              <span v-if="a.lifestyle.is_smoking" class="inline-flex items-center gap-1 px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-xs font-medium ring-1 ring-orange-200">
+              <span
+                v-if="a.lifestyle.is_smoking"
+                class="inline-flex items-center gap-1 px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-xs font-medium ring-1 ring-orange-200"
+              >
                 🚬 Smoking
-                <span v-if="a.lifestyle.smoking_frequency" class="text-orange-500">· {{ a.lifestyle.smoking_frequency }}</span>
+                <span v-if="a.lifestyle.smoking_frequency" class="text-orange-500">
+                  · {{ a.lifestyle.smoking_frequency }}
+                </span>
               </span>
-              <span v-if="a.lifestyle.is_drinking_alcohol" class="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium ring-1 ring-blue-200">
+              <span
+                v-if="a.lifestyle.is_drinking_alcohol"
+                class="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium ring-1 ring-blue-200"
+              >
                 🍺 Drinking
-                <span v-if="a.lifestyle.drinking_frequency" class="text-blue-500">· {{ a.lifestyle.drinking_frequency }}</span>
+                <span v-if="a.lifestyle.drinking_frequency" class="text-blue-500">
+                  · {{ a.lifestyle.drinking_frequency }}
+                </span>
               </span>
-              <span v-if="a.lifestyle.is_using_drugs" class="inline-flex items-center gap-1 px-3 py-1 bg-red-50 text-red-700 rounded-full text-xs font-medium ring-1 ring-red-200">
+              <span
+                v-if="a.lifestyle.is_using_drugs"
+                class="inline-flex items-center gap-1 px-3 py-1 bg-red-50 text-red-700 rounded-full text-xs font-medium ring-1 ring-red-200"
+              >
                 💊 Drug Use
               </span>
-              <span v-if="!a.lifestyle.is_smoking && !a.lifestyle.is_drinking_alcohol && !a.lifestyle.is_using_drugs" class="text-blueberry-400 italic text-sm">
+              <span
+                v-if="!a.lifestyle.is_smoking && !a.lifestyle.is_drinking_alcohol && !a.lifestyle.is_using_drugs"
+                class="text-blueberry-400 italic text-sm"
+              >
                 No current habits reported
               </span>
             </div>
           </div>
+
           <div class="mb-4">
             <p class="text-xs text-blueberry-400 uppercase tracking-wider mb-2">Past Habits</p>
             <div class="flex flex-wrap gap-2">
-              <span v-if="a.lifestyle.was_smoking" class="px-3 py-1 bg-appleCore-50 text-blueberry-700 rounded-full text-xs font-medium">Was smoking</span>
-              <span v-if="a.lifestyle.was_drinking_alcohol" class="px-3 py-1 bg-appleCore-50 text-blueberry-700 rounded-full text-xs font-medium">Was drinking</span>
-              <span v-if="a.lifestyle.was_using_drugs" class="px-3 py-1 bg-appleCore-50 text-blueberry-700 rounded-full text-xs font-medium">Was using drugs</span>
-              <span v-if="!a.lifestyle.was_smoking && !a.lifestyle.was_drinking_alcohol && !a.lifestyle.was_using_drugs" class="text-blueberry-400 italic text-sm">None</span>
+              <span
+                v-if="a.lifestyle.was_smoking"
+                class="px-3 py-1 bg-appleCore-50 text-blueberry-700 rounded-full text-xs font-medium"
+              >
+                Was smoking
+              </span>
+              <span
+                v-if="a.lifestyle.was_drinking_alcohol"
+                class="px-3 py-1 bg-appleCore-50 text-blueberry-700 rounded-full text-xs font-medium"
+              >
+                Was drinking
+              </span>
+              <span
+                v-if="a.lifestyle.was_using_drugs"
+                class="px-3 py-1 bg-appleCore-50 text-blueberry-700 rounded-full text-xs font-medium"
+              >
+                Was using drugs
+              </span>
+              <span
+                v-if="!a.lifestyle.was_smoking && !a.lifestyle.was_drinking_alcohol && !a.lifestyle.was_using_drugs"
+                class="text-blueberry-400 italic text-sm"
+              >
+                None
+              </span>
             </div>
           </div>
+
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="bg-appleCore-50/50 rounded-lg p-3">
               <div class="flex items-center gap-2 mb-1">
-                <i :class="a.lifestyle.has_medical_condition ? 'pi pi-exclamation-triangle text-red-500' : 'pi pi-check-circle text-green-500'" class="text-sm" />
+                <i
+                  :class="a.lifestyle.has_medical_condition ? 'pi pi-exclamation-triangle text-red-500' : 'pi pi-check-circle text-green-500'"
+                  class="text-sm"
+                />
                 <span class="text-xs font-semibold text-blueberry-700 uppercase tracking-wider">Medical Condition</span>
               </div>
-              <p class="text-sm text-blueberry-800">{{ a.lifestyle.has_medical_condition ? (a.lifestyle.medical_notes || 'Yes (no notes)') : 'None' }}</p>
+              <p class="text-sm text-blueberry-800">
+                {{ a.lifestyle.has_medical_condition ? (a.lifestyle.medical_notes || 'Yes (no notes)') : 'None' }}
+              </p>
             </div>
             <div class="bg-appleCore-50/50 rounded-lg p-3">
               <div class="flex items-center gap-2 mb-1">
-                <i :class="a.lifestyle.has_allergies ? 'pi pi-exclamation-triangle text-yellow-500' : 'pi pi-check-circle text-green-500'" class="text-sm" />
+                <i
+                  :class="a.lifestyle.has_allergies ? 'pi pi-exclamation-triangle text-yellow-500' : 'pi pi-check-circle text-green-500'"
+                  class="text-sm"
+                />
                 <span class="text-xs font-semibold text-blueberry-700 uppercase tracking-wider">Allergies</span>
               </div>
-              <p class="text-sm text-blueberry-800">{{ a.lifestyle.has_allergies ? (a.lifestyle.allergies_notes || 'Yes (no notes)') : 'None' }}</p>
+              <p class="text-sm text-blueberry-800">
+                {{ a.lifestyle.has_allergies ? (a.lifestyle.allergies_notes || 'Yes (no notes)') : 'None' }}
+              </p>
             </div>
           </div>
         </template>
@@ -1109,14 +1328,20 @@ onMounted(async () => {
           <span class="text-xs text-blueberry-400 font-sans font-normal ml-1">({{ a.educations?.length ?? 0 }})</span>
         </h3>
         <div v-if="a.educations && a.educations.length > 0" class="space-y-3">
-          <div v-for="edu in a.educations" :key="edu.id" class="border border-appleCore-100 rounded-lg p-4 hover:bg-appleCore-50/30 transition-colors">
+          <div
+            v-for="edu in a.educations"
+            :key="edu.id"
+            class="border border-appleCore-100 rounded-lg p-4 hover:bg-appleCore-50/30 transition-colors"
+          >
             <p class="font-semibold text-blueberry-800">{{ edu.school_name }}</p>
             <p class="text-sm text-blueberry-600 mt-0.5">
               {{ capitalize(edu.education_level) }}
               <span v-if="edu.course"> · {{ edu.course }}</span>
             </p>
             <div class="flex flex-wrap items-center gap-2 mt-2 text-xs text-blueberry-500">
-              <span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 ring-1 ring-blue-200">{{ capitalize(edu.education_status) }}</span>
+              <span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 ring-1 ring-blue-200">
+                {{ capitalize(edu.education_status) }}
+              </span>
               <span v-if="edu.year_started || edu.year_ended">
                 <i class="pi pi-calendar text-[10px] mr-1" />
                 {{ edu.year_started ?? '?' }} — {{ edu.year_ended ?? 'Present' }}
@@ -1136,10 +1361,19 @@ onMounted(async () => {
           <span class="text-xs text-blueberry-400 font-sans font-normal ml-1">({{ a.employments?.length ?? 0 }})</span>
         </h3>
         <div v-if="a.employments && a.employments.length > 0" class="space-y-3">
-          <div v-for="emp in a.employments" :key="emp.id" class="border border-appleCore-100 rounded-lg p-4 hover:bg-appleCore-50/30 transition-colors">
+          <div
+            v-for="emp in a.employments"
+            :key="emp.id"
+            class="border border-appleCore-100 rounded-lg p-4 hover:bg-appleCore-50/30 transition-colors"
+          >
             <div class="flex items-center gap-2">
               <p class="font-semibold text-blueberry-800">{{ emp.position }}</p>
-              <span v-if="emp.is_current" class="px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-xs font-medium ring-1 ring-green-200">Current</span>
+              <span
+                v-if="emp.is_current"
+                class="px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-xs font-medium ring-1 ring-green-200"
+              >
+                Current
+              </span>
             </div>
             <p class="text-sm text-blueberry-600 mt-0.5">
               {{ emp.company_name }}
@@ -1159,8 +1393,12 @@ onMounted(async () => {
                 {{ emp.salary_currency }} {{ emp.salary.toLocaleString() }}
               </span>
             </div>
-            <p v-if="emp.job_description" class="text-sm text-blueberry-600 mt-2 leading-relaxed">{{ emp.job_description }}</p>
-            <p v-if="emp.reason_for_leaving" class="text-xs text-blueberry-500 mt-2 italic">Reason for leaving: {{ emp.reason_for_leaving }}</p>
+            <p v-if="emp.job_description" class="text-sm text-blueberry-600 mt-2 leading-relaxed">
+              {{ emp.job_description }}
+            </p>
+            <p v-if="emp.reason_for_leaving" class="text-xs text-blueberry-500 mt-2 italic">
+              Reason for leaving: {{ emp.reason_for_leaving }}
+            </p>
           </div>
         </div>
         <p v-else class="text-blueberry-400 italic text-sm">No employment history</p>
@@ -1174,7 +1412,11 @@ onMounted(async () => {
           <span class="text-xs text-blueberry-400 font-sans font-normal ml-1">({{ a.tattoos?.length ?? 0 }})</span>
         </h3>
         <div v-if="a.tattoos && a.tattoos.length > 0" class="space-y-3">
-          <div v-for="tattoo in a.tattoos" :key="tattoo.id" class="border border-appleCore-100 rounded-lg p-4 hover:bg-appleCore-50/30 transition-colors">
+          <div
+            v-for="tattoo in a.tattoos"
+            :key="tattoo.id"
+            class="border border-appleCore-100 rounded-lg p-4 hover:bg-appleCore-50/30 transition-colors"
+          >
             <p class="font-semibold text-blueberry-800">{{ tattoo.location }}</p>
             <div class="flex flex-wrap items-center gap-2 mt-1 text-xs text-blueberry-500">
               <span v-if="tattoo.size" class="capitalize">
@@ -1227,12 +1469,24 @@ onMounted(async () => {
             </p>
 
             <div class="flex flex-wrap gap-3 mt-2 text-xs text-blueberry-500">
-              <span v-if="ab.assigned_at"><i class="pi pi-calendar text-[10px] mr-1" />Assigned: {{ formatDateTime(ab.assigned_at) }}</span>
-              <span v-if="ab.interview_date"><i class="pi pi-comments text-[10px] mr-1" />Interview: {{ formatDate(ab.interview_date) }}</span>
-              <span v-if="ab.medical_date"><i class="pi pi-heart text-[10px] mr-1" />Medical: {{ formatDate(ab.medical_date) }}</span>
-              <span v-if="ab.exam_date"><i class="pi pi-book text-[10px] mr-1" />Exam: {{ formatDate(ab.exam_date) }}</span>
-              <span v-if="ab.accepted_at"><i class="pi pi-check-circle text-[10px] mr-1" />Accepted: {{ formatDateTime(ab.accepted_at) }}</span>
-              <span v-if="ab.deployed_at"><i class="pi pi-send text-[10px] mr-1" />Deployed: {{ formatDateTime(ab.deployed_at) }}</span>
+              <span v-if="ab.assigned_at">
+                <i class="pi pi-calendar text-[10px] mr-1" />Assigned: {{ formatDateTime(ab.assigned_at) }}
+              </span>
+              <span v-if="ab.interview_date">
+                <i class="pi pi-comments text-[10px] mr-1" />Interview: {{ formatDate(ab.interview_date) }}
+              </span>
+              <span v-if="ab.medical_date">
+                <i class="pi pi-heart text-[10px] mr-1" />Medical: {{ formatDate(ab.medical_date) }}
+              </span>
+              <span v-if="ab.exam_date">
+                <i class="pi pi-book text-[10px] mr-1" />Exam: {{ formatDate(ab.exam_date) }}
+              </span>
+              <span v-if="ab.accepted_at">
+                <i class="pi pi-check-circle text-[10px] mr-1" />Accepted: {{ formatDateTime(ab.accepted_at) }}
+              </span>
+              <span v-if="ab.deployed_at">
+                <i class="pi pi-send text-[10px] mr-1" />Deployed: {{ formatDateTime(ab.deployed_at) }}
+              </span>
             </div>
 
             <div v-if="ab.exam_score" class="mt-2 text-sm">
@@ -1240,11 +1494,21 @@ onMounted(async () => {
               <span class="font-semibold text-blueberry-800 ml-1">{{ ab.exam_score }}%</span>
             </div>
 
-            <p v-if="ab.interview_notes" class="text-sm text-blueberry-600 mt-2 italic"><strong>Interview notes:</strong> {{ ab.interview_notes }}</p>
-            <p v-if="ab.medical_notes" class="text-sm text-blueberry-600 mt-1 italic"><strong>Medical notes:</strong> {{ ab.medical_notes }}</p>
-            <p v-if="ab.remarks" class="text-sm text-blueberry-600 mt-1 italic"><strong>Remarks:</strong> {{ ab.remarks }}</p>
-            <p v-if="ab.rejection_reason" class="text-sm text-red-600 mt-2"><strong>Rejection reason:</strong> {{ ab.rejection_reason }}</p>
-            <p v-if="ab.processed_by" class="text-xs text-blueberry-400 mt-2">Processed by: {{ ab.processed_by?.full_name }}</p>
+            <p v-if="ab.interview_notes" class="text-sm text-blueberry-600 mt-2 italic">
+              <strong>Interview notes:</strong> {{ ab.interview_notes }}
+            </p>
+            <p v-if="ab.medical_notes" class="text-sm text-blueberry-600 mt-1 italic">
+              <strong>Medical notes:</strong> {{ ab.medical_notes }}
+            </p>
+            <p v-if="ab.remarks" class="text-sm text-blueberry-600 mt-1 italic">
+              <strong>Remarks:</strong> {{ ab.remarks }}
+            </p>
+            <p v-if="ab.rejection_reason" class="text-sm text-red-600 mt-2">
+              <strong>Rejection reason:</strong> {{ ab.rejection_reason }}
+            </p>
+            <p v-if="ab.processed_by" class="text-xs text-blueberry-400 mt-2">
+              Processed by: {{ ab.processed_by?.full_name }}
+            </p>
           </div>
         </div>
       </section>
@@ -1262,7 +1526,7 @@ onMounted(async () => {
         </p>
       </section>
 
-      <!-- ─── INTERNSHIP HISTORY (kept – not in modal) ─── -->
+      <!-- ─── INTERNSHIP HISTORY ─── -->
       <InternshipHistorySection :applicant-id="a.id" />
 
       <!-- ─── DEPLOYMENT HISTORY ─── -->

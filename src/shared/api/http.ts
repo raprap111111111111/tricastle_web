@@ -3,7 +3,7 @@ import axios from 'axios'
 import type { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 
 const http: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8086/api/v1',
+  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8089/api/v1',
   headers: {
     // ✅ FIX 1: Do NOT set Content-Type here.
     //          Let axios choose it per request:

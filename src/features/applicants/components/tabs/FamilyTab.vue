@@ -21,10 +21,18 @@ const emit = defineEmits<{
 }>()
 
 // ─── Form ─────────────────────────────────────────────────────────────────────
+const initialLiving =
+  props.initialValues?.living_arrangement ??
+  props.initialValues?.living_situation ??
+  null
+
 const { handleSubmit, values, setFieldValue } = useForm<FamilyFormValues>({
   validationSchema: toTypedSchema(familySchema),
-  initialValues: props.initialValues ?? {
+  initialValues: {
     spouse_salary_unit: 'per_month',
+    living_arrangement: initialLiving,
+    living_situation: initialLiving,
+    ...props.initialValues,
   },
 })
 
@@ -137,13 +145,13 @@ const onNext = handleSubmit((data) => {
       </p>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-xl bg-apricot-50 border border-apricot-200">
-        <!-- Living Situation -->
+        <!-- Living Situation (keeps living_situation and living_arrangement in sync) -->
         <div class="md:col-span-3">
           <label class="block text-xs font-semibold text-blueberry-700 mb-1.5 uppercase tracking-wide">
-            Living Situation
+            Living Situation / Arrangement
           </label>
           <Select
-            :model-value="values.living_situation ?? ''"
+            :model-value="values.living_situation ?? values.living_arrangement ?? ''"
             :options="livingSituationOptions"
             option-label="label"
             option-value="value"
@@ -152,12 +160,16 @@ const onNext = handleSubmit((data) => {
             filter
             show-clear
             class="w-full"
-            @update:model-value="(v) => setFieldValue('living_situation', v || null)"
+            @update:model-value="(v) => {
+              const val = v || null
+              setFieldValue('living_situation', val)
+              setFieldValue('living_arrangement', val)
+            }"
           />
           <p class="text-[10px] text-blueberry-400 mt-1">
             Printed on AIS as:
             <em class="text-blueberry-600">
-              {{ values.living_situation || 'living in his/her parents house together with his/her siblings' }}
+              {{ values.living_arrangement || values.living_situation || 'living in his/her parents house together with his/her siblings' }}
             </em>
           </p>
         </div>

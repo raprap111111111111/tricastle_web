@@ -2,7 +2,7 @@ import axios from 'axios'
 
 export const TOKEN_KEY = 'portal_token'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost/api/v1'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8089/api/v1'
 
 const portalApi = axios.create({
   baseURL: `${API_BASE_URL}/portal`,

@@ -19,21 +19,21 @@ export const personalSchema = z.object({
   phone: z.string().max(20).nullable().optional().or(z.literal('')),
   mobile: z.string().max(20).nullable().optional().or(z.literal('')),
   date_of_birth: dateString,
-  birthplace: z.string().max(150).nullable().optional(),           // AIS
+  birthplace: z.string().max(150).nullable().optional(),
   gender: z.enum(['male', 'female']).nullable().optional(),
   civil_status: z
-    .enum(['single', 'married', 'widowed', 'separated', 'divorced', 'live_in_partner']) // 👈 Added 'live_in_partner'
+    .enum(['single', 'married', 'widowed', 'separated', 'divorced', 'live_in_partner'])
     .nullable()
     .optional(),
-  religion: z.string().max(100).nullable().optional(),             // AIS
+  religion: z.string().max(100).nullable().optional(),
   number_of_children: z.coerce.number().int().min(0).default(0),
   nationality: z.string().max(100).nullable().optional(),
-  english_proficiency_pct: z.coerce.number().int().min(0).max(100).default(0), // AIS
+  english_proficiency_pct: z.coerce.number().int().min(0).max(100).nullable().optional(),
 
-  // AIS Trade header (shown on print sheet)
-  applied_position: z.string().max(100).nullable().optional(),     // AIS e.g. Steelman
-  trade_test_try:   z.string().max(20).nullable().optional(),      // AIS e.g. 1st
-  trade_test_date:  dateString,                                    // AIS
+  // AIS Trade header
+  applied_position: z.string().max(100).nullable().optional(),
+  trade_test_try:   z.string().max(20).nullable().optional(),
+  trade_test_date:  dateString,
 })
 
 // ─── Step 2: Physical & Address ───────────────────────────────────────────────
@@ -55,7 +55,7 @@ export const physicalAddressSchema = z.object({
 export const documentsSchema = z.object({
   passport_number:            z.string().max(50).nullable().optional(),
   passport_expiry:            dateString,
-  passport_issuing_office_id: z.coerce.number().int().positive().nullable().optional(), // 👈 Added Validation Constraint
+  passport_issuing_office_id: z.coerce.number().int().positive().nullable().optional(),
   sss_number:                 z.string().max(50).nullable().optional(),
   tin_number:                 z.string().max(50).nullable().optional(),
   philhealth_number:          z.string().max(50).nullable().optional(),
@@ -69,6 +69,7 @@ export const documentsSchema = z.object({
 // ─── Japan contact entry (AIS) ────────────────────────────────────────────────
 
 export const japanContactEntrySchema = z.object({
+  id:               z.number().optional(),
   affiliation_type: z.enum(['marucon', 'non_marucon']),
   name:             z.string().max(150).default(''),
   batch_no:         z.string().max(50).nullable().optional(),
@@ -93,6 +94,7 @@ export const deploymentSchema = z.object({
     .optional(),
 
   willing_to_be_deployed:  z.boolean().default(false),
+  japan_deployment_ready:  z.boolean().default(false),
   preferred_work_location: z.string().max(100).nullable().optional(),
 
   previous_japan_experience: z.boolean().default(false),
@@ -100,41 +102,43 @@ export const deploymentSchema = z.object({
 
   has_titp_certificate: z.boolean().default(false),
   titp_occupation:      z.string().max(100).nullable().optional(),
+  ssw_eligible:         z.boolean().default(false),
 
   expected_salary:          z.coerce.number().min(0).nullable().optional(),
   expected_salary_currency: z.string().length(3).default('JPY'),
   current_salary:           z.coerce.number().min(0).nullable().optional(),
   current_salary_currency:  z.string().length(3).default('PHP'),
 
-  // Japan Contacts (AIS)
+  // Japan Contacts
   japan_contacts: z.array(japanContactEntrySchema).default([]),
 })
 
 // ─── Step 5: Family Background ────────────────────────────────────────────────
 
 export const familySchema = z.object({
-  // ─── AIS Family Background Sentences ────────────────────────────────
-  living_situation:     z.string().max(500).nullable().optional(),                    // AIS
-  birth_order:          z.coerce.number().int().min(1).max(20).nullable().optional(), // AIS
-  siblings_count:       z.coerce.number().int().min(0).max(30).nullable().optional(), // AIS
-  siblings_description: z.string().max(100).nullable().optional(),                    // AIS
+  // AIS Living Arrangement & Siblings
+  living_arrangement:   z.string().max(500).nullable().optional(),
+  living_situation:     z.string().max(500).nullable().optional(),
+  birth_order:          z.coerce.number().int().min(1).max(20).nullable().optional(),
+  siblings_count:       z.coerce.number().int().min(0).max(30).nullable().optional(),
+  siblings_description: z.string().max(100).nullable().optional(),
 
-  // Family — Father
+  // Father
   father_name:       z.string().max(150).nullable().optional(),
   father_occupation: z.string().max(100).nullable().optional(),
   father_contact:    z.string().max(30).nullable().optional(),
 
-  // Family — Mother
+  // Mother
   mother_name:       z.string().max(150).nullable().optional(),
   mother_occupation: z.string().max(100).nullable().optional(),
   mother_contact:    z.string().max(30).nullable().optional(),
 
-  // Family — Spouse (+ AIS salary)
+  // Spouse
   spouse_name:        z.string().max(150).nullable().optional(),
   spouse_occupation:  z.string().max(100).nullable().optional(),
   spouse_contact:     z.string().max(30).nullable().optional(),
-  spouse_salary:      z.coerce.number().min(0).nullable().optional(),                    // AIS
-  spouse_salary_unit: z.enum(['per_day', 'per_month', 'per_year']).nullable().optional(),// AIS
+  spouse_salary:      z.coerce.number().min(0).nullable().optional(),
+  spouse_salary_unit: z.enum(['per_day', 'per_month', 'per_year']).nullable().optional(),
 
   // Emergency Contact
   emergency_contact_name:         z.string().max(150).nullable().optional(),
@@ -146,15 +150,15 @@ export const familySchema = z.object({
 // ─── Step 6: Lifestyle ────────────────────────────────────────────────────────
 
 export const lifestyleSchema = z.object({
-  is_smoking:           z.boolean().default(false),
-  is_drinking_alcohol:  z.boolean().default(false),
-  is_using_drugs:       z.boolean().default(false),
-  was_smoking:          z.boolean().default(false),
-  was_drinking_alcohol: z.boolean().default(false),
-  was_using_drugs:      z.boolean().default(false),
-  smoking_frequency:    z.string().max(100).nullable().optional(),
-  drinking_frequency:   z.string().max(100).nullable().optional(),
-  drugs_notes:          z.string().max(500).nullable().optional(),
+  is_smoking:            z.boolean().default(false),
+  is_drinking_alcohol:   z.boolean().default(false),
+  is_using_drugs:        z.boolean().default(false),
+  was_smoking:           z.boolean().default(false),
+  was_drinking_alcohol:  z.boolean().default(false),
+  was_using_drugs:       z.boolean().default(false),
+  smoking_frequency:     z.string().max(100).nullable().optional(),
+  drinking_frequency:    z.string().max(100).nullable().optional(),
+  drugs_notes:           z.string().max(500).nullable().optional(),
   has_medical_condition: z.boolean().default(false),
   medical_notes:         z.string().max(500).nullable().optional(),
   has_allergies:         z.boolean().default(false),
@@ -181,7 +185,7 @@ export const educationEntrySchema = z.object({
   year_started: z.coerce.number().int().min(1950).max(2100).nullable().optional(),
   year_ended:   z.coerce.number().int().min(1950).max(2100).nullable().optional(),
   honors:       z.string().max(200).nullable().optional(),
-  remarks:      z.string().max(500).nullable().optional(), // AIS
+  remarks:      z.string().max(500).nullable().optional(),
 })
 
 export const educationSchema = z.object({
@@ -191,24 +195,20 @@ export const educationSchema = z.object({
 // ─── Step 8: Employment ───────────────────────────────────────────────────────
 
 export const employmentEntrySchema = z.object({
-  id:              z.number().optional(),
-  company_name:    z.string().min(1, 'Company name is required').max(200),
-  position:        z.string().min(1, 'Position is required').max(200),
-  industry:        z.string().max(100).nullable().optional(),
-  job_description: z.string().max(1000).nullable().optional(),
-  date_started:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Required'),
-  date_ended: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD')
-    .nullable()
-    .optional(),
+  id:                 z.number().optional(),
+  company_name:       z.string().min(1, 'Company name is required').max(200),
+  position:           z.string().min(1, 'Position is required').max(200),
+  industry:           z.string().max(100).nullable().optional(),
+  job_description:    z.string().max(1000).nullable().optional(),
+  date_started:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Required YYYY-MM-DD'),
+  date_ended:         dateString,
   is_current:         z.boolean().default(false),
   country:            z.string().max(100).default('Philippines'),
   city:               z.string().max(100).nullable().optional(),
-  is_overseas:        z.boolean().default(false),                          // AIS
+  is_overseas:        z.boolean().default(false),
   salary:             z.coerce.number().min(0).nullable().optional(),
   salary_currency:    z.string().max(3).default('PHP'),
-  salary_unit:        z.enum(['per_day', 'per_month', 'per_year']).nullable().optional(), // AIS
+  salary_unit:        z.enum(['per_day', 'per_month', 'per_year']).nullable().optional(),
   reason_for_leaving: z.string().max(500).nullable().optional(),
 })
 
@@ -231,7 +231,7 @@ export const tattooSchema = z.object({
   tattoos: z.array(tattooEntrySchema).default([]),
 })
 
-// ─── Legacy: Batch Assignment ─────────────────────────────────────────────────
+// ─── Step 10: Batch Assignment ────────────────────────────────────────────────
 
 export const batchAssignmentSchema = z.object({
   batch_id: z.number().int().positive().nullable().optional(),
@@ -264,6 +264,7 @@ export const fullApplicantSchema = personalSchema
   .merge(documentsSchema)
   .merge(deploymentSchema)
   .merge(familySchema)
+  .merge(lifestyleSchema)
 
 // ─── Inferred Types ───────────────────────────────────────────────────────────
 
